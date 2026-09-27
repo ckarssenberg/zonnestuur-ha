@@ -1,5 +1,5 @@
 name: Zonnestuur
-version: "0.5.0"
+version: "0.5.1"
 slug: zonnestuur
 description: Laat boiler, warmtepomp en auto draaien op je eigen zonnestroom
 url: https://github.com/ckarssenberg/zonnestuur-ha
@@ -12,10 +12,11 @@ startup: application
 boot: auto
 host_network: true          # nodig om P1-meters en slimme stekkers in je netwerk te vinden
 ingress: true
-ingress_port: 8099
+ingress_port: 0            # Home Assistant kiest zelf een vrije poort (8099 is vaak al bezet)
 panel_icon: mdi:solar-power-variant
 panel_title: Zonnestuur
 homeassistant_api: true     # geeft een token om apparaten via Home Assistant te sturen
+hassio_api: true            # om de toegewezen ingress-poort op te vragen
 options:
   log_level: info
 schema:

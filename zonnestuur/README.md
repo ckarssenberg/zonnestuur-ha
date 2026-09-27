@@ -13,7 +13,7 @@ in plaats van die stroom voor bijna niets terug te leveren.
 
 ## Veiligheid
 
-- De app is alleen te openen via Home Assistant. Wil je hem ook los op je netwerk openen (poort 8099),
+- De app is alleen te openen via Home Assistant. Wil je hem ook los op je netwerk openen (de poort staat bovenaan in het logboek),
   stel dan in Zonnestuur onder **Instellingen > Beveiliging** een wachtwoord in.
 - Zonnestuur zet alleen aan, uit, hoger of lager wat jij kiest. Handmatig aan of uit gaat altijd voor.
 

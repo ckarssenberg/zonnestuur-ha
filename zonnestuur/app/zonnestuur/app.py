@@ -530,7 +530,11 @@ def make_handler(engine: Engine):
 
 def run(cfg: Config, config_path: Optional[str] = None) -> None:
     engine = Engine(cfg, config_path=config_path)
-    server = ThreadingHTTPServer((cfg.web_host, cfg.web_port), make_handler(engine))
+    try:
+        server = ThreadingHTTPServer((cfg.web_host, cfg.web_port), make_handler(engine))
+    except OSError as exc:
+        log.error("Poort %d is al in gebruik door een ander programma (%s). Kies een andere web_port.", cfg.web_port, exc)
+        raise SystemExit(1)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     log.info("Dashboard op http://%s:%d", cfg.web_host, cfg.web_port)
 
