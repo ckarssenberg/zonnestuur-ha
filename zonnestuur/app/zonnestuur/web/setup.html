@@ -441,7 +441,7 @@ function deviceFromPick(p) {
       power_w: 2000, tested: null, model: `${p.f.name} op ${p.f.host}` };
   }
   const c = p.c, params = {};
-  for (const k of ["entity", "current_entity", "switch_entity", "power_entity", "normal_temp", "boost_temp", "min_a", "max_a", "button_entity", "remote_entity", "min_interval_s"]) if (c[k] !== undefined && c[k] !== "") params[k] = c[k];
+  for (const k of ["entity", "current_entity", "switch_entity", "power_entity", "normal_temp", "boost_temp", "min_a", "max_a", "button_entity", "remote_entity", "min_interval_s", "plug_entity"]) if (c[k] !== undefined && c[k] !== "") params[k] = c[k];
   if (c.driver === "ha_current") params.phases = 3;
   const power = c.power_w || (c.driver === "ha_current" ? 11000 : c.kind === "heatpump" ? 1500 : 2000);
   return { key: p.key, host: "", driver: c.driver, switch_id: 0, params, kind: c.kind, name: c.name, power_w: power, tested: null,
@@ -502,7 +502,7 @@ function apparaten() {
     save(); $("testBox").innerHTML = '<span class="spin"></span><span>Aan het testen… luister of je het apparaat hoort aanslaan.</span>';
     try {
       const r = await api("api/setup/test-switch", { method: "POST", body: JSON.stringify({ host: d.host, driver: d.driver, switch_id: d.switch_id, params: d.params }) });
-      d.tested = r.max_power_w; d.ready = r.ready;
+      d.tested = r.max_power_w; d.ready = r.ready; d.no_car = !!r.no_car;
       if (r.max_power_w > 50 && drv !== "ha_current") d.power_w = Math.round(r.max_power_w / 50) * 50;
     } catch (e) { d.tested = -1; setErr(e.message); }
     apparaten();
@@ -511,6 +511,7 @@ function apparaten() {
   $("next").onclick = () => { save(); if (devIdx < W.devices.length - 1) { devIdx++; apparaten(); } else if (W.addOnly) saveAll(); else go(4); };
 }
 function testHtml(d) {
+  if (d.no_car) return `<span style="flex:1"><b style="color:var(--good)">Laadpaal bereikbaar.</b> Er is nu geen auto aangesloten, dus we konden niet laten laden. Dat is prima: Zonnestuur start zodra de stekker erin zit.</span><button class="btn ghost small" id="testBtn">Opnieuw</button>`;
   if (d.driver === "ha_start_button" && d.tested != null && d.tested >= 0) return `<span style="flex:1"><b style="color:var(--good)">Bereikbaar.</b> ${d.ready ? "Hij staat nu klaar om te starten." : "Hij staat nu niet op start op afstand; dat is prima."}</span><button class="btn ghost small" id="testBtn">Opnieuw</button>`;
   if (d.tested == null) return `<span class="small muted" style="flex:1">Nog niet getest</span><button class="btn small" id="testBtn">Test nu</button>`;
   if (d.tested < 0) return `<span style="flex:1">Het apparaat reageerde niet.</span><button class="btn small" id="testBtn">Opnieuw</button>`;

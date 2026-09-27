@@ -264,6 +264,11 @@ class Engine:
                 return {"max_power_w": 0, "metering": False, "restored": True, "no_test": True, "ready": True}
             except NotReady as exc:
                 return {"max_power_w": 0, "metering": False, "restored": True, "no_test": True, "ready": False, "note": str(exc)}
+        if d.driver == "ha_current":
+            try:
+                sw.status()
+            except NotReady as exc:
+                return {"max_power_w": 0, "metering": False, "restored": True, "no_car": True, "note": str(exc)}
         with self.lock:                          # regelaar even pauzeren tijdens de test
             before = sw.status()
             sw.set(True)

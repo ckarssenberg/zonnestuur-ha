@@ -282,9 +282,10 @@ class HACurrentControl:
     modulating = True
 
     def __init__(self, ha: HomeAssistant, current_entity: str, switch_entity: str = "", power_entity: str = "",
-                 phases: int = 1, volts: float = 230.0, min_a: float = 6.0, max_a: float = 16.0):
+                 phases: int = 1, volts: float = 230.0, min_a: float = 6.0, max_a: float = 16.0, plug_entity: str = ""):
         self.ha, self.cur, self.sw, self.power_entity = ha, current_entity, switch_entity, power_entity
         self.phases, self.volts, self.min_a, self.max_a = phases, volts, min_a, max_a
+        self.plug = plug_entity
 
     @property
     def w_per_a(self) -> float:
@@ -303,6 +304,8 @@ class HACurrentControl:
         return self.w_per_a
 
     def status(self) -> SwitchStatus:
+        if self.plug and self.ha.state(self.plug).get("state") == "off":
+            raise NotReady("wacht tot de auto is aangesloten")
         on = True
         if self.sw:
             on = self.ha.state(self.sw).get("state") == "on"
@@ -310,6 +313,10 @@ class HACurrentControl:
         return SwitchStatus(on, float(power or 0.0), None)
 
     def set(self, on: bool) -> None:
+        if self.sw and self.ha.state(self.sw).get("state") in ("unavailable", "unknown"):
+            if not on:
+                self.ha.call("number", "set_value", {"entity_id": self.cur, "value": 0})
+            return                                        # geen auto aangesloten: de schakelaar bestaat dan even niet
         if self.sw:
             domain = self.sw.split(".", 1)[0]
             self.ha.call(domain if domain != "button" else "button", "turn_on" if on else "turn_off", {"entity_id": self.sw})
@@ -357,7 +364,7 @@ def make_switch(cfg, d):
     if drv == "ha_current":
         return HACurrentControl(ha, p["current_entity"], p.get("switch_entity", ""), p.get("power_entity", ""),
                                 int(p.get("phases", 1)), float(p.get("volts", 230)), float(p.get("min_a", 6)),
-                                float(p.get("max_a", 16)))
+                                float(p.get("max_a", 16)), p.get("plug_entity", ""))
     raise ValueError(f"Onbekende koppeling: {drv}")
 
 
@@ -374,7 +381,7 @@ def ha_client(cfg) -> HomeAssistant:
 _NOT_A_LOAD = ("camera", "privacy", "detectie", "detection", "watermerk", "watermark", "mute", "volume", "indicator",
                "permit join", "omdraaien", "flip", "siren", "sirene", "slaapstand", "audio", "status licht", "niet storen",
                "do not disturb", "kinderslot", "child lock", "wake sound", "rolluik", "screen", "zonwering", "cover",
-               "opname", "recording", "firmware", "update", "led", "motion", "beweging")
+               "opname", "recording", "firmware", "update", "led", "motion", "beweging", "vergrendeling", "lock")
 _METER_WORDS = ("p1", "dsmr", "grid", "net_", "meter", "tibber", "pulse", "homewizard", "hoofd", "mains", "slimme meter",
                 "smart meter", "afname", "import", "levering", "consumption")
 _EXPORT_WORDS = ("productie", "production", "export", "teruglever", "returned", "injection", "feed")
@@ -397,7 +404,8 @@ def ha_candidates(states: list[dict]) -> dict:
     """
     power_sensors, devices, price_sensors = [], [], []
     by_id = {s.get("entity_id"): s for s in states}
-    charging_switches = [e for e in by_id if e.startswith("switch.") and e.endswith("_charging")]
+    charging_switches = [e for e in by_id if e.startswith("switch.") and e.endswith(("_charging", "_opladen", "_laden"))]
+    has_available = any(e.startswith("number.") and ("available_current" in e or "beschikbare_stroom" in e) for e in by_id)
     for s in states:
         eid = s.get("entity_id", "")
         dom = eid.split(".", 1)[0]
@@ -448,14 +456,20 @@ def ha_candidates(states: list[dict]) -> dict:
                             "boost_temp": min(float(a.get("max", 65) or 65), temp + 10), "power_entity": _match_power(eid, by_id),
                             "score": 3})
         elif dom == "number" and (unit == "A" or any(w in eid for w in ("charging_current", "charge_current", "charging_amps",
-                                                                          "laadstroom", "available_current"))):
-            if any(w in t for w in ("3 to 1", "phase switch", "fallback", "offline")):
+                                                                          "laadstroom", "available_current", "beschikbare_stroom"))):
+            if any(w in t for w in ("3 to 1", "phase switch", "fallback", "offline", "terugschakel", "fase", "phase",
+                                    "min stroom", "min current", "minimum", "helderheid", "brightness")):
                 continue                                  # instellingen, geen laadstroom
-            zaptec = "available_current" in eid or "zaptec" in t
+            available = "available_current" in eid or "beschikbare_stroom" in eid
+            if has_available and not available:
+                continue                                  # Zaptec: alleen de installatiestroom gebruiken
+            zaptec = available or "zaptec" in t
             sw = _match_switch(eid, by_id) or (charging_switches[0] if len(charging_switches) == 1 else "")
+            pw = _match_power(eid, by_id) or (_match_power(sw, by_id) if sw else "")
+            plug = _match_plug(sw or eid, by_id)
             devices.append({"driver": "ha_current", "current_entity": eid, "name": name, "kind": "ev",
                             "min_a": a.get("min", 6) if (a.get("min") or 0) >= 6 else 6, "max_a": min(16, a.get("max", 16) or 16),
-                            "switch_entity": sw, "power_entity": _match_power(eid, by_id), "score": 4,
+                            "switch_entity": sw, "power_entity": pw, "plug_entity": plug, "score": 4,
                             # Zaptec: laadstroom niet vaker dan eens per 15 minuten aanpassen (advies van Zaptec)
                             "min_interval_s": 900 if zaptec else 30})
     used = {d.get("switch_entity") for d in devices if d["driver"] == "ha_current"}
@@ -501,7 +515,7 @@ def _common(a: str, b: str) -> int:
 
 def _stem(eid: str) -> str:
     base = eid.split(".", 1)[1]
-    for suffix in ("_start_program", "_starten", "_start", "_charging_current", "_max_charging_current", "_current", "_switch", "_charging", "_power",
+    for suffix in ("_start_program", "_starten", "_start", "_opladen", "_laden", "_laadvermogen", "_charge_power", "_charging_current", "_max_charging_current", "_current", "_switch", "_charging", "_power",
                    "_hot_water", "_water_heater"):
         if base.endswith(suffix):
             return base[: -len(suffix)]
@@ -523,6 +537,16 @@ def _match_remote_start(eid: str, by_id: dict) -> str:
     for suffix in ("_mobiel_starten", "_start_op_afstand", "_mobile_start", "_remote_start", "_remote_start_allowed"):
         cand = f"binary_sensor.{stem.split('.', 1)[-1]}{suffix}"
         if cand in by_id:
+            return cand
+    return ""
+
+
+def _match_plug(eid: str, by_id: dict) -> str:
+    """Stekker-sensor van dezelfde laadpaal (bijv. binary_sensor.<laadpaal>_stekker / _plug)."""
+    stem = _stem(eid)
+    for cand, s in by_id.items():
+        if cand.startswith("binary_sensor.") and stem and cand.split(".", 1)[1].startswith(stem + "_") \
+                and (s.get("attributes") or {}).get("device_class") == "plug":
             return cand
     return ""
 
