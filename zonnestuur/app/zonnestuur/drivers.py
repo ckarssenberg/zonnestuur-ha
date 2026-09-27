@@ -472,7 +472,22 @@ def ha_candidates(states: list[dict]) -> dict:
             p["export_entity"] = twin["entity"] if twin else ""
     power_sensors.sort(key=lambda p: (-p["score"], p["export"], p["name"]))
     devices.sort(key=lambda d: (-d["score"], d["name"]))
-    return {"power_sensors": power_sensors, "devices": devices, "price_sensors": price_sensors}
+    # Laadpalen die Home Assistant wel ziet maar niet kan sturen (bijv. Zaptec via de Tibber-koppeling)
+    readonly = []
+    has_control = any(d["driver"] == "ha_current" for d in devices)
+    if not has_control:
+        for eid, st in by_id.items():
+            a = st.get("attributes") or {}
+            if not eid.startswith("binary_sensor.") or a.get("device_class") != "battery_charging":
+                continue
+            prefix = eid.split(".", 1)[1].rsplit("_", 1)[0]
+            siblings = [e for e in by_id if e.startswith("sensor." + prefix + "_")]
+            if not any(("charge_current" in e or "grid_phases" in e or "laadstroom" in e) for e in siblings):
+                continue                                  # waarschijnlijk een auto, geen laadpaal
+            name = (a.get("friendly_name") or prefix).rsplit(" ", 1)[0]
+            readonly.append({"name": name, "brand": "zaptec" if any("fallback_current" in e for e in siblings) else "",
+                             "via": "een andere koppeling, zoals Tibber"})
+    return {"power_sensors": power_sensors, "devices": devices, "price_sensors": price_sensors, "readonly_chargers": readonly}
 
 
 def _common(a: str, b: str) -> int:

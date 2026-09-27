@@ -438,7 +438,7 @@ function renderDevices(s) {
     const el = document.createElement("article");
     const running = d.on && d.power_w > 50;
     el.className = "card dev" + (running ? " on" : "");
-    const state = !d.online ? "Offline" : d.on ? (running ? (RUNNING_WORD[d.kind] || "Aan") : "Aan · neemt geen stroom op") : "Uit";
+    const state = !d.online ? (d.reason && d.reason.startsWith("wacht") ? "Klaar om te zetten" : "Offline") : d.on ? (running ? (RUNNING_WORD[d.kind] || "Aan") : "Aan · neemt geen stroom op") : "Uit";
     const pos = (h, m) => ((h + m / 60) / 24) * 100;
     let strip = "";
     if (d.best_hours && d.best_hours.length) {
