@@ -410,7 +410,7 @@ function renderStatus(s) {
 
   renderDevices(s);
   $("err").textContent = s.last_error ? "Laatste melding: " + s.last_error : "";
-  $("foot").textContent = `Contract: ${s.contract === "dynamic" ? "dynamisch" : "vast"} · versie ${s.version}`;
+  $("foot").textContent = `Contract: ${s.contract === "dynamic" ? "dynamisch" : "vast"}${s.supplier ? " (" + s.supplier + ")" : ""} · besparing gerekend zonder salderen, zoals vanaf 2027 · versie ${s.version}`;
 }
 
 function setPulse(id, active, reverse, watts) {

@@ -9,6 +9,7 @@ from typing import Callable, Optional
 
 from .adapters import http_get_json
 from .config import ContractConfig
+from .suppliers import energy_tax_for
 
 log = logging.getLogger(__name__)
 
@@ -32,23 +33,44 @@ class PriceProvider:
         self.fetcher = fetcher or http_get_json
         self.slots: list[PriceSlot] = []
         self._last_fetch = 0.0
+        self.live_price: Optional[float] = None     # actuele prijs uit Home Assistant (bijv. Tibber)
+        self.live_at: Optional[datetime] = None
+
+    def set_live_price(self, price: Optional[float], at: datetime) -> None:
+        """Actuele all-in afnameprijs van je eigen leverancier (via een Home Assistant-sensor)."""
+        self.live_price, self.live_at = price, at
+
+    def _live(self, when: datetime) -> Optional[float]:
+        if self.live_price is None or self.live_at is None:
+            return None
+        return self.live_price if abs((when - self.live_at).total_seconds()) < 900 else None
+
+    def energy_tax(self, when: datetime) -> float:
+        return self.contract.energy_tax if self.contract.energy_tax is not None else energy_tax_for(when.year)
+
+    def _feed_in_adjust(self) -> float:
+        c = self.contract
+        return c.feed_in_adjust if c.feed_in_adjust is not None else -c.feed_in_cost
 
     # ---- publieke API -------------------------------------------------
-    def import_price(self, when: datetime) -> float:
+    def import_price(self, when: datetime, live: bool = True) -> float:
+        lp = self._live(when) if live else None
+        if lp is not None:
+            return lp
         if self.contract.type == "fixed":
             return self.contract.import_price
         slot = self._slot_at(when)
         if slot is None:
             return self.contract.import_price
-        return slot.market + self.contract.energy_tax + self.contract.supplier_markup
+        return slot.market + self.energy_tax(when) + self.contract.supplier_markup
 
     def feed_in_price(self, when: datetime) -> float:
         if self.contract.type == "fixed":
-            return self.contract.feed_in_price
+            return self.contract.feed_in_price - self.contract.return_cost
         slot = self._slot_at(when)
         if slot is None:
             return self.contract.feed_in_price
-        return slot.market / 1.21 - self.contract.feed_in_cost
+        return slot.market / 1.21 + self._feed_in_adjust()
 
     def value_of_own_kwh(self, when: datetime) -> float:
         """Wat een kWh eigen zonnestroom oplevert: afnameprijs min terugleververgoeding."""
@@ -59,7 +81,7 @@ class PriceProvider:
         out = []
         for s in self.slots:
             if s.end > start and s.start < end:
-                out.append((max(s.start, start), min(s.end, end), self.import_price(s.start)))
+                out.append((max(s.start, start), min(s.end, end), self.import_price(s.start, live=False)))
         return out
 
     def refresh(self, now: datetime, force: bool = False) -> None:

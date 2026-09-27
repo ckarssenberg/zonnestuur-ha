@@ -22,7 +22,7 @@ from . import __version__
 from .adapters import DeviceError, HomeWizardP1, ShellySwitch, NotReady
 from .config import Config, load_config, merge_public, public_dict, save_config, effective_ha
 from .discovery import PROBLEMS, Scanner, identify
-from .drivers import HomeAssistant, ha_candidates, make_meter, make_switch
+from .drivers import HomeAssistant, ha_candidates, make_meter, make_switch, ha_client
 from .controller import Context, Controller, plan_cheapest_hours, plan_sunny_hours
 from .forecast import SolarForecast
 from .ledger import Ledger
@@ -86,7 +86,7 @@ class Engine:
             except DeviceError as exc:
                 self.meter_online = False
                 self.meter_fail_since = self.meter_fail_since or mono
-                self.last_error = f"P1-meter: {exc}"
+                self.last_error = f"Meter: {exc}"
                 log.warning(self.last_error)
                 # korte storing overbruggen met de laatste waarde, daarna veilig terugvallen
                 if mono - self.meter_fail_since > 120:
@@ -112,6 +112,7 @@ class Engine:
 
             # 3. prijzen en zonvoorspelling bijwerken, garantie-planning maken
             self.prices.refresh(now)
+            self._read_live_price(now, mono)
             self.forecast.refresh()
             cheapest = self._plan_guarantee(now)
             sunny = self._plan_sunny(now)
@@ -232,6 +233,23 @@ class Engine:
             except (ValueError, KeyError) as exc:
                 log.warning("%s: koppeling niet bruikbaar: %s", d.name, exc)
         return out
+
+    def _read_live_price(self, now: datetime, mono: float) -> None:
+        """Actuele prijs uit een Home Assistant-sensor van je leverancier (bijv. Tibber, Frank, Zonneplan)."""
+        ent = self.cfg.contract.price_entity
+        if not ent or mono - getattr(self, "_price_read_mono", -1e9) < 60:
+            return
+        self._price_read_mono = mono
+        try:
+            st = ha_client(self.cfg).state(ent)
+            v = float(st.get("state"))
+            unit = str((st.get("attributes") or {}).get("unit_of_measurement", "")).lower()
+            if "ct" in unit or "cent" in unit or v > 5:           # soms in centen
+                v = v / 100
+            self.prices.set_live_price(v, now)
+        except (DeviceError, ValueError, TypeError) as exc:
+            self.prices.set_live_price(None, now)
+            log.warning("Prijssensor %s niet te lezen: %s", ent, exc)
 
     def test_switch(self, spec: dict, seconds: float = 8.0) -> dict:
         """Zet een apparaat kort aan en meet wat het opneemt. Zet daarna de oude stand terug."""
@@ -354,6 +372,7 @@ class Engine:
                 "grid_w": None if self.grid_w is None else round(self.grid_w),
                 "meter_online": self.meter_online,
                 "contract": self.cfg.contract.type,
+                "supplier": _supplier_name(self.cfg.contract),
                 "price_now": round(self.prices.import_price(now), 4),
                 "value_own_kwh": round(self.prices.value_of_own_kwh(now), 4),
                 "forecast_now_w": self._rounded(self.forecast.production_w(now)),
@@ -470,6 +489,9 @@ def make_handler(engine: Engine):
                 return self._json(200, engine.read_p1(host))
             if url.path == "/api/setup/ha":
                 return self._json(200, engine.ha_candidates())
+            if url.path == "/api/suppliers":
+                from .suppliers import catalog
+                return self._json(200, catalog())
             return self._json(404, {"error": "niet gevonden"})
 
         def do_PUT(self):
@@ -534,6 +556,12 @@ def make_handler(engine: Engine):
             return self._json(404, {"error": "niet gevonden"})
 
     return Handler
+
+
+def _supplier_name(c) -> str:
+    from .suppliers import DYNAMIC, FIXED
+    table = DYNAMIC if c.type == "dynamic" else FIXED
+    return table.get(c.supplier, {}).get("name", "") if c.supplier else ""
 
 
 def run(cfg: Config, config_path: Optional[str] = None) -> None:

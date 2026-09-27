@@ -72,11 +72,15 @@ class ContractConfig:
     """Energiecontract: bepaalt wat een kWh eigen zonnestroom waard is."""
 
     type: str = "fixed"                 # fixed | dynamic
+    supplier: str = ""                  # sleutel uit suppliers.py (vult de bedragen hieronder voor)
     import_price: float = 0.29          # €/kWh incl. belastingen (vast contract)
     feed_in_price: float = 0.01         # €/kWh netto terugleververgoeding (vast contract)
-    energy_tax: float = 0.1108          # €/kWh energiebelasting incl. btw (dynamisch) - controleer het actuele tarief
+    energy_tax: Optional[float] = None  # €/kWh energiebelasting incl. btw; leeg = automatisch per jaar
     supplier_markup: float = 0.02       # €/kWh inkoopvergoeding leverancier incl. btw (dynamisch)
-    feed_in_cost: float = 0.02          # €/kWh die de leverancier inhoudt op teruglevering (dynamisch)
+    feed_in_cost: float = 0.02          # (oud) €/kWh die de leverancier inhoudt op teruglevering (dynamisch)
+    feed_in_adjust: Optional[float] = None  # €/kWh bovenop (+) of van (−) de marktprijs bij teruglevering (dynamisch)
+    return_cost: float = 0.0            # terugleverkosten per kWh (vast/variabel contract, vanaf 2027)
+    price_entity: str = ""              # Home Assistant-sensor met je actuele stroomprijs (bijv. van Tibber)
 
 
 @dataclass

@@ -395,8 +395,9 @@ def ha_candidates(states: list[dict]) -> dict:
 
     De meest waarschijnlijke komen bovenaan; ruis (camera-instellingen, rolluiken, onbeschikbare dingen) valt weg.
     """
-    power_sensors, devices = [], []
+    power_sensors, devices, price_sensors = [], [], []
     by_id = {s.get("entity_id"): s for s in states}
+    charging_switches = [e for e in by_id if e.startswith("switch.") and e.endswith("_charging")]
     for s in states:
         eid = s.get("entity_id", "")
         dom = eid.split(".", 1)[0]
@@ -406,7 +407,9 @@ def ha_candidates(states: list[dict]) -> dict:
         t = _text(eid, name)
         if s.get("state") in ("unavailable",) and dom not in ("sensor", "button"):
             continue
-        if dom == "sensor" and _is_power(s):
+        if dom == "sensor" and "/kwh" in unit.lower().replace(" ", "") and any(c in unit.lower() for c in ("€", "eur", "ct")):
+            price_sensors.append({"entity": eid, "name": name, "unit": unit, "state": s.get("state")})
+        elif dom == "sensor" and _is_power(s):
             score = 2 * any(w in t for w in _METER_WORDS) - any(w in t for w in ("dimmer", "lamp", "licht", "light", "max ", "min ", "gemiddeld", "average"))
             power_sensors.append({"entity": eid, "name": name, "unit": unit, "state": s.get("state"), "score": score,
                                   "export": any(w in t for w in _EXPORT_WORDS)})
@@ -444,10 +447,17 @@ def ha_candidates(states: list[dict]) -> dict:
             devices.append({"driver": "ha_setpoint", "entity": eid, "name": name, "kind": "boiler", "normal_temp": temp,
                             "boost_temp": min(float(a.get("max", 65) or 65), temp + 10), "power_entity": _match_power(eid, by_id),
                             "score": 3})
-        elif dom == "number" and (unit == "A" or any(w in eid for w in ("charging_current", "charge_current", "charging_amps", "laadstroom"))):
+        elif dom == "number" and (unit == "A" or any(w in eid for w in ("charging_current", "charge_current", "charging_amps",
+                                                                          "laadstroom", "available_current"))):
+            if any(w in t for w in ("3 to 1", "phase switch", "fallback", "offline")):
+                continue                                  # instellingen, geen laadstroom
+            zaptec = "available_current" in eid or "zaptec" in t
+            sw = _match_switch(eid, by_id) or (charging_switches[0] if len(charging_switches) == 1 else "")
             devices.append({"driver": "ha_current", "current_entity": eid, "name": name, "kind": "ev",
                             "min_a": a.get("min", 6) if (a.get("min") or 0) >= 6 else 6, "max_a": min(16, a.get("max", 16) or 16),
-                            "switch_entity": _match_switch(eid, by_id), "power_entity": _match_power(eid, by_id), "score": 4})
+                            "switch_entity": sw, "power_entity": _match_power(eid, by_id), "score": 4,
+                            # Zaptec: laadstroom niet vaker dan eens per 15 minuten aanpassen (advies van Zaptec)
+                            "min_interval_s": 900 if zaptec else 30})
     used = {d.get("switch_entity") for d in devices if d["driver"] == "ha_current"}
     devices = [d for d in devices if not (d["driver"] == "ha_switch" and d["entity"] in used)]   # laadschakelaar hoort bij de laadpaal
     # Aan/uit-knop van witgoed met een startknop: aanzetten start geen programma, dus weglaten
@@ -462,7 +472,7 @@ def ha_candidates(states: list[dict]) -> dict:
             p["export_entity"] = twin["entity"] if twin else ""
     power_sensors.sort(key=lambda p: (-p["score"], p["export"], p["name"]))
     devices.sort(key=lambda d: (-d["score"], d["name"]))
-    return {"power_sensors": power_sensors, "devices": devices}
+    return {"power_sensors": power_sensors, "devices": devices, "price_sensors": price_sensors}
 
 
 def _common(a: str, b: str) -> int:

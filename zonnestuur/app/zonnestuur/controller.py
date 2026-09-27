@@ -47,7 +47,8 @@ class DeviceState:
     override_until: Optional[datetime] = None
     setpoint_w: Optional[float] = None      # traploze apparaten: ingesteld vermogen
     setpoint_at: float = -math.inf
-    offline_reason: str = ""                  # waarom niet beschikbaar (bijv. 'wacht tot je hem klaarzet')
+    offline_reason: str = ""
+    targets: list = field(default_factory=list)   # recente gewenste vermogens (voor apparaten die zelden bijsturen)                  # waarom niet beschikbaar (bijv. 'wacht tot je hem klaarzet')
 
     def to_dict(self) -> dict:
         return {
@@ -181,9 +182,18 @@ class Controller:
             target = current - ctx.grid_w - 100          # 100 W marge zodat we net niet van het net halen
         step = d.w_per_step
         target = max(d.min_w, min(d.max_w, math.floor(target / step) * step))
+        interval = float((d.params or {}).get("min_interval_s", 30))
+        if interval > 60 and not forced:
+            # Zelden bijsturen (bijv. Zaptec: eens per 15 min): kies het laagste wat de hele periode paste,
+            # zodat een wolk niet meteen stroom van het net kost.
+            st.targets = [(m, v) for m, v in st.targets if ctx.mono - m <= interval] + [(ctx.mono, target)]
+            target = min(v for _, v in st.targets)
         first = st.setpoint_w is None
         changed = first or abs(target - st.setpoint_w) >= step
-        calm = first or forced or ctx.mono - st.setpoint_at >= 30 or target < st.setpoint_w   # omlaag mag altijd direct
+        if interval > 60:
+            calm = first or forced or ctx.mono - st.setpoint_at >= interval
+        else:
+            calm = first or forced or ctx.mono - st.setpoint_at >= interval or target < st.setpoint_w   # omlaag mag direct
         if changed and calm:
             st.setpoint_w, st.setpoint_at = target, ctx.mono
             return target

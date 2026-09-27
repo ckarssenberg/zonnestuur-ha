@@ -440,7 +440,7 @@ function deviceFromPick(p) {
       power_w: 2000, tested: null, model: `${p.f.name} op ${p.f.host}` };
   }
   const c = p.c, params = {};
-  for (const k of ["entity", "current_entity", "switch_entity", "power_entity", "normal_temp", "boost_temp", "min_a", "max_a", "button_entity", "remote_entity"]) if (c[k] !== undefined && c[k] !== "") params[k] = c[k];
+  for (const k of ["entity", "current_entity", "switch_entity", "power_entity", "normal_temp", "boost_temp", "min_a", "max_a", "button_entity", "remote_entity", "min_interval_s"]) if (c[k] !== undefined && c[k] !== "") params[k] = c[k];
   if (c.driver === "ha_current") params.phases = 3;
   const power = c.power_w || (c.driver === "ha_current" ? 11000 : c.kind === "heatpump" ? 1500 : 2000);
   return { key: p.key, host: "", driver: c.driver, switch_id: 0, params, kind: c.kind, name: c.name, power_w: power, tested: null,
@@ -462,7 +462,7 @@ function apparaten() {
       <div class="field"><label for="phases">Aansluiting</label><select id="phases"><option value="1" ${P.phases == 1 ? "selected" : ""}>1 fase</option><option value="3" ${P.phases == 3 ? "selected" : ""}>3 fasen</option></select></div>
       <div class="field"><label for="mina">Minimaal (A)</label><input id="mina" type="number" min="6" max="32" value="${P.min_a}"></div>
       <div class="field"><label for="maxa">Maximaal (A)</label><input id="maxa" type="number" min="6" max="32" value="${P.max_a}"></div></div>
-      <p class="small muted">Zonnestuur regelt de laadstroom traploos tussen <b>${nl(lo / 1000, 1)}</b> en <b>${nl(hi / 1000, 1)} kW</b>, precies op wat je overhoudt.</p>`;
+      <p class="small muted">Zonnestuur regelt de laadstroom traploos tussen <b>${nl(lo / 1000, 1)}</b> en <b>${nl(hi / 1000, 1)} kW</b>, precies op wat je overhoudt.${(P.min_interval_s || 0) > 60 ? ` Deze laadpaal passen we hooguit eens per ${Math.round(P.min_interval_s / 60)} minuten aan (advies van de fabrikant), met wat je dat hele kwartier minstens overhield.` : ""}</p>`;
   }
   $("app").innerHTML = `<section class="card">
     <div class="eyebrow">Stap 4 · apparaat ${devIdx + 1} van ${W.devices.length}</div>
@@ -517,19 +517,71 @@ function testHtml(d) {
   return `<span style="flex:1"><b>Koppeling werkt</b>, maar we zagen geen stroomverbruik${isHA(d.driver) && !d.params.power_entity ? " (er is geen vermogensmeting gekoppeld)" : ". Een boiler die al warm is of een auto die vol is, neemt ook niets op"}. Vul het vermogen hieronder in.</span><button class="btn ghost small" id="testBtn">Opnieuw</button>`;
 }
 
+// ---------- contract en leverancier (gedeeld door assistent en instellingen) ----------
+let SUP = null, PRICE_SENSORS = null;
+async function loadSuppliers() {
+  if (!SUP) { try { SUP = await api("api/suppliers"); } catch (e) { SUP = { dynamic: {}, fixed: {}, energy_tax: {} }; } }
+  if (PRICE_SENSORS === null) {
+    PRICE_SENSORS = [];
+    if (CFG && CFG.has_ha) { try { const r = W.ha.cands || await api("api/setup/ha"); if (r.ok !== false) PRICE_SENSORS = r.price_sensors || []; } catch (e) {} }
+  }
+}
+const eur = (v, d = 4) => (v == null || v === "" ? "–" : "€ " + nl(v, d));
+function applySupplier(c, key) {
+  c.supplier = key;
+  if (!key || !SUP) return;
+  if (c.type === "dynamic" && SUP.dynamic[key]) { c.supplier_markup = SUP.dynamic[key].markup; c.feed_in_adjust = SUP.dynamic[key].feed_in; }
+  if (c.type === "fixed" && SUP.fixed[key]) { c.feed_in_price = SUP.fixed[key].feed_in_2027; c.return_cost = SUP.fixed[key].return_cost_2027; }
+}
+function contractHtml(c) {
+  const list = c.type === "dynamic" ? SUP.dynamic : SUP.fixed;
+  const p = list[c.supplier];
+  const tax = SUP.energy_tax || {};
+  let info = "";
+  if (c.type === "dynamic" && p) {
+    info = `Inkoopvergoeding <b>${eur(p.markup)}</b> per kWh · teruglevering: marktprijs ${p.feed_in >= 0 ? "+" : "−"} <b>${eur(Math.abs(p.feed_in))}</b> · ${esc(p.interval)}prijzen${p.note ? " · " + esc(p.note) : ""}`;
+    info += `<br>Gecontroleerd op ${esc(String(SUP.checked_on).split("-").reverse().join("-"))} · <a href="${esc(p.source)}" target="_blank" rel="noopener">bron</a>${p.verified ? "" : " · <b>indicatie</b>, controleer je contract"}`;
+  } else if (c.type === "fixed" && p) {
+    info = `Vanaf 2027: terugleververgoeding <b>${eur(p.feed_in_2027)}</b> min terugleverkosten <b>${eur(p.return_cost_2027)}</b> per kWh = netto <b>${eur(p.feed_in_2027 - p.return_cost_2027)}</b>.`;
+    info += `<br>Tarieven voor een nieuw 1-jarig contract, gecontroleerd op ${esc(String(SUP.checked_on).split("-").reverse().join("-"))} · <a href="${esc(SUP.fixed_source)}" target="_blank" rel="noopener">bron</a>. Staat in je contract iets anders? Pas het hieronder aan.`;
+  }
+  const ps = PRICE_SENSORS || [];
+  return `<div class="field" style="margin-top:14px"><label for="cp_sup">Leverancier</label><select id="cp_sup">
+      <option value="">Anders / weet ik niet</option>
+      ${Object.entries(list).map(([k, v]) => `<option value="${k}" ${k === c.supplier ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></div>
+    ${info ? `<p class="small muted" style="margin-top:8px">${info}</p>` : ""}
+    ${c.type === "fixed" ? `<div class="row" style="margin-top:12px">
+      <div class="field"><label for="cp_ip">Stroomprijs per kWh</label><input id="cp_ip" type="number" step="0.001" min="0" max="2" value="${c.import_price}"><span class="hint">Inclusief belastingen, zie je contract of jaarafrekening.</span></div>
+      <div class="field"><label for="cp_fp">Terugleververgoeding per kWh</label><input id="cp_fp" type="number" step="0.001" min="-1" max="1" value="${c.feed_in_price}"></div>
+      <div class="field"><label for="cp_rc">Terugleverkosten per kWh</label><input id="cp_rc" type="number" step="0.001" min="0" max="1" value="${c.return_cost ?? 0}"></div>
+    </div>` : `<details style="margin-top:10px"><summary>Bedragen aanpassen</summary><div class="row" style="margin-top:12px">
+      <div class="field"><label for="cp_sm">Inkoopvergoeding per kWh (incl. btw)</label><input id="cp_sm" type="number" step="0.0001" value="${c.supplier_markup}"></div>
+      <div class="field"><label for="cp_fa">Teruglevering: + of − op de marktprijs</label><input id="cp_fa" type="number" step="0.0001" value="${c.feed_in_adjust ?? -(c.feed_in_cost ?? 0)}"></div>
+      <div class="field"><label for="cp_et">Energiebelasting per kWh</label><input id="cp_et" type="number" step="0.0001" value="${c.energy_tax ?? ""}" placeholder="automatisch"><span class="hint">Leeg = automatisch: ${Object.entries(tax).map(([y, v]) => `${y}: ${eur(v)}`).join(", ")}.</span></div>
+    </div></details>`}
+    ${ps.length ? `<div class="field" style="margin-top:12px"><label for="cp_pe">Actuele prijs uit Home Assistant (optioneel)</label><select id="cp_pe">
+      <option value="">Niet gebruiken</option>${ps.map((x) => `<option value="${esc(x.entity)}" ${x.entity === c.price_entity ? "selected" : ""}>${esc(x.name)} (nu ${esc(x.state)} ${esc(x.unit)})</option>`).join("")}</select>
+      <span class="hint">De prijs die je leverancier zelf doorgeeft, bijvoorbeeld via de Tibber-koppeling. Dan klopt de besparing precies.</span></div>` : ""}`;
+}
+function readContract(c) {
+  if ($("cp_ip")) { c.import_price = Number($("cp_ip").value) || 0.29; c.feed_in_price = Number($("cp_fp").value) || 0; c.return_cost = Number($("cp_rc").value) || 0; }
+  if ($("cp_sm")) { c.supplier_markup = Number($("cp_sm").value) || 0; c.feed_in_adjust = Number($("cp_fa").value); c.energy_tax = $("cp_et").value === "" ? null : Number($("cp_et").value); }
+  if ($("cp_pe")) c.price_entity = $("cp_pe").value;
+}
+function bindContract(c, rerender) {
+  $("cp_sup").onchange = () => { readContract(c); applySupplier(c, $("cp_sup").value); rerender(); };
+}
+
 // ---------- stap 5: drie vragen ----------
-function vragen() {
+async function vragen() {
+  await loadSuppliers();
   const c = W.contract, s = W.solar;
   $("app").innerHTML = `<section class="card">
     <div class="eyebrow">Stap 5</div>
     <h1 class="t">Nog drie vragen</h1>
     <h2 class="t">1. Wat voor energiecontract heb je?</h2>
-    <div class="chips" data-k="type"><button data-v="fixed" class="${c.type === "fixed" ? "on" : ""}">Vast of variabel</button><button data-v="dynamic" class="${c.type === "dynamic" ? "on" : ""}">Dynamisch (uurprijzen)</button></div>
-    <div class="row" style="margin-top:14px" ${c.type === "fixed" ? "" : "hidden"}>
-      <div class="field"><label for="ip">Stroomprijs per kWh</label><input id="ip" type="number" step="0.01" min="0" max="2" value="${c.import_price}"><span class="hint">Inclusief belastingen, zie je jaarafrekening.</span></div>
-      <div class="field"><label for="fp">Terugleververgoeding per kWh</label><input id="fp" type="number" step="0.01" min="-1" max="1" value="${c.feed_in_price}"><span class="hint">Na aftrek van terugleverkosten. Vanaf 2027 vaak bijna €0.</span></div>
-    </div>
-    <p class="small muted" ${c.type === "dynamic" ? "" : "hidden"} style="margin-top:12px">Zonnestuur haalt de uurprijzen zelf op en kiest de goedkoopste uren als de zon het niet redt.</p>
+    <div class="chips" data-k="type"><button data-v="fixed" class="${c.type === "fixed" ? "on" : ""}">Vast of variabel</button><button data-v="dynamic" class="${c.type === "dynamic" ? "on" : ""}">Dynamisch (uur- of kwartierprijzen)</button></div>
+    ${contractHtml(c)}
     <h2 class="t">2. Hoe groot zijn je zonnepanelen?</h2>
     <div class="row">
       <div class="field"><label for="kwp">Totaal piekvermogen (kWp)</label><input id="kwp" type="number" step="0.1" min="0.5" max="50" value="${s.kwp}"><span class="hint">Aantal panelen × wattpiek per paneel ÷ 1000. Bijv. 10 × 400 = 4,0.</span></div>
@@ -539,9 +591,11 @@ function vragen() {
     <div class="field"><label for="rg">Provincie</label><select id="rg">${Object.keys(REGIONS).map((r) => `<option ${r === s.region ? "selected" : ""}>${r}</option>`).join("")}</select><span class="hint">Voor de weersverwachting. We slaan geen adres op.</span></div>
     <div class="actions"><button class="btn ghost" id="back">← Terug</button><button class="btn" id="next">Opslaan en starten →</button></div>
   </section>`;
-  document.querySelectorAll(".chips button").forEach((b) => b.onclick = () => { read(); c.type = b.dataset.v; vragen(); });
+  document.querySelectorAll(".chips button").forEach((b) => b.onclick = () => { read(); c.type = b.dataset.v; applySupplier(c, c.supplier); vragen(); });
+  bindContract(c, () => { readSolar(); vragen(); });
+  const readSolar = () => { s.kwp = Number($("kwp").value) || 4; s.orient = $("or").value; s.region = $("rg").value; };
   const read = () => {
-    if ($("ip")) { c.import_price = Number($("ip").value) || 0.29; c.feed_in_price = Number($("fp").value) || 0; }
+    readContract(c);
     s.kwp = Number($("kwp").value) || 4; s.orient = $("or").value; s.region = $("rg").value;
   };
   $("back").onclick = () => { read(); devIdx = W.devices.length - 1; go(3); };
@@ -574,7 +628,7 @@ async function saveAll() {
     next.p1_host = m.type === "ha" ? "" : m.host;
     next.meter = meterSpec(m, W.invert).meter;
     next.devices = newDevs.map((d, i) => ({ ...d, priority: i + 1 }));
-    next.contract = Object.assign({}, next.contract || {}, { type: W.contract.type, import_price: W.contract.import_price, feed_in_price: W.contract.feed_in_price });
+    next.contract = Object.assign({}, next.contract || {}, W.contract);
     const [lat, lon] = REGIONS[W.solar.region];
     next.solar = Object.assign({}, next.solar || {}, { kwp: W.solar.kwp, azimuth: ORIENT[W.solar.orient], latitude: lat, longitude: lon,
       tilt: W.solar.orient === "Oost-west" ? 15 : 35 });
@@ -598,8 +652,9 @@ function klaar() {
 }
 
 // ---------- instellingen ----------
-function settings() {
-  const c = CFG.contract, s = CFG.solar;
+async function settings() {
+  await loadSuppliers();
+  const c = JSON.parse(JSON.stringify(CFG.contract)), s = CFG.solar;
   const orient = Object.entries(ORIENT).find(([, v]) => v === s.azimuth)?.[0] || "Zuid";
   const md = (CFG.meter && CFG.meter.driver) || "homewizard";
   $("app").innerHTML = `<div class="settings">
@@ -613,14 +668,7 @@ function settings() {
     <section class="card" id="editCard" hidden></section>
     <section class="card"><h2 class="t">Energiecontract</h2>
       <div class="chips" id="ctype"><button data-v="fixed" class="${c.type === "fixed" ? "on" : ""}">Vast of variabel</button><button data-v="dynamic" class="${c.type === "dynamic" ? "on" : ""}">Dynamisch</button></div>
-      <div class="row" style="margin-top:14px">
-        <div class="field"><label for="s_ip">Stroomprijs per kWh (vast)</label><input id="s_ip" type="number" step="0.01" value="${c.import_price}"></div>
-        <div class="field"><label for="s_fp">Terugleververgoeding per kWh (vast)</label><input id="s_fp" type="number" step="0.01" value="${c.feed_in_price}"></div>
-      </div>
-      <details><summary>Dynamisch contract: belasting en opslagen</summary><div class="row" style="margin-top:12px">
-        <div class="field"><label for="s_et">Energiebelasting per kWh</label><input id="s_et" type="number" step="0.001" value="${c.energy_tax}"></div>
-        <div class="field"><label for="s_sm">Inkoopvergoeding per kWh</label><input id="s_sm" type="number" step="0.001" value="${c.supplier_markup}"></div>
-        <div class="field"><label for="s_fc">Terugleverkosten per kWh</label><input id="s_fc" type="number" step="0.001" value="${c.feed_in_cost}"></div></div></details>
+      <div id="cbox">${contractHtml(c)}</div>
     </section>
     <section class="card"><h2 class="t">Zonnepanelen</h2>
       <div class="row">
@@ -659,8 +707,12 @@ function settings() {
     </section>
     <div class="actions"><span class="small muted">Wijzigingen gaan meteen in, zonder herstart.</span><button class="btn" id="saveBtn">Opslaan</button></div>
   </div>`;
-  let ctype = c.type;
-  document.querySelectorAll("#ctype button").forEach((b) => b.onclick = () => { ctype = b.dataset.v; document.querySelectorAll("#ctype button").forEach((x) => x.classList.toggle("on", x === b)); });
+  const redraw = () => { $("cbox").innerHTML = contractHtml(c); bindContract(c, redraw); };
+  bindContract(c, redraw);
+  document.querySelectorAll("#ctype button").forEach((b) => b.onclick = () => {
+    readContract(c); c.type = b.dataset.v; applySupplier(c, c.supplier);
+    document.querySelectorAll("#ctype button").forEach((x) => x.classList.toggle("on", x === b)); redraw();
+  });
   document.querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => editDevice(Number(b.dataset.edit)));
   const meterFromForm = () => {
     const drv = $("s_md").value, v = $("s_p1").value.trim(), inv = $("s_inv").checked;
@@ -692,8 +744,8 @@ function settings() {
   };
   $("saveBtn").onclick = async () => {
     const next = JSON.parse(JSON.stringify(CFG));
-    Object.assign(next.contract, { type: ctype, import_price: Number($("s_ip").value), feed_in_price: Number($("s_fp").value),
-      energy_tax: Number($("s_et").value), supplier_markup: Number($("s_sm").value), feed_in_cost: Number($("s_fc").value) });
+    readContract(c);
+    next.contract = Object.assign({}, next.contract, c);
     const [lat, lon] = REGIONS[$("s_rg").value];
     Object.assign(next.solar, { kwp: Number($("s_kwp").value), azimuth: ORIENT[$("s_or").value], latitude: lat, longitude: lon,
       base_load_w: Number($("s_base").value), tilt: $("s_or").value === "Oost-west" ? 15 : 35 });
@@ -759,7 +811,7 @@ function editDevice(i) {
   try {
     CFG = await api("api/config");
     if (CFG.solar) { W.solar.kwp = CFG.solar.kwp; W.solar.region = nearestRegion(CFG.solar.latitude, CFG.solar.longitude); }
-    if (CFG.contract) Object.assign(W.contract, { type: CFG.contract.type, import_price: CFG.contract.import_price, feed_in_price: CFG.contract.feed_in_price });
+    if (CFG.contract) Object.assign(W.contract, CFG.contract);
     if (CFG.has_ha) W.ha.url = CFG.homeassistant?.url || "";
     if (MODE === "settings") {
       if (!CFG.configured) { location.href = "setup"; return; }
