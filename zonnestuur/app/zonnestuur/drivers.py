@@ -388,7 +388,7 @@ def ha_candidates(states: list[dict]) -> dict:
             devices.append({"driver": "ha_setpoint", "entity": eid, "name": name, "kind": "heatpump",
                             "normal_temp": temp, "boost_temp": round(float(temp) + 1.5, 1), "power_entity": _match_power(eid, by_id),
                             "score": 3})
-        elif dom == "number" and unit in ("°C", "°F") and any(w in t for w in _HOT_WATER_WORDS) and "max" not in t and "booster" not in t:
+        elif dom == "number" and (unit in ("°C", "°F") or a.get("device_class") == "temperature") and any(w in t for w in _HOT_WATER_WORDS) and "max" not in t and "booster" not in t:
             try:
                 temp = float(s.get("state"))
             except (TypeError, ValueError):
