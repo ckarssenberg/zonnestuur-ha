@@ -177,7 +177,7 @@ const ICONS = {
 ICONS.hw_socket = ICONS.shelly; ICONS.tasmota = ICONS.shelly; ICONS.shelly_em = ICONS.p1;
 const DRIVER_LABEL = {
   shelly: "Shelly", shelly_gen1: "Shelly (oud model)", homewizard_socket: "HomeWizard Energy Socket", tasmota: "Tasmota",
-  ha_switch: "Home Assistant · schakelaar", ha_setpoint: "Home Assistant · temperatuur", ha_current: "Home Assistant · laadstroom",
+  ha_switch: "Home Assistant · schakelaar", ha_start_button: "Home Assistant · witgoed starten", ha_setpoint: "Home Assistant · temperatuur", ha_current: "Home Assistant · laadstroom",
 };
 const METER_KINDS = ["p1", "shelly_em"], SWITCH_KINDS = ["shelly", "hw_socket", "tasmota"];
 const isHA = (drv) => String(drv || "").startsWith("ha_");
@@ -361,9 +361,9 @@ function renderFound() {
   if (cands) {
     html += `<p class="small muted" style="margin:-4px 0 10px">Gekoppeld met ${esc(W.ha.url || CFG.homeassistant?.url || "Home Assistant")}. Kies wat Zonnestuur mag sturen.</p><div class="list">${
       cands.devices.length ? cands.devices.map((c) => {
-        const ent = c.entity || c.current_entity, key = "h:" + ent;
-        const what = c.driver === "ha_current" ? "laadstroom traploos regelen" : c.driver === "ha_setpoint" ? `temperatuur ${nl(c.normal_temp, 1)} → ${nl(c.boost_temp, 1)} °C bij zon` : "aan/uit";
-        const taken = (CFG?.devices || []).some((d) => d.params && (d.params.entity === ent || d.params.current_entity === ent));
+        const ent = c.entity || c.current_entity || c.button_entity, key = "h:" + ent;
+        const what = c.driver === "ha_start_button" ? "programma starten bij zon" : c.driver === "ha_current" ? "laadstroom traploos regelen" : c.driver === "ha_setpoint" ? `temperatuur ${nl(c.normal_temp, 1)} → ${nl(c.boost_temp, 1)} °C bij zon` : "aan/uit";
+        const taken = (CFG?.devices || []).some((d) => d.params && (d.params.entity === ent || d.params.current_entity === ent || d.params.button_entity === ent));
         return card(key, "ha", ICONS[c.kind] || ICONS.generic, c.name, `${esc(ent)} · ${what}${c.warning ? ` · <b style="color:var(--warn,#e5484d)">${esc(c.warning)}</b>` : ""}`, picked(key), true, "", taken);
       }).join("") : '<p class="small muted">In Home Assistant vonden we geen schakelaars, thermostaten of laadpalen.</p>'}</div>`;
   } else {
@@ -385,7 +385,7 @@ function renderFound() {
       else if (kind === "hameter") { const p = cands.power_sensors.find((x) => "m:" + x.entity === key); W.meter = { type: "ha", entity: p.entity, export_entity: p.export_entity || "", name: p.name }; }
       else if (W.picks.some((p) => p.key === key)) W.picks = W.picks.filter((p) => p.key !== key);
       else if (kind === "found") W.picks.push({ key, source: "found", f: FOUND.find((x) => "f:" + x.host === key) });
-      else W.picks.push({ key, source: "ha", c: cands.devices.find((c) => "h:" + (c.entity || c.current_entity) === key) });
+      else W.picks.push({ key, source: "ha", c: cands.devices.find((c) => "h:" + (c.entity || c.current_entity || c.button_entity) === key) });
       renderFound();
     };
     d.onclick = toggle; d.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } };
@@ -440,11 +440,11 @@ function deviceFromPick(p) {
       power_w: 2000, tested: null, model: `${p.f.name} op ${p.f.host}` };
   }
   const c = p.c, params = {};
-  for (const k of ["entity", "current_entity", "switch_entity", "power_entity", "normal_temp", "boost_temp", "min_a", "max_a"]) if (c[k] !== undefined && c[k] !== "") params[k] = c[k];
+  for (const k of ["entity", "current_entity", "switch_entity", "power_entity", "normal_temp", "boost_temp", "min_a", "max_a", "button_entity", "remote_entity"]) if (c[k] !== undefined && c[k] !== "") params[k] = c[k];
   if (c.driver === "ha_current") params.phases = 3;
-  const power = c.driver === "ha_current" ? 11000 : c.kind === "heatpump" ? 1500 : 2000;
+  const power = c.power_w || (c.driver === "ha_current" ? 11000 : c.kind === "heatpump" ? 1500 : 2000);
   return { key: p.key, host: "", driver: c.driver, switch_id: 0, params, kind: c.kind, name: c.name, power_w: power, tested: null,
-    model: `Home Assistant · ${c.entity || c.current_entity}` };
+    model: `Home Assistant · ${c.entity || c.current_entity || c.button_entity}` };
 }
 function evRange(d) { const w = 230 * (d.params.phases || 1); return [d.params.min_a * w, d.params.max_a * w]; }
 function apparaten() {
@@ -475,9 +475,10 @@ function apparaten() {
     </div>
     ${extra}
     <h2 class="t">Test de koppeling</h2>
-    <p class="small muted" style="margin-top:-4px">${drv === "ha_setpoint" ? "We zetten de temperatuur een paar seconden hoger en daarna terug." : drv === "ha_current" ? "We starten het laden een paar seconden op de laagste stroom." : "We zetten hem een paar seconden aan en meten wat het apparaat opneemt."}</p>
+    <p class="small muted" style="margin-top:-4px">${drv === "ha_start_button" ? "We starten geen programma om te testen. We kijken alleen of hij bereikbaar is." : drv === "ha_setpoint" ? "We zetten de temperatuur een paar seconden hoger en daarna terug." : drv === "ha_current" ? "We starten het laden een paar seconden op de laagste stroom." : "We zetten hem een paar seconden aan en meten wat het apparaat opneemt."}</p>
     <div class="test" id="testBox">${testHtml(d)}</div>
-    ${drv === "ha_current" ? "" : `<div class="row"><div class="field" style="flex:0 1 220px"><label for="dpower">Vermogen (watt)</label><input id="dpower" type="number" min="100" max="25000" step="50" value="${d.power_w}"><span class="hint">${drv === "ha_setpoint" ? "Wat hij ongeveer opneemt als hij draait." : "Staat ook op het typeplaatje."}</span></div></div>`}
+    ${drv === "ha_start_button" ? `<p class="small muted">Zo gebruik je hem: vul de machine, kies het programma en zet hem op <b>Start op afstand</b> (MobileStart). Zonnestuur drukt op start zodra er genoeg zon is. Een gestart programma zet Zonnestuur nooit stop.</p>` : ""}
+    ${drv === "ha_current" ? "" : `<div class="row"><div class="field" style="flex:0 1 220px"><label for="dpower">Vermogen (watt)</label><input id="dpower" type="number" min="100" max="25000" step="50" value="${d.power_w}"><span class="hint">${drv === "ha_setpoint" || drv === "ha_start_button" ? "Wat hij ongeveer gemiddeld opneemt als hij draait." : "Staat ook op het typeplaatje."}</span></div></div>`}
     <div class="actions"><button class="btn ghost" id="back">← Terug</button><button class="btn" id="next">${devIdx < W.devices.length - 1 ? "Volgende →" : "Verder →"}</button></div>
   </section>`;
   const save = () => {
@@ -500,7 +501,7 @@ function apparaten() {
     save(); $("testBox").innerHTML = '<span class="spin"></span><span>Aan het testen… luister of je het apparaat hoort aanslaan.</span>';
     try {
       const r = await api("api/setup/test-switch", { method: "POST", body: JSON.stringify({ host: d.host, driver: d.driver, switch_id: d.switch_id, params: d.params }) });
-      d.tested = r.max_power_w;
+      d.tested = r.max_power_w; d.ready = r.ready;
       if (r.max_power_w > 50 && drv !== "ha_current") d.power_w = Math.round(r.max_power_w / 50) * 50;
     } catch (e) { d.tested = -1; setErr(e.message); }
     apparaten();
@@ -509,6 +510,7 @@ function apparaten() {
   $("next").onclick = () => { save(); if (devIdx < W.devices.length - 1) { devIdx++; apparaten(); } else go(W.addOnly ? 5 : 4); };
 }
 function testHtml(d) {
+  if (d.driver === "ha_start_button" && d.tested != null && d.tested >= 0) return `<span style="flex:1"><b style="color:var(--good)">Bereikbaar.</b> ${d.ready ? "Hij staat nu klaar om te starten." : "Hij staat nu niet op start op afstand; dat is prima."}</span><button class="btn ghost small" id="testBtn">Opnieuw</button>`;
   if (d.tested == null) return `<span class="small muted" style="flex:1">Nog niet getest</span><button class="btn small" id="testBtn">Test nu</button>`;
   if (d.tested < 0) return `<span style="flex:1">Het apparaat reageerde niet.</span><button class="btn small" id="testBtn">Opnieuw</button>`;
   if (d.tested > 50) return `<span style="flex:1"><b style="color:var(--good)">Werkt.</b> We maten ${nl(d.tested)} W.</span><button class="btn ghost small" id="testBtn">Opnieuw</button>`;
@@ -604,7 +606,7 @@ function settings() {
     <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:6px"><h1 class="t" style="margin:0">Instellingen</h1><a class="btn ghost small" href="./">← Dashboard</a></div>
     <section class="card"><h2 class="t">Apparaten</h2>
       <div>${CFG.devices.map((d, i) => `<div class="dev-row"><div class="ico" style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--chip)">${ICONS[d.kind].replace("<svg", '<svg width="20" height="20" stroke="currentColor" fill="none" stroke-width="1.8"')}</div>
-        <div style="flex:1;min-width:0"><b>${esc(d.name)}</b><div class="small muted">${esc(DRIVER_LABEL[d.driver] || d.driver)} · ${esc(d.host || d.params.entity || d.params.current_entity || "")} · ${d.driver === "ha_current" ? "traploos" : nl(d.power_w) + " W"} · prioriteit ${d.priority}</div></div>
+        <div style="flex:1;min-width:0"><b>${esc(d.name)}</b><div class="small muted">${esc(DRIVER_LABEL[d.driver] || d.driver)} · ${esc(d.host || d.params.entity || d.params.current_entity || d.params.button_entity || "")} · ${d.driver === "ha_current" ? "traploos" : nl(d.power_w) + " W"} · prioriteit ${d.priority}</div></div>
         <button class="btn ghost small" data-edit="${i}">Aanpassen</button></div>`).join("")}</div>
       <div class="actions" style="margin-top:14px"><span></span><a class="btn ghost small" href="setup#toevoegen" id="addBtn">+ Apparaat toevoegen</a></div>
     </section>

@@ -15,6 +15,10 @@ class DeviceError(Exception):
     """Een apparaat reageert niet of geeft onverwachte data terug."""
 
 
+class NotReady(DeviceError):
+    """Het apparaat werkt, maar is (nog) niet klaargezet, bijv. een wasmachine zonder 'start op afstand'."""
+
+
 def http_get_json(url: str, timeout: float = 4.0) -> dict:
     try:
         with urllib.request.urlopen(url, timeout=timeout) as resp:

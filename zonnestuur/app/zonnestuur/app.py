@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
 from . import __version__
-from .adapters import DeviceError, HomeWizardP1, ShellySwitch
+from .adapters import DeviceError, HomeWizardP1, ShellySwitch, NotReady
 from .config import Config, load_config, merge_public, public_dict, save_config, effective_ha
 from .discovery import PROBLEMS, Scanner, identify
 from .drivers import HomeAssistant, ha_candidates, make_meter, make_switch
@@ -103,6 +103,8 @@ class Engine:
                     self._last_on[d.id] = s.on
                     self.controller.update_measurements(d.id, s.on, s.power_w, s.energy_wh, True)
                     powers[d.id] = s.power_w
+                except NotReady as exc:
+                    self.controller.update_measurements(d.id, False, 0.0, None, online=False, offline_reason=str(exc))
                 except (DeviceError, KeyError, ValueError) as exc:
                     self.controller.update_measurements(d.id, False, 0.0, None, online=False)
                     self.last_error = f"{d.name}: {exc}"
@@ -238,6 +240,12 @@ class Engine:
                          switch_id=int(spec.get("switch_id", 0)), params=dict(spec.get("params") or {}))
         cfg = Config(homeassistant=self.cfg.homeassistant)
         sw = make_switch(cfg, d)
+        if d.driver == "ha_start_button":             # nooit een wasprogramma starten om te testen
+            try:
+                sw.status()
+                return {"max_power_w": 0, "metering": False, "restored": True, "no_test": True, "ready": True}
+            except NotReady as exc:
+                return {"max_power_w": 0, "metering": False, "restored": True, "no_test": True, "ready": False, "note": str(exc)}
         with self.lock:                          # regelaar even pauzeren tijdens de test
             before = sw.status()
             sw.set(True)

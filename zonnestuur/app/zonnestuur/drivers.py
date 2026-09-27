@@ -18,11 +18,12 @@ from __future__ import annotations
 
 import json
 import math
+import time
 import urllib.parse
 import urllib.request
 from typing import Optional
 
-from .adapters import DeviceError, HomeWizardP1, MeterReading, ShellySwitch, SwitchStatus, http_get_json
+from .adapters import DeviceError, NotReady, HomeWizardP1, MeterReading, ShellySwitch, SwitchStatus, http_get_json
 
 
 def _request(url: str, method: str = "GET", body: Optional[dict] = None, headers: Optional[dict] = None,
@@ -234,6 +235,44 @@ class HASetpointBoost:
             self.ha.call(self.domain, "set_temperature", {"entity_id": self.entity, "temperature": t})
 
 
+class HAStartButton:
+    """Witgoed via Home Assistant (bijv. Miele, Home Connect): het programma starten als de zon schijnt.
+
+    Jij vult de machine en zet hem op 'start op afstand'. Zonnestuur drukt op de startknop zodra er genoeg
+    overschot is. Uitzetten doet Zonnestuur nooit: een gestart programma loopt altijd af.
+    """
+
+    RUN_HOURS = 4.0
+
+    def __init__(self, ha: HomeAssistant, button_entity: str, remote_entity: str = "", power_entity: str = ""):
+        self.ha, self.button, self.remote, self.power_entity = ha, button_entity, remote_entity, power_entity
+        self.started_at: Optional[float] = None
+
+    def _armed(self) -> bool:
+        if self.ha.state(self.button).get("state") in ("unavailable", "unknown", None):
+            return False
+        return not self.remote or self.ha.state(self.remote).get("state") == "on"
+
+    def status(self) -> SwitchStatus:
+        armed = self._armed()
+        power = self.ha.number(self.power_entity) if self.power_entity else None
+        running = self.started_at is not None and time.monotonic() - self.started_at < self.RUN_HOURS * 3600 and not armed
+        if running:
+            return SwitchStatus(True, float(power or 0.0), None)
+        self.started_at = None
+        if not armed:
+            raise NotReady("wacht tot je hem klaarzet met start op afstand")
+        return SwitchStatus(False, 0.0, None)
+
+    def set(self, on: bool) -> None:
+        if not on:
+            return                                      # een lopend programma nooit afbreken
+        if not self._armed():
+            raise NotReady("niet klaargezet")
+        self.ha.call("button", "press", {"entity_id": self.button})
+        self.started_at = time.monotonic()
+
+
 class HACurrentControl:
     """Laadpaal of auto via Home Assistant: laadstroom (A) traploos instellen, plus optioneel laden aan/uit.
 
@@ -313,6 +352,8 @@ def make_switch(cfg, d):
     if drv == "ha_setpoint":
         return HASetpointBoost(ha, p["entity"], float(p.get("normal_temp", 50)), float(p.get("boost_temp", 60)),
                                p.get("power_entity", ""))
+    if drv == "ha_start_button":
+        return HAStartButton(ha, p["button_entity"], p.get("remote_entity", ""), p.get("power_entity", ""))
     if drv == "ha_current":
         return HACurrentControl(ha, p["current_entity"], p.get("switch_entity", ""), p.get("power_entity", ""),
                                 int(p.get("phases", 1)), float(p.get("volts", 230)), float(p.get("min_a", 6)),
@@ -363,12 +404,19 @@ def ha_candidates(states: list[dict]) -> dict:
         name = a.get("friendly_name") or eid
         unit = a.get("unit_of_measurement", "")
         t = _text(eid, name)
-        if s.get("state") in ("unavailable",) and dom != "sensor":
+        if s.get("state") in ("unavailable",) and dom not in ("sensor", "button"):
             continue
         if dom == "sensor" and _is_power(s):
             score = 2 * any(w in t for w in _METER_WORDS) - any(w in t for w in ("dimmer", "lamp", "licht", "light", "max ", "min ", "gemiddeld", "average"))
             power_sensors.append({"entity": eid, "name": name, "unit": unit, "state": s.get("state"), "score": score,
                                   "export": any(w in t for w in _EXPORT_WORDS)})
+        elif dom == "button" and (eid.endswith(("_starten", "_start", "_start_program")) or name.lower().endswith((" starten", " start"))):
+            remote = _match_remote_start(eid, by_id)
+            if not remote:
+                continue                                  # zonder 'start op afstand' is het vaak geen witgoed
+            dev_name = name[: -len(" starten")] if name.lower().endswith(" starten") else name
+            devices.append({"driver": "ha_start_button", "button_entity": eid, "remote_entity": remote, "name": dev_name,
+                            "kind": "generic", "power_w": 1200, "power_entity": _match_power(eid, by_id), "score": 3})
         elif dom == "switch":
             if any(w in t for w in _NOT_A_LOAD):
                 continue
@@ -402,6 +450,9 @@ def ha_candidates(states: list[dict]) -> dict:
                             "switch_entity": _match_switch(eid, by_id), "power_entity": _match_power(eid, by_id), "score": 4})
     used = {d.get("switch_entity") for d in devices if d["driver"] == "ha_current"}
     devices = [d for d in devices if not (d["driver"] == "ha_switch" and d["entity"] in used)]   # laadschakelaar hoort bij de laadpaal
+    # Aan/uit-knop van witgoed met een startknop: aanzetten start geen programma, dus weglaten
+    starters = {_stem(d["button_entity"]) for d in devices if d["driver"] == "ha_start_button"}
+    devices = [d for d in devices if not (d["driver"] == "ha_switch" and _stem(d["entity"]) in starters)]
     # Meter met aparte sensor voor teruglevering (bijv. Tibber Pulse: 'power' en 'stroomproductie')
     for p in power_sensors:
         if not p["export"]:
@@ -425,7 +476,7 @@ def _common(a: str, b: str) -> int:
 
 def _stem(eid: str) -> str:
     base = eid.split(".", 1)[1]
-    for suffix in ("_charging_current", "_max_charging_current", "_current", "_switch", "_charging", "_power",
+    for suffix in ("_start_program", "_starten", "_start", "_charging_current", "_max_charging_current", "_current", "_switch", "_charging", "_power",
                    "_hot_water", "_water_heater"):
         if base.endswith(suffix):
             return base[: -len(suffix)]
@@ -439,6 +490,15 @@ def _match_power(eid: str, by_id: dict) -> str:
             a = s.get("attributes") or {}
             if a.get("device_class") == "power" or a.get("unit_of_measurement") in ("W", "kW"):
                 return cand
+    return ""
+
+
+def _match_remote_start(eid: str, by_id: dict) -> str:
+    stem = _stem(eid)
+    for suffix in ("_mobiel_starten", "_start_op_afstand", "_mobile_start", "_remote_start", "_remote_start_allowed"):
+        cand = f"binary_sensor.{stem.split('.', 1)[-1]}{suffix}"
+        if cand in by_id:
+            return cand
     return ""
 
 

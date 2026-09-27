@@ -38,6 +38,11 @@ class DeviceConfig:
     expected_run_min: int = 150    # zoveel minuten draait hij gemiddeld per dag (voor het kiezen van de beste zonuren)
 
     @property
+    def one_shot(self) -> bool:
+        """Alleen starten, nooit uitzetten: witgoed dat een programma afmaakt (wasmachine, droger, vaatwasser)."""
+        return self.driver == "ha_start_button"
+
+    @property
     def modulating(self) -> bool:
         """Traploos regelbaar (laadstroom instellen) in plaats van alleen aan/uit."""
         return self.driver == "ha_current"
@@ -142,7 +147,8 @@ def effective_ha(cfg: "Config") -> dict:
     return {"url": SUPERVISOR_URL, "token": tok, "addon": True} if tok else {}
 
 
-DRIVERS = ("shelly", "shelly_gen1", "homewizard_socket", "tasmota", "ha_switch", "ha_setpoint", "ha_current")
+DRIVERS = ("shelly", "shelly_gen1", "homewizard_socket", "tasmota", "ha_switch", "ha_setpoint", "ha_current",
+           "ha_start_button")
 SERVER_KEYS = ("interval_s", "web_host", "web_port", "web_token", "db_path", "timezone", "scan_extra")
 
 

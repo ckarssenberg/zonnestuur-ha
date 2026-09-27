@@ -47,6 +47,7 @@ class DeviceState:
     override_until: Optional[datetime] = None
     setpoint_w: Optional[float] = None      # traploze apparaten: ingesteld vermogen
     setpoint_at: float = -math.inf
+    offline_reason: str = ""                  # waarom niet beschikbaar (bijv. 'wacht tot je hem klaarzet')
 
     def to_dict(self) -> dict:
         return {
@@ -92,9 +93,10 @@ class Controller:
         st.override_until = now + timedelta(hours=hours) if (hours and mode != "auto") else None
 
     def update_measurements(self, device_id: str, on: bool, power_w: float,
-                            energy_wh: Optional[float], online: bool = True) -> None:
+                            energy_wh: Optional[float], online: bool = True, offline_reason: str = "") -> None:
         st = self.states[device_id]
         st.on, st.power_w, st.energy_wh, st.online = on, power_w, energy_wh, online
+        st.offline_reason = "" if online else offline_reason
 
     # ---- garantie --------------------------------------------------------
     @staticmethod
@@ -145,9 +147,11 @@ class Controller:
         for d in devices:
             st = self.states[d.id]
             if not st.online:
-                st.reason = "offline"
+                st.reason = st.offline_reason or "offline"
                 continue
             on, reason = wanted.get(d.id, (st.on, st.reason))
+            if d.one_shot and st.on:
+                on, reason = True, "programma loopt"          # een gestart programma breken we nooit af
             setpoint = self._setpoint(d, st, ctx, on, reason) if d.modulating else None
             if on != st.on:
                 decisions.append(Decision(d.id, on, reason, setpoint))
