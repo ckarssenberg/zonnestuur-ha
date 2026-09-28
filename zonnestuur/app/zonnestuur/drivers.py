@@ -159,6 +159,14 @@ class HomeAssistant:
     def call(self, domain: str, service: str, data: dict) -> None:
         _request(f"{self.url}/api/services/{domain}/{service}", "POST", data, headers=self._h(), timeout=self.timeout)
 
+    def notify_services(self) -> list[str]:
+        """Alle notify-diensten, bijvoorbeeld notify.mobile_app_telefoon (voor meldingen op je telefoon)."""
+        data = _request(f"{self.url}/api/services", headers=self._h(), timeout=self.timeout)
+        for d in data or []:
+            if d.get("domain") == "notify":
+                return sorted(f"notify.{k}" for k in (d.get("services") or {}) if k not in ("notify", "send_message"))
+        return []
+
     def number(self, entity_id: str) -> Optional[float]:
         st = self.state(entity_id)
         try:
@@ -402,7 +410,7 @@ def ha_candidates(states: list[dict]) -> dict:
 
     De meest waarschijnlijke komen bovenaan; ruis (camera-instellingen, rolluiken, onbeschikbare dingen) valt weg.
     """
-    power_sensors, devices, price_sensors = [], [], []
+    power_sensors, devices, price_sensors, inverter_limits = [], [], [], []
     by_id = {s.get("entity_id"): s for s in states}
     charging_switches = [e for e in by_id if e.startswith("switch.") and e.endswith(("_charging", "_opladen", "_laden"))]
     has_available = any(e.startswith("number.") and ("available_current" in e or "beschikbare_stroom" in e) for e in by_id)
@@ -414,6 +422,10 @@ def ha_candidates(states: list[dict]) -> dict:
         unit = a.get("unit_of_measurement", "")
         t = _text(eid, name)
         if s.get("state") in ("unavailable",) and dom not in ("sensor", "button"):
+            continue
+        if dom in ("number", "input_number") and _is_inverter_limit(t, unit):
+            inverter_limits.append({"entity": eid, "name": name, "unit": unit,
+                                    "state": s.get("state"), "max": a.get("max")})
             continue
         if dom == "sensor" and "/kwh" in unit.lower().replace(" ", "") and any(c in unit.lower() for c in ("€", "eur", "ct")):
             price_sensors.append({"entity": eid, "name": name, "unit": unit, "state": s.get("state")})
@@ -501,7 +513,19 @@ def ha_candidates(states: list[dict]) -> dict:
             name = (a.get("friendly_name") or prefix).rsplit(" ", 1)[0]
             readonly.append({"name": name, "brand": "zaptec" if any("fallback_current" in e for e in siblings) else "",
                              "via": "een andere koppeling, zoals Tibber"})
-    return {"power_sensors": power_sensors, "devices": devices, "price_sensors": price_sensors, "readonly_chargers": readonly}
+    return {"power_sensors": power_sensors, "devices": devices, "price_sensors": price_sensors, "readonly_chargers": readonly,
+            "inverter_limits": inverter_limits}
+
+
+_INVERTER_WORDS = ("inverter", "omvormer", "solaredge", "growatt", "huawei", "sungrow", "fronius", "goodwe", "solis",
+                   "sma ", "hoymiles", "enphase", "apsystems", "deye", "solax", "foxess", "pv ", "zonnepan", "opendtu", "ahoy")
+_LIMIT_WORDS = ("power limit", "active power", "export limit", "limit", "vermogenslimiet", "begrenzing", "max output",
+                "maximaal vermogen", "power control", "active_power", "limit_nonpersistent")
+
+
+def _is_inverter_limit(t: str, unit: str) -> bool:
+    """Een instelbaar getal waarmee je het vermogen van de omvormer begrenst (in W, kW of %)."""
+    return unit in ("W", "kW", "%") and any(w in t for w in _LIMIT_WORDS) and any(w in t for w in _INVERTER_WORDS)
 
 
 def _common(a: str, b: str) -> int:

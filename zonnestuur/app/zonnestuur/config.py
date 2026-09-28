@@ -114,6 +114,8 @@ class Config:
     scan_extra: list[str] = field(default_factory=list)   # extra adressen om te proberen bij het zoeken
     meter: dict = field(default_factory=dict)              # {"driver": "homewizard"|"shelly_em"|"ha", ...}
     homeassistant: dict = field(default_factory=dict)      # {"url": ..., "token": ...}
+    inverter: dict = field(default_factory=dict)           # {"entity": number.x, "max_w": 5000, "unit": "W"|"%"}
+    notify: dict = field(default_factory=dict)             # {"service": "notify.mobile_app_x", "tips": true, "alerts": true}
 
     @property
     def meter_driver(self) -> str:
@@ -251,6 +253,16 @@ def config_from_dict(raw: dict) -> Config:
         raise ValueError("contract.type moet 'fixed' of 'dynamic' zijn")
     if cfg.strategy == "price" and cfg.contract.type != "dynamic" and cfg.devices:
         raise ValueError("Zonder zonnepanelen stuurt Zonnestuur op de stroomprijs: daarvoor is een dynamisch contract nodig")
+    inv = cfg.inverter or {}
+    if inv.get("entity"):
+        if inv.get("unit", "W") not in ("W", "kW", "%"):
+            raise ValueError("Omvormer: eenheid moet W, kW of % zijn")
+        if not (100 <= float(inv.get("max_w") or 0) <= 100000):
+            raise ValueError("Omvormer: vul het maximale vermogen in (100–100.000 W)")
+        if not effective_ha(cfg).get("token"):
+            raise ValueError("Omvormer begrenzen gaat via Home Assistant, maar die is nog niet gekoppeld")
+    if (cfg.notify or {}).get("service") and not str(cfg.notify["service"]).startswith("notify."):
+        raise ValueError("Meldingen: kies een dienst die met 'notify.' begint")
     for d in cfg.devices:
         for t in d.ready_times:
             hh, mm = t.split(":")

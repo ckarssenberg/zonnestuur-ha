@@ -89,7 +89,17 @@
   .c-flow { grid-column: span 8; } .c-save { grid-column: span 4; }
   .c-dev { grid-column: span 5; } .c-today { grid-column: span 7; }
   .c-ring { grid-column: span 4; } .c-month { grid-column: span 8; }
-  .c-price, .c-usage { grid-column: span 12; }
+  .c-price, .c-usage, .c-feed { grid-column: span 12; }
+  .advice { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin-top: 14px; }
+  .advice div { background: var(--chip); border-radius: 14px; padding: 12px 14px; }
+  .advice b { display: block; font-size: 14px; margin-bottom: 4px; }
+  .advice p { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+  .batt { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .batt td, .batt th { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--rule); }
+  .batt td:first-child, .batt th:first-child { text-align: left; }
+  .batt th { color: var(--ink-3); font-weight: 550; font-size: 12px; }
+  @media (max-width: 560px) { .batt .hide-m { display: none; } }
+  .btn-soft { font: inherit; font-size: 13px; font-weight: 600; border: 0; border-radius: 999px; padding: 8px 14px; background: var(--chip); color: var(--ink); cursor: pointer; }
   .price-stats, .use-stats { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 6px 0 14px; }
   .price-stats div, .use-stats div { display: grid; gap: 2px; }
   .price-stats b, .use-stats b { font-family: "Inter Tight", Inter, sans-serif; font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
@@ -195,7 +205,7 @@
 
   @media (max-width: 980px) {
     .c-flow, .c-save, .c-dev, .c-today, .c-ring, .c-month { grid-column: span 12; }
-    .c-save { order: 2; } .c-price { order: 3; } .c-dev { order: 4; } .c-today { order: 5; } .c-usage { order: 6; } .c-ring { order: 7; } .c-month { order: 8; }
+    .c-save { order: 2; } .c-price { order: 3; } .c-dev { order: 4; } .c-today { order: 5; } .c-usage { order: 6; } .c-feed { order: 7; } .c-ring { order: 8; } .c-month { order: 9; }
   }
   @media (max-width: 560px) {
     .flow .lbl { font-size: 15px; } .flow .val { font-size: 21px; }
@@ -333,6 +343,12 @@
       <details class="table"><summary>Toon als tabel</summary><table id="useTable"></table></details>
     </section>
 
+    <!-- teruglevering -->
+    <section class="card c-feed" aria-labelledby="feedTitle">
+      <div class="title-row"><span class="eyebrow" id="feedTitle">Teruglevering: waar gaat je stroom heen?</span><span class="small muted" id="feedNote"></span></div>
+      <div id="feedBody"><div class="empty">Laden…</div></div>
+    </section>
+
     <!-- zelfverbruik -->
     <section class="card c-ring" aria-labelledby="ringTitle">
       <div class="title-row"><span class="eyebrow" id="ringTitle">Uit eigen zon</span></div>
@@ -405,7 +421,7 @@ async function api(path, opts = {}) {
   return r.json();
 }
 
-let STATUS = null, TODAY = null, MONTH = [], PRICES = null, USAGE = null, USE_P = "day", USE_OFF = 0;
+let STATUS = null, TODAY = null, MONTH = [], PRICES = null, USAGE = null, USE_P = "day", USE_OFF = 0, INSIGHT = null;
 
 function renderStatus(s) {
   STATUS = s;
@@ -827,7 +843,69 @@ document.querySelectorAll("#useSeg button").forEach((b) => b.onclick = () => {
 $("usePrev").onclick = () => { USE_OFF++; loadUsage(); };
 $("useNext").onclick = () => { if (USE_OFF > 0) { USE_OFF--; loadUsage(); } };
 
-function drawCharts() { drawToday(); drawMonth(); drawPrices(); drawUsage(); }
+
+// ---------- teruglevering: inzicht en advies ----------
+function drawInsight() {
+  const I = INSIGHT, body = $("feedBody"); if (!I) return;
+  if (!I.ok) {
+    body.innerHTML = `<div class="empty">Nog geen meetgegevens. Zonnestuur houdt vanaf nu per uur bij wat je afneemt en teruglevert.
+      ${I.can_backfill ? '<br><br><button class="btn-soft" id="bfBtn">Haal het afgelopen jaar op uit Home Assistant</button>' : ""}</div>`;
+    if ($("bfBtn")) $("bfBtn").onclick = backfill;
+    $("feedNote").textContent = ""; return;
+  }
+  const f = (d) => new Date(d).toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" });
+  $("feedNote").textContent = `${f(I.first)} – ${f(I.last)} · ${I.days} dagen`;
+  const peak = I.peak_hours.length ? `${String(I.peak_hours[0]).padStart(2, "0")}:00–${String(I.peak_hours[I.peak_hours.length - 1] + 1).padStart(2, "0")}:00` : "–";
+  body.innerHTML = `<div class="use-stats">
+      <div><b>${nl(I.export_per_day, 1)} kWh</b><span>per dag teruggeleverd</span></div>
+      <div><b>${nl(I.import_per_day, 1)} kWh</b><span>per dag afgenomen</span></div>
+      <div><b>€ ${nl(I.missed_eur_year)}</b><span>per jaar meer waard als je het zelf gebruikt*</span></div>
+      <div><b>${peak}</b><span>hier lever je het meest terug</span></div>
+    </div>
+    ${STATUS && STATUS.inverter ? `<p class="small" style="margin:10px 0 0"><span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:${STATUS.inverter.limited ? "var(--sun)" : "var(--ink-3)"}"></span>${STATUS.inverter.limited ? esc(STATUS.inverter.reason) : "Omvormer op vol vermogen; Zonnestuur knijpt hem af zodra terugleveren geld kost."}</p>` : ""}
+    ${STATUS && STATUS.notifications && STATUS.notifications.length ? `<p class="small muted" style="margin:6px 0 0">Laatste melding (${new Date(STATUS.notifications[0].at).toLocaleString("nl-NL", { weekday: "short", hour: "2-digit", minute: "2-digit" })}): ${esc(STATUS.notifications[0].title)}</p>` : ""}
+    <div class="chart" id="feedChart"><svg id="feedSvg" role="img" aria-label="Gemiddeld per uur van de dag: afname en teruglevering"></svg><div class="tip" id="feedTip"></div></div>
+    <div class="legend"><span><i class="sw" style="background:var(--net)"></i>Gemiddeld afgenomen</span><span><i class="sw" style="background:var(--sun)"></i>Gemiddeld teruggeleverd</span><span class="muted">kWh per uur van de dag</span></div>
+    ${I.advice.length ? `<div class="advice">${I.advice.map((a) => `<div><b>${esc(a.title)}</b><p>${esc(a.text)}</p></div>`).join("")}</div>` : ""}
+    <div style="overflow-x:auto"><table class="batt"><tr><th>Batterij (richtprijs)</th><th class="hide-m">Laden uit teruglevering</th><th>Bespaart per jaar</th><th>Terugverdiend in</th></tr>
+      ${I.batteries.map((b) => `<tr><td>${esc(b.name)} · € ${nl(b.price)}</td><td class="hide-m">${nl(b.charged_kwh * 365 / I.days)} kWh/jaar</td><td>€ ${nl(b.saving_year)}</td><td>${b.payback_years ? nl(b.payback_years, 1) + " jaar" : "–"}</td></tr>`).join("")}</table></div>
+    <p class="small muted" style="margin-top:10px">* Bovengrens: wat je had bespaard als je al die stroom zelf had gebruikt (afnameprijs min wat teruglevering opleverde: gemiddeld ${eur3(I.avg_import_price)} tegen ${eur3(I.avg_export_value)} per kWh). Batterijen: simulatie op jouw uurdata, 90% rendement.
+      ${I.seasonal_warning ? "Minder dan een jaar aan gegevens: per-jaar-bedragen zijn doorgetrokken en hangen af van het seizoen." : ""}</p>`;
+  const svg = $("feedSvg"), box = $("feedChart"), tip = $("feedTip");
+  const W = Math.max(300, box.clientWidth), H = 180, L = 40, R = 6, T = 10, B = 24;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("height", H);
+  const up = Math.max(0.05, ...I.profile_import), down = Math.max(0, ...I.profile_export);
+  const sc = niceScale(up + down), ymax = Math.ceil(up / sc.step) * sc.step, ymin = -Math.ceil(down / sc.step) * sc.step;
+  const Y = (v) => T + (1 - (v - ymin) / (ymax - ymin || 1)) * (H - T - B);
+  for (let v = ymin; v <= ymax + 1e-9; v += sc.step) {
+    el("line", { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: "grid-l" }, svg);
+    el("text", { x: L - 6, y: Y(v) + 4, "text-anchor": "end", class: "axis" }, svg).textContent = nl(Math.abs(v), sc.step % 1 ? 1 : 0);
+  }
+  el("line", { x1: L, x2: W - R, y1: Y(0), y2: Y(0), stroke: "var(--ink-3)", "stroke-width": 1 }, svg);
+  const slot = (W - L - R) / 24, bw = Math.max(2, slot - 2);
+  for (let h = 0; h < 24; h++) {
+    const x = L + h * slot + 1, i = I.profile_import[h], e = I.profile_export[h];
+    if (i > 0.005) el("path", { d: roundedTop(x, Y(i), bw, Y(0) - Y(i) - 1, 3), fill: "var(--net)" }, svg);
+    if (e > 0.005) { const y1 = Y(-e), y0 = Y(0) + 1, r = Math.min(3, (y1 - y0) / 2);
+      el("path", { d: `M${x},${y0} V${y1 - r} Q${x},${y1} ${x + r},${y1} H${x + bw - r} Q${x + bw},${y1} ${x + bw},${y1 - r} V${y0} Z`, fill: "var(--sun)" }, svg); }
+    if (h % (W < 560 ? 6 : 3) === 0) el("text", { x: L + h * slot + slot / 2, y: H - 6, "text-anchor": "middle", class: "axis" }, svg).textContent = String(h).padStart(2, "0") + ":00";
+    const hit = el("rect", { x: L + h * slot, y: T, width: slot, height: H - T - B, fill: "transparent" }, svg);
+    hit.addEventListener("pointerenter", () => showTip(tip, box, (L + h * slot + slot / 2) * (box.clientWidth / W), `<b>${String(h).padStart(2, "0")}:00–${String(h + 1).padStart(2, "0")}:00</b>
+      <div class="row"><i class="sw" style="background:var(--net)"></i>Afgenomen<em>${nl(i, 2)} kWh</em></div>
+      <div class="row"><i class="sw" style="background:var(--sun)"></i>Teruggeleverd<em>${nl(e, 2)} kWh</em></div>`));
+    hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+  }
+}
+async function backfill() {
+  const b = $("bfBtn"); if (b) { b.disabled = true; b.textContent = "Bezig met ophalen…"; }
+  try {
+    const r = await api("api/history/backfill", { method: "POST", body: "{}" });
+    if (!r.ok) { $("feedBody").innerHTML = `<div class="empty">${esc(r.error)}</div>`; return; }
+    INSIGHT = await api("api/insight"); drawInsight(); loadUsage();
+  } catch (e) {}
+}
+
+function drawCharts() { drawToday(); drawMonth(); drawPrices(); drawUsage(); drawInsight(); }
 
 async function refresh() {
   try { renderStatus(await api("api/status")); }
@@ -836,8 +914,9 @@ async function refresh() {
 async function refreshCharts() {
   try {
     const r = await Promise.allSettled([api("api/today"), api("api/history?days=31"), api("api/prices"),
-      api(`api/usage?period=${USE_P}&offset=${USE_OFF}`)]);
+      api(`api/usage?period=${USE_P}&offset=${USE_OFF}`), api("api/insight")]);
     const v = (i, d) => (r[i].status === "fulfilled" ? r[i].value : d);
+    INSIGHT = v(4, null); $("feedBody").closest("section").hidden = !INSIGHT;
     TODAY = v(0, TODAY); MONTH = v(1, MONTH); PRICES = v(2, null); USAGE = v(3, null);
     $("priceSvg").closest("section").hidden = !PRICES;
     $("useSvg").closest("section").hidden = !USAGE;

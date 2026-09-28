@@ -690,6 +690,25 @@ async function settings() {
       </div>
       <div class="row"><div class="field"><label for="s_base">Sluipverbruik huis overdag (W)</label><input id="s_base" type="number" step="10" value="${s.base_load_w}"></div></div>
     </section>
+    <section class="card" id="feedCard"><h2 class="t">Minder terugleveren</h2>
+      ${CFG.has_ha ? `<p class="small muted" style="margin-top:-4px">Zonnestuur laat je apparaten al op je eigen zonnestroom draaien. Hiermee gaat hij nog een stap verder.</p>
+      <h3 class="t" style="font-size:15px;margin:14px 0 6px">Omvormer begrenzen als terugleveren geld kost</h3>
+      <p class="small muted" style="margin-top:0">Bij een negatieve terugleverprijs (of terugleverkosten hoger dan de vergoeding) knijpt Zonnestuur je omvormer af tot precies je eigen verbruik. Daarna gaat hij vanzelf terug naar vol vermogen.</p>
+      <div class="row">
+        <div class="field"><label for="i_ent">Instelling van je omvormer (number.…)</label><input id="i_ent" list="i_list" placeholder="bijv. number.solaredge_active_power_limit" value="${esc(CFG.inverter?.entity || "")}"><datalist id="i_list"></datalist></div>
+        <div class="field" style="flex:0 1 160px"><label for="i_max">Vol vermogen (W)</label><input id="i_max" type="number" step="100" value="${CFG.inverter?.max_w || ""}"></div>
+        <div class="field" style="flex:0 1 120px"><label for="i_unit">Eenheid</label><select id="i_unit">${["W", "kW", "%"].map((u) => `<option ${(CFG.inverter?.unit || "W") === u ? "selected" : ""}>${u}</option>`).join("")}</select></div>
+      </div>
+      <p class="small muted" id="i_hint"></p>
+      <h3 class="t" style="font-size:15px;margin:14px 0 6px">Meldingen op je telefoon</h3>
+      <div class="row">
+        <div class="field"><label for="n_svc">Via (Home Assistant-app)</label><select id="n_svc"><option value="">Geen meldingen</option>${CFG.notify?.service ? `<option selected>${esc(CFG.notify.service)}</option>` : ""}</select></div>
+        <div class="field" style="flex:0 0 auto"><button class="btn ghost" id="n_test">Testmelding</button></div>
+      </div>
+      <label class="check-row"><input type="checkbox" id="n_tips" ${CFG.notify?.tips === false ? "" : "checked"}> Tips: "je levert nu veel terug, zet de wasmachine aan", "morgen negatieve prijzen"</label>
+      <label class="check-row"><input type="checkbox" id="n_alerts" ${CFG.notify?.alerts === false ? "" : "checked"}> Storingen: meter of apparaat reageert niet</label>
+      <p class="small muted" id="n_res" role="status"></p>` : `<p class="small muted" style="margin-top:-4px">Koppel Home Assistant om je omvormer af te knijpen bij negatieve prijzen en meldingen op je telefoon te krijgen.</p>`}
+    </section>
     <section class="card"><h2 class="t">Meter</h2>
       <div class="row">
         <div class="field" style="flex:0 1 240px"><label for="s_md">Soort meter</label><select id="s_md">
@@ -746,6 +765,26 @@ async function settings() {
       CFG = await api("api/config"); settings(); toast(`Gekoppeld: ${r.devices.length} apparaten beschikbaar`);
     } catch (e) { $("s_hares").textContent = e.message; }
   };
+  if (CFG.has_ha) {
+    (async () => {
+      try {
+        const r = await api("api/setup/ha");
+        if (r.ok === false) return;
+        $("i_list").innerHTML = (r.inverter_limits || []).map((x) => `<option value="${esc(x.entity)}">${esc(x.name)} (${esc(x.unit)})</option>`).join("");
+        const inv = r.inverter_limits || [];
+        $("i_hint").textContent = inv.length ? `Gevonden: ${inv.map((x) => x.name).join(", ")}.` : "Geen omvormer-begrenzing gevonden in Home Assistant. Veel omvormers (SolarEdge, Huawei, Growatt, Hoymiles via OpenDTU) hebben er een via hun integratie.";
+        $("i_ent").onchange = () => { const x = inv.find((y) => y.entity === $("i_ent").value); if (x) $("i_unit").value = ["W", "kW", "%"].includes(x.unit) ? x.unit : "W"; };
+        const cur = CFG.notify?.service || "";
+        $("n_svc").innerHTML = `<option value="">Geen meldingen</option>` + [...new Set([...(r.notify_services || []), ...(cur ? [cur] : [])])]
+          .map((v) => `<option ${v === cur ? "selected" : ""} value="${esc(v)}">${esc(v.replace("notify.mobile_app_", "📱 ").replace("notify.", ""))}</option>`).join("");
+      } catch (e) {}
+    })();
+    $("n_test").onclick = async () => {
+      const svc = $("n_svc").value; if (!svc) { $("n_res").textContent = "Kies eerst waar de melding heen moet."; return; }
+      const r = await api("api/notify/test", { method: "POST", body: JSON.stringify({ service: svc }) });
+      $("n_res").textContent = r.ok ? "Verstuurd. Kijk op je telefoon." : r.error;
+    };
+  }
   $("tokBtn").onclick = async () => {
     try {
       const v = $("s_tok").value;
@@ -762,6 +801,11 @@ async function settings() {
     Object.assign(next.solar, { kwp: Number($("s_kwp").value), azimuth: ORIENT[$("s_or").value], latitude: lat, longitude: lon,
       base_load_w: Number($("s_base").value), tilt: $("s_or").value === "Oost-west" ? 15 : 35, has_panels: $("s_haspan").checked });
     Object.assign(next, meterFromForm());
+    if (CFG.has_ha) {
+      const ent = $("i_ent").value.trim();
+      next.inverter = ent ? { entity: ent, max_w: Number($("i_max").value) || 0, unit: $("i_unit").value } : {};
+      next.notify = $("n_svc").value ? { service: $("n_svc").value, tips: $("n_tips").checked, alerts: $("n_alerts").checked } : {};
+    }
     try { CFG = await postCfg(next); toast("Opgeslagen"); setErr(""); }
     catch (e) { setErr(e.message); }
   };

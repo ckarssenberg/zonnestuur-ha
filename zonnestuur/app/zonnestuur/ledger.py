@@ -107,6 +107,19 @@ class Ledger:
             self.conn.execute("DELETE FROM house_hour WHERE ts < ?", (ts - 800 * 86400,))
             self.conn.commit()
 
+    def insert_house_hours(self, rows: list[dict]) -> int:
+        """Historie invoegen (uit Home Assistant); bestaande uren blijven staan."""
+        with self.lock:
+            cur = self.conn.executemany(
+                "INSERT OR IGNORE INTO house_hour(ts, import_kwh, export_kwh, cost_eur, revenue_eur, market_x_kwh, dev_kwh) "
+                "VALUES (?,?,?,?,?,0,0)", [(r["ts"], r["import_kwh"], r["export_kwh"], r["cost"], r["revenue"]) for r in rows])
+            self.conn.commit()
+            return cur.rowcount
+
+    def house_hours_count(self) -> int:
+        with self.lock:
+            return self.conn.execute("SELECT COUNT(*) FROM house_hour").fetchone()[0]
+
     def house_hours(self, start_ts: int, end_ts: int) -> list[dict]:
         with self.lock:
             rows = self.conn.execute(

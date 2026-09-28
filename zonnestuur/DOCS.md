@@ -11,6 +11,13 @@ in plaats van die stroom voor bijna niets terug te leveren.
 4. Kies wat Zonnestuur mag sturen. Alles uit Home Assistant staat er al bij: je hoeft geen token aan te maken.
 5. Test elk apparaat en sla op.
 
+## Minder terugleveren
+
+- De kaart **Teruglevering** op het dashboard toont hoeveel en wanneer je teruglevert, wat dat kost en wat helpt.
+  Zonnestuur haalt daarvoor bij de eerste start het afgelopen jaar op uit de statistieken van Home Assistant.
+- Onder **Instellingen > Minder terugleveren** kun je je omvormer laten begrenzen als terugleveren geld kost,
+  en meldingen op je telefoon aanzetten.
+
 ## Veiligheid
 
 - De app is alleen te openen via Home Assistant. Wil je hem ook los op je netwerk openen (de poort staat bovenaan in het logboek),

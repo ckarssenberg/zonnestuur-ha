@@ -48,7 +48,7 @@ class DeviceState:
     setpoint_w: Optional[float] = None      # traploze apparaten: ingesteld vermogen
     setpoint_at: float = -math.inf
     offline_reason: str = ""
-    targets: list = field(default_factory=list)   # recente gewenste vermogens (voor apparaten die zelden bijsturen)                  # waarom niet beschikbaar (bijv. 'wacht tot je hem klaarzet')
+    targets: list = field(default_factory=list)   # recente gewenste vermogens (voor apparaten die zelden bijsturen)
 
     def to_dict(self) -> dict:
         return {
@@ -345,6 +345,69 @@ def plan_sunny_hours(surplus_by_hour: list[tuple[datetime, float]], run_minutes:
     if best_sum <= 0:
         return set()
     return {h for h, _ in best}
+
+
+@dataclass
+class Need:
+    """Wat een apparaat vandaag nog nodig heeft, voor de dagplanning."""
+    device_id: str
+    power_w: float                  # vermogen als hij draait (traploos: maximum)
+    hours_needed: float             # nog te draaien uren
+    min_w: float = 0.0              # traploos: minimum vermogen
+    modulating: bool = False
+    contiguous: bool = False        # witgoed: programma in één blok
+    deadline: Optional[datetime] = None
+
+
+def plan_day(needs: list["Need"], surplus_by_hour: list[tuple[datetime, float]]) -> dict[str, set]:
+    """Verdeel het verwachte zonne-overschot van vandaag over alle apparaten tegelijk.
+
+    Doel: zo min mogelijk terugleveren. Apparaten met prioriteit kiezen eerst de uren met het meeste
+    overschot; wat zij gebruiken, gaat van het overschot af, zodat het volgende apparaat de zonnige uren
+    krijgt die over zijn (in plaats van dat iedereen hetzelfde middaguur kiest en de ochtend verloren gaat).
+    Traploze apparaten (auto) vullen daarna het restant op. Geeft per apparaat de gekozen uren.
+    """
+    left = {h: w for h, w in surplus_by_hour}
+    order = sorted(surplus_by_hour, key=lambda x: x[0])
+    out: dict[str, set] = {}
+    fixed = [n for n in needs if not n.modulating]
+    mod = [n for n in needs if n.modulating]
+    for n in fixed:
+        hours = [h for h, _ in order if n.deadline is None or h < n.deadline]
+        k = max(0, math.ceil(n.hours_needed - 1e-9))
+        if k == 0 or not hours:
+            continue
+        if n.contiguous:
+            best, best_val = None, 0.0
+            for i in range(len(hours) - k + 1):
+                block = hours[i:i + k]
+                if any(block[j + 1] - block[j] != timedelta(hours=1) for j in range(k - 1)):
+                    continue
+                val = sum(min(max(0.0, left[h]), n.power_w) for h in block)
+                if val > best_val:
+                    best, best_val = block, val
+            chosen = best if best and best_val >= 0.3 * n.power_w * k else []
+        else:
+            cand = [h for h in hours if left[h] >= 0.25 * n.power_w]
+            cand.sort(key=lambda h: (-min(left[h], n.power_w), -left[h]))
+            chosen = cand[:k]
+        for h in chosen:
+            left[h] -= n.power_w
+        if chosen:
+            out[n.device_id] = set(chosen)
+    for n in mod:
+        need_wh = n.hours_needed * n.power_w
+        chosen = set()
+        for h, _ in sorted(((h, left[h]) for h, _ in order if n.deadline is None or h < n.deadline), key=lambda x: -x[1]):
+            if need_wh <= 0 or left[h] < n.min_w:
+                continue
+            use = min(n.power_w, left[h], need_wh)
+            left[h] -= use
+            need_wh -= use
+            chosen.add(h)
+        if chosen:
+            out[n.device_id] = chosen
+    return out
 
 
 def plan_cheapest_block(duration_s: float, candidates: list[tuple[datetime, datetime, float]]) -> Optional[datetime]:

@@ -22,8 +22,9 @@ from . import __version__
 from .adapters import DeviceError, HomeWizardP1, ShellySwitch, NotReady, http_get_json
 from .config import Config, load_config, merge_public, public_dict, save_config, effective_ha
 from .discovery import PROBLEMS, Scanner, identify
+from .guard import InverterLimiter, Notifier, negative_window
 from .drivers import HomeAssistant, ha_candidates, make_meter, make_switch, ha_client
-from .controller import Context, Controller, plan_cheapest_hours, plan_sunny_hours, plan_cheapest_block
+from .controller import Context, Controller, plan_cheapest_hours, plan_sunny_hours, plan_cheapest_block, plan_day, Need
 from .forecast import SolarForecast
 from .ledger import Ledger
 from .prices import PriceProvider
@@ -63,6 +64,8 @@ class Engine:
         self.last_error = ""
         self._last_save = 0.0
         self._last_on: dict[str, Optional[bool]] = {}
+        self.limiter = InverterLimiter.from_config(cfg.inverter)
+        self.notifier = Notifier.from_config(cfg.notify)
         self._restore_state()
 
     # ---- regelronde ------------------------------------------------------
@@ -124,7 +127,7 @@ class Engine:
             # 4. beslissen en schakelen
             price_hours = self._plan_price(now)
             price_now = self.prices.import_price(now) if self.cfg.contract.type == "dynamic" and self.prices.slots else None
-            ctx = Context(now=now, mono=mono, grid_w=self.grid_w, dt=dt, cheapest_hours=cheapest, sunny_hours=sunny,
+            ctx = Context(now=now, mono=mono, grid_w=self._grid_for_controller(now), dt=dt, cheapest_hours=cheapest, sunny_hours=sunny,
                           price_hours=price_hours, price_now=price_now)
             for dec in self.controller.step(ctx):
                 try:
@@ -140,6 +143,10 @@ class Engine:
                     self.last_error = f"schakelen {dec.device_id}: {exc}"
                     log.warning(self.last_error)
                     self.controller.states[dec.device_id].on = not dec.on
+
+            # 4b. omvormer begrenzen als terugleveren geld kost, en meldingen
+            self._limit_inverter(now, mono)
+            self._notify(now, mono)
 
             # 5. boekhouding
             if self.grid_w is not None:
@@ -158,6 +165,54 @@ class Engine:
                 self.ledger.flush()
                 self._save_state()
                 self._last_save = mono
+
+    def _grid_for_controller(self, now: datetime) -> Optional[float]:
+        """Is de omvormer afgeknepen, dan ziet de meter geen overschot meer. Voor de apparaten tellen we het
+        weggeknepen deel (volgens de zonvoorspelling) als overschot mee: liever zelf gebruiken dan weggooien."""
+        g = self.grid_w
+        if g is None or not (self.limiter and self.limiter.active):
+            return g
+        fc = self.forecast.production_w(now)
+        if fc is None:
+            return g
+        return g - max(0.0, min(self.limiter.max_w, fc) - self.limiter.limit_w)
+
+    def _limit_inverter(self, now: datetime, mono: float) -> None:
+        if not self.limiter:
+            return
+        value = self.limiter.decide(mono, self.grid_w, self.prices.feed_in_price(now))
+        if value is None:
+            return
+        try:
+            self.limiter.apply(ha_client(self.cfg), value)
+            log.info("omvormer %s -> %s %s (%s)", self.limiter.entity, value, self.limiter.unit, self.limiter.reason)
+        except (DeviceError, ValueError, OSError) as exc:
+            self.last_error = f"omvormer: {exc}"
+            log.warning(self.last_error)
+
+    def _notify(self, now: datetime, mono: float) -> None:
+        if not self.notifier:
+            return
+        neg = None
+        if self.cfg.contract.type == "dynamic" and self.prices.slots:
+            tomorrow = (now + timedelta(days=1)).date()
+            start = datetime.combine(tomorrow, datetime.min.time(), self.tz)
+            neg = negative_window([(s.astimezone(self.tz), e.astimezone(self.tz), p)
+                                   for s, e, p in self.prices.upcoming(start, start + timedelta(days=1))], tomorrow)
+        items = self.notifier.evaluate(now, mono, grid_w=self.grid_w, meter_online=self.meter_online or not self.cfg.has_meter,
+                                       has_panels=self.cfg.solar.has_panels, devices=self.cfg.devices,
+                                       states=self.controller.states, tomorrow_negative=neg)
+        self.notifier.send(lambda: ha_client(self.cfg), now, items)
+
+    def notify_test(self, service: str) -> dict:
+        if not service.startswith("notify."):
+            return {"ok": False, "error": "Kies een melddienst"}
+        try:
+            ha_client(self.cfg).call("notify", service.split(".", 1)[1],
+                                     {"title": "Zonnestuur", "message": "Zo ziet een melding van Zonnestuur eruit. Je krijgt er alleen een als je zelf iets kunt doen."})
+            return {"ok": True}
+        except (DeviceError, ValueError, OSError) as exc:
+            return {"ok": False, "error": f"Versturen mislukt: {exc}"}
 
     def _plan_guarantee(self, now: datetime) -> dict[str, set]:
         """Zon + goedkope stroom (dynamisch contract, met zonnepanelen).
@@ -256,28 +311,35 @@ class Engine:
         return out
 
     def _plan_sunny(self, now: datetime) -> dict[str, set]:
-        """Kies per apparaat de zonnigste uren van vandaag (eens per uur opnieuw)."""
+        """Dagplanning voor zelfverbruik: het verwachte overschot van vandaag, verdeeld over alle apparaten.
+
+        Eens per uur opnieuw, met wat elk apparaat vandaag al gedraaid heeft.
+        """
         key = now.strftime("%Y-%m-%d %H")
         if getattr(self, "_sunny_key", None) == key:
             return self._sunny
         out: dict[str, set] = {}
-        if self.forecast.hours:
-            for d in self.cfg.devices:
-                if d.expected_run_min <= 0:
+        if self.forecast.hours and self.cfg.strategy == "solar":
+            hour = now.replace(minute=0, second=0, microsecond=0)
+            surplus, t = [], max(hour, now.replace(hour=5, minute=0, second=0, microsecond=0))
+            end_day = now.replace(hour=22, minute=0, second=0, microsecond=0)
+            while t < end_day:
+                prod = self.forecast.production_w(t + timedelta(minutes=30))
+                if prod is not None:
+                    surplus.append((t, prod - self.cfg.solar.base_load_w))
+                t += timedelta(hours=1)
+            needs = []
+            for d in sorted(self.cfg.devices, key=lambda x: x.priority):
+                st = self.controller.states[d.id]
+                if d.expected_run_min <= 0 and not d.one_shot:
                     continue
-                end = now.replace(hour=22, minute=0, second=0, microsecond=0)
+                if d.ready_times and self.controller.next_unsatisfied(d, st, now) is None:
+                    continue                                  # al vol / klaar
+                left_h = max(0.0, (d.expected_run_min or 120) / 60 - (0 if d.one_shot else st.run_seconds_today / 3600))
                 ready = self.controller.ready_datetimes(d, now)
-                if ready and ready[0].date() == now.date():
-                    end = ready[0] - timedelta(minutes=d.guarantee_min)
-                hours = []
-                t = now.replace(hour=5, minute=0, second=0, microsecond=0)
-                while t < end:
-                    prod = self.forecast.production_w(t + timedelta(minutes=30))
-                    if prod is not None:
-                        hours.append((t, prod - self.cfg.solar.base_load_w))
-                    t += timedelta(hours=1)
-                chosen = plan_sunny_hours(hours, d.expected_run_min)
-                out[d.id] = chosen
+                deadline = ready[0] - timedelta(minutes=d.guarantee_min) if ready and ready[0].date() == now.date() else None
+                needs.append(Need(d.id, d.max_w, left_h, d.min_w if d.modulating else 0.0, d.modulating, d.one_shot, deadline))
+            out = plan_day(needs, surplus)
         self._sunny_key, self._sunny = key, out
         return out
 
@@ -298,6 +360,17 @@ class Engine:
             self._sunny_key = None
             self.meter_fail_since, self.last_error = None, ""
             self.scanner.extra_hosts = new.scan_extra
+            old_lim, self.limiter = self.limiter, InverterLimiter.from_config(new.inverter)
+            if old_lim and self.limiter and old_lim.entity == self.limiter.entity:
+                self.limiter.limit_w, self.limiter._last, self.limiter.reason = old_lim.limit_w, old_lim._last, old_lim.reason
+            if old_lim and old_lim.active and (not self.limiter or self.limiter.entity != old_lim.entity):
+                try:                                     # begrenzing uitgezet: omvormer terug naar vol vermogen
+                    old_lim.apply(ha_client(new), old_lim._value(old_lim.max_w))
+                except Exception as exc:
+                    log.warning("omvormer terugzetten mislukt: %s", exc)
+            old_n, self.notifier = self.notifier, Notifier.from_config(new.notify)
+            if old_n and self.notifier:
+                self.notifier.sent, self.notifier.history = old_n.sent, old_n.history
             if self.config_path:
                 save_config(new, self.config_path)
             self._save_state()
@@ -384,7 +457,11 @@ class Engine:
             if "401" in msg:
                 return {"ok": False, "error": "Home Assistant weigert het token. Maak een nieuw langlevend toegangstoken aan (profiel > Beveiliging)."}
             return {"ok": False, "error": "Home Assistant is niet bereikbaar op dit adres. Klopt het, inclusief poort (meestal :8123)?"}
-        return {"ok": True, "entities": len(states), **ha_candidates(states)}
+        try:
+            notify = ha.notify_services()
+        except DeviceError:
+            notify = []
+        return {"ok": True, "entities": len(states), **ha_candidates(states), "notify_services": notify}
 
     def ha_candidates(self) -> dict:
         ha = effective_ha(self.cfg)
@@ -474,7 +551,74 @@ class Engine:
                 "month": self.ledger.totals(month_start),
                 "year": self.ledger.totals(year_start),
                 "last_error": self.last_error,
+                "inverter": ({"entity": self.limiter.entity, "limited": self.limiter.active,
+                              "limit_w": self._rounded(self.limiter.limit_w), "reason": self.limiter.reason}
+                             if self.limiter else None),
+                "notifications": self.notifier.history[:5] if self.notifier else [],
             }
+
+    def backfill_history(self, days: int = 365) -> dict:
+        """Verbruik en teruglevering van het afgelopen jaar uit Home Assistant halen (meter-sensoren)."""
+        from .hastats import hourly_means
+        m = self.cfg.meter or {}
+        ha = effective_ha(self.cfg)
+        if m.get("driver") != "ha" or not ha.get("token"):
+            return {"ok": False, "error": "alleen mogelijk met een meter-sensor uit Home Assistant"}
+        ids = [x for x in (m.get("entity"), m.get("import_entity"), m.get("export_entity")) if x]
+        now = datetime.now(self.tz)
+        start = (now - timedelta(days=days)).replace(minute=0, second=0, microsecond=0)
+        try:
+            client = ha_client(self.cfg)
+            factor = {}
+            for e in ids:
+                unit = str((client.state(e).get("attributes") or {}).get("unit_of_measurement", "W")).lower()
+                factor[e] = 1000.0 if unit == "kw" else 1.0
+            data = hourly_means(ha["url"], ha["token"], ids, start)
+        except Exception as exc:  # netwerk, rechten, oude HA-versie
+            return {"ok": False, "error": f"Home Assistant-statistieken niet op te halen: {exc}"}
+        sign = -1.0 if m.get("invert") else 1.0
+        hours: dict[int, list] = {}
+        if m.get("entity"):
+            for ts, v in data.get(m["entity"], []):
+                w = v * factor[m["entity"]] * sign
+                hours[ts] = [max(w, 0) / 1000, max(-w, 0) / 1000]
+        else:
+            for ts, v in data.get(m.get("import_entity"), []):
+                hours.setdefault(ts, [0.0, 0.0])[0] = max(0.0, v * factor[m["import_entity"]]) / 1000
+            for ts, v in data.get(m.get("export_entity"), []):
+                hours.setdefault(ts, [0.0, 0.0])[1] = max(0.0, v * factor[m["export_entity"]]) / 1000
+        if not hours:
+            return {"ok": False, "error": "Home Assistant heeft voor deze sensor(en) geen langetermijnstatistieken"}
+        # Prijzen per uur erbij, zodat de euro's kloppen met je contract
+        c = self.cfg.contract
+        market: dict[int, float] = {}
+        if c.type == "dynamic":
+            first = min(hours)
+            hist = _price_history(datetime.fromtimestamp(first, self.tz).date().isoformat(),
+                                  (now + timedelta(days=1)).date().isoformat())
+            for k, v in hist.get("hours", []):
+                market[int(datetime.fromisoformat(k.replace("Z", "+00:00")).timestamp())] = v
+        rows = []
+        for ts, (imp, exp) in sorted(hours.items()):
+            when = datetime.fromtimestamp(ts, self.tz)
+            if c.type == "dynamic" and ts in market:
+                ip = market[ts] + self.prices.energy_tax(when) + c.supplier_markup
+                fp = market[ts] / 1.21 + self.prices._feed_in_adjust()
+            else:
+                ip, fp = c.import_price, c.feed_in_price - (c.return_cost if c.type == "fixed" else 0)
+            rows.append({"ts": ts, "import_kwh": imp, "export_kwh": exp, "cost": imp * ip, "revenue": exp * fp})
+        added = self.ledger.insert_house_hours(rows)
+        self.ledger.save_state("backfill", {"done": now.isoformat(), "hours": len(rows)})
+        log.info("Historie uit Home Assistant: %d uren toegevoegd", added)
+        return {"ok": True, "hours": len(rows), "added": added, "from": datetime.fromtimestamp(min(hours), self.tz).date().isoformat()}
+
+    def insight_view(self, days: int = 365) -> dict:
+        from .insight import compute
+        now = datetime.now(self.tz)
+        rows = self.ledger.house_hours(int((now - timedelta(days=days)).timestamp()), int(now.timestamp()) + 3600)
+        out = compute(rows, self.tz, self.cfg.solar.has_panels, self.cfg.devices, bool((self.cfg.inverter or {}).get("entity")))
+        out["can_backfill"] = (self.cfg.meter or {}).get("driver") == "ha"
+        return out
 
     def prices_view(self) -> dict:
         """Prijzen voor het dashboard: all-in per uur voor vandaag en morgen (dynamisch) of de vaste tarieven."""
@@ -669,6 +813,8 @@ def make_handler(engine: Engine):
                 return self._json(200, _solar_history(engine.cfg, q.get("start", [""])[0], q.get("end", [""])[0]))
             if url.path == "/api/simulate":
                 return self._json(200, _simulate(engine.cfg, q))
+            if url.path == "/api/insight":
+                return self._json(200, engine.insight_view())
             if url.path == "/api/prices":
                 return self._json(200, engine.prices_view())
             if url.path == "/api/usage":
@@ -715,6 +861,8 @@ def make_handler(engine: Engine):
                     return self._json(400, {"error": str(exc)})
                 engine.apply_config(new)
                 return self._json(200, public_dict(engine.cfg))
+            if url.path == "/api/notify/test":
+                return self._json(200, engine.notify_test(str(body.get("service", ""))))
             if url.path == "/api/setup/scan":
                 engine.scanner.start()
                 return self._json(200, engine.scanner.snapshot())
@@ -731,6 +879,8 @@ def make_handler(engine: Engine):
                     return self._json(200, engine.test_switch(body))
                 except (DeviceError, ValueError, KeyError) as exc:
                     return self._json(502, {"error": f"Het apparaat reageert niet: {exc}"})
+            if url.path == "/api/history/backfill":
+                return self._json(200, engine.backfill_history(int(body.get("days", 365))))
             if url.path == "/api/setup/meter":
                 return self._json(200, engine.read_meter(body))
             if url.path == "/api/setup/ha":
@@ -849,6 +999,15 @@ def run(cfg: Config, config_path: Optional[str] = None) -> None:
         raise SystemExit(1)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     log.info("Dashboard op http://%s:%d", cfg.web_host, cfg.web_port)
+
+    def _auto_backfill():
+        # Eenmalig: historie uit Home Assistant, zodat het verbruiksoverzicht en advies meteen gevuld zijn
+        if (engine.cfg.meter or {}).get("driver") == "ha" and not engine.ledger.load_state("backfill"):
+            time.sleep(20)
+            res = engine.backfill_history()
+            if not res.get("ok"):
+                log.info("Historie niet opgehaald: %s", res.get("error"))
+    threading.Thread(target=_auto_backfill, daemon=True).start()
 
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
