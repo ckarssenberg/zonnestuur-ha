@@ -48,11 +48,16 @@ class Ledger:
 
     # ---- vastleggen -----------------------------------------------------
     def record(self, now: datetime, dt: float, grid_w: Optional[float],
-               device_powers: dict[str, float], value_per_kwh: float) -> None:
+               device_powers: dict[str, float], value_per_kwh: float, all_counts: bool = False) -> None:
+        """all_counts=True: geen zonnepanelen; al het verbruik telt als 'slim ingepland' en value_per_kwh is
+        het verschil met de gemiddelde prijs van de dag."""
         if dt <= 0 or dt > 600:
             return  # gat in de data (bijv. na herstart): niet meetellen
         day = now.date().isoformat()
-        shares = solar_share(grid_w, device_powers) if grid_w is not None else {k: 0.0 for k in device_powers}
+        if all_counts:
+            shares = {k: max(0.0, p) for k, p in device_powers.items()}
+        else:
+            shares = solar_share(grid_w, device_powers) if grid_w is not None else {k: 0.0 for k in device_powers}
         self._add_sample(now, grid_w, sum(max(0.0, p) for p in device_powers.values()), sum(shares.values()))
         for dev, p in device_powers.items():
             kwh = max(0.0, p) * dt / 3_600_000

@@ -23,7 +23,7 @@ from .adapters import DeviceError, HomeWizardP1, ShellySwitch, NotReady
 from .config import Config, load_config, merge_public, public_dict, save_config, effective_ha
 from .discovery import PROBLEMS, Scanner, identify
 from .drivers import HomeAssistant, ha_candidates, make_meter, make_switch, ha_client
-from .controller import Context, Controller, plan_cheapest_hours, plan_sunny_hours
+from .controller import Context, Controller, plan_cheapest_hours, plan_sunny_hours, plan_cheapest_block
 from .forecast import SolarForecast
 from .ledger import Ledger
 from .prices import PriceProvider
@@ -79,10 +79,14 @@ class Engine:
             # 1. meter uitlezen
             reading = None
             try:
+                if self.cfg.strategy == "price" and not self.cfg.has_meter:
+                    raise _NoMeter()
                 reading = self.meter.read()
                 self.grid_w = reading.grid_w
                 self.meter_online = True
                 self.meter_fail_since = None
+            except _NoMeter:
+                self.grid_w, self.meter_online = None, False
             except DeviceError as exc:
                 self.meter_online = False
                 self.meter_fail_since = self.meter_fail_since or mono
@@ -118,7 +122,10 @@ class Engine:
             sunny = self._plan_sunny(now)
 
             # 4. beslissen en schakelen
-            ctx = Context(now=now, mono=mono, grid_w=self.grid_w, dt=dt, cheapest_hours=cheapest, sunny_hours=sunny)
+            price_hours = self._plan_price(now)
+            price_now = self.prices.import_price(now) if self.cfg.contract.type == "dynamic" and self.prices.slots else None
+            ctx = Context(now=now, mono=mono, grid_w=self.grid_w, dt=dt, cheapest_hours=cheapest, sunny_hours=sunny,
+                          price_hours=price_hours, price_now=price_now)
             for dec in self.controller.step(ctx):
                 try:
                     sw = self.switches[dec.device_id]
@@ -135,7 +142,13 @@ class Engine:
                     self.controller.states[dec.device_id].on = not dec.on
 
             # 5. boekhouding
-            self.ledger.record(now, dt, self.grid_w, powers, self.prices.value_of_own_kwh(now))
+            if self.cfg.strategy == "price":
+                # Besparing zonder panelen: wat je betaalt tegenover de gemiddelde prijs van vandaag
+                avg = self._avg_price_today(now)
+                saving = (avg - price_now) if (avg is not None and price_now is not None) else 0.0
+                self.ledger.record(now, dt, None, powers, saving, all_counts=True)
+            else:
+                self.ledger.record(now, dt, self.grid_w, powers, self.prices.value_of_own_kwh(now))
             if reading is not None:
                 self.ledger.record_meter(now, reading.import_kwh, reading.export_kwh)
             if mono - self._last_save > 60:
@@ -166,6 +179,49 @@ class Engine:
             candidates = self.prices.upcoming(plan_start.astimezone(timezone.utc), window_start.astimezone(timezone.utc))
             hours = plan_cheapest_hours(need - 0.8 * expected, candidates)
             out[d.id] = {h.astimezone(self.tz).replace(minute=0, second=0, microsecond=0) for h in hours}
+        return out
+
+    def _best_hours(self, device_id: str, now: datetime) -> list:
+        if self.cfg.strategy == "price":
+            plan = getattr(self, "_price_plans", {}).get(device_id)
+            return sorted(h.strftime("%H:00") for h in plan["hours"]) if plan else []
+        return sorted(h.strftime("%H:00") for h in getattr(self, "_sunny", {}).get(device_id, set()))
+
+    def _avg_price_today(self, now: datetime) -> Optional[float]:
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        slots = self.prices.upcoming(start.astimezone(timezone.utc), (start + timedelta(days=1)).astimezone(timezone.utc))
+        return sum(p for _, _, p in slots) / len(slots) if slots else None
+
+    def _plan_price(self, now: datetime) -> dict[str, set]:
+        """Zonder zonnepanelen: kies per apparaat de goedkoopste uren tot zijn klaar-tijd.
+
+        Een plan blijft staan tot de klaar-tijd voorbij is, zodat het niet steeds opschuift. Alleen als er
+        nieuwe prijzen bij komen (rond 13:00 die van morgen) en het plan nog niet begonnen is, plannen we opnieuw.
+        """
+        if self.cfg.strategy != "price" or self.cfg.contract.type != "dynamic" or not self.prices.slots:
+            return {}
+        plans = getattr(self, "_price_plans", {})
+        hour = now.replace(minute=0, second=0, microsecond=0)
+        out: dict[str, set] = {}
+        for d in self.cfg.devices:
+            ready = self.controller.ready_datetimes(d, now)
+            end = ready[0] if ready else (now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1))
+            key = (end.isoformat(), len(self.prices.slots))
+            old = plans.get(d.id)
+            if old and old["end"] == end.isoformat() and (old["key"] == key or any(h <= hour for h in old["hours"])):
+                out[d.id] = old["hours"]
+                continue
+            run_s = max(d.expected_run_min, d.guarantee_min if d.ready_times else 0) * 60 or 3600
+            candidates = self.prices.upcoming(hour.astimezone(timezone.utc), end.astimezone(timezone.utc))
+            if d.one_shot:
+                start = plan_cheapest_block(run_s, candidates)
+                hours = {start} if start else set()
+            else:
+                hours = plan_cheapest_hours(run_s, candidates)
+            hours = {h.astimezone(self.tz).replace(minute=0, second=0, microsecond=0) for h in hours}
+            plans[d.id] = {"end": end.isoformat(), "key": key, "hours": hours}
+            out[d.id] = hours
+        self._price_plans = plans
         return out
 
     def _plan_sunny(self, now: datetime) -> dict[str, set]:
@@ -368,7 +424,7 @@ class Engine:
                                 "next_ready": ready[0].isoformat(timespec="minutes") if ready else None,
                                 "next_ready_ok": (self.controller.is_satisfied(d, self.controller.states[d.id], ready[0])
                                                   if ready else None),
-                                "best_hours": sorted(h.strftime("%H:00") for h in getattr(self, "_sunny", {}).get(d.id, set())),
+                                "best_hours": self._best_hours(d.id, now),
                                 **st.to_dict(), "month": per_dev.get(d.id, {"kwh": 0, "kwh_solar": 0, "eur_saved": 0})})
             return {
                 "version": __version__,
@@ -377,6 +433,7 @@ class Engine:
                 "grid_w": None if self.grid_w is None else round(self.grid_w),
                 "meter_online": self.meter_online,
                 "contract": self.cfg.contract.type,
+                "strategy": self.cfg.strategy,
                 "supplier": _supplier_name(self.cfg.contract),
                 "price_now": round(self.prices.import_price(now), 4),
                 "value_own_kwh": round(self.prices.value_of_own_kwh(now), 4),
@@ -561,6 +618,10 @@ def make_handler(engine: Engine):
             return self._json(404, {"error": "niet gevonden"})
 
     return Handler
+
+
+class _NoMeter(Exception):
+    """Geen meter nodig: zonder zonnepanelen sturen we alleen op de prijs."""
 
 
 def _supplier_name(c) -> str:

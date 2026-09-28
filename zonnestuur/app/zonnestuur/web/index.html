@@ -279,7 +279,7 @@
       <div class="title-row"><span class="eyebrow" id="todayTitle">Vandaag</span><span class="small muted" id="todayNote"></span></div>
       <div class="chart" id="todayChart"><svg id="todaySvg" role="img" aria-label="Verbruik van gestuurde apparaten vandaag, per vijf minuten"></svg><div class="tip" id="todayTip"></div></div>
       <div class="legend">
-        <span><i class="sw" style="background:var(--sun)"></i>Uit eigen zon</span>
+        <span><i class="sw" style="background:var(--sun)"></i><span class="lbl-sun">Uit eigen zon</span></span>
         <span><i class="sw" style="background:var(--net)"></i>Van het net</span>
         <span><i class="sw line"></i>Zonvoorspelling</span>
       </div>
@@ -308,7 +308,7 @@
       <div class="title-row"><span class="eyebrow" id="monthTitle">Laatste 31 dagen</span><span class="small muted">kWh per dag</span></div>
       <div class="chart" id="monthChart"><svg id="monthSvg" role="img" aria-label="Verbruik van gestuurde apparaten per dag, uit eigen zon en van het net"></svg><div class="tip" id="monthTip"></div></div>
       <div class="legend">
-        <span><i class="sw" style="background:var(--sun)"></i>Uit eigen zon</span>
+        <span><i class="sw" style="background:var(--sun)"></i><span class="lbl-sun">Uit eigen zon</span></span>
         <span><i class="sw" style="background:var(--net)"></i>Van het net</span>
       </div>
       <details class="table"><summary>Toon als tabel</summary><table id="monthTable"></table></details>
@@ -410,7 +410,12 @@ function renderStatus(s) {
 
   renderDevices(s);
   $("err").textContent = s.last_error ? "Laatste melding: " + s.last_error : "";
-  $("foot").textContent = `Contract: ${s.contract === "dynamic" ? "dynamisch" : "vast"}${s.supplier ? " (" + s.supplier + ")" : ""} · besparing gerekend zonder salderen, zoals vanaf 2027 · versie ${s.version}`;
+  if (s.strategy === "price") {
+    $("sMonthNote").textContent = "door te draaien in de goedkoopste uren";
+    $("ringTitle").textContent = "Slim ingepland";
+    document.querySelectorAll(".lbl-sun").forEach((e) => { e.textContent = "In goedkope uren"; });
+  }
+  $("foot").textContent = `Contract: ${s.contract === "dynamic" ? "dynamisch" : "vast"}${s.supplier ? " (" + s.supplier + ")" : ""} · ${s.strategy === "price" ? "besparing t.o.v. de gemiddelde prijs van de dag" : "besparing gerekend zonder salderen, zoals vanaf 2027"} · versie ${s.version}`;
 }
 
 function setPulse(id, active, reverse, watts) {
@@ -441,16 +446,21 @@ function renderDevices(s) {
     const state = !d.online ? (d.reason && d.reason.startsWith("wacht") ? "Klaar om te zetten" : "Offline") : d.on ? (running ? (RUNNING_WORD[d.kind] || "Aan") : "Aan · neemt geen stroom op") : "Uit";
     const pos = (h, m) => ((h + m / 60) / 24) * 100;
     let strip = "";
-    if (d.best_hours && d.best_hours.length) {
-      const a = Number(d.best_hours[0].slice(0, 2)), b = Number(d.best_hours[d.best_hours.length - 1].slice(0, 2)) + 1;
-      strip += `<div class="best" style="left:${pos(a, 0)}%; width:${pos(b - a, 0)}%" title="Zonnigste uren"></div>`;
+    const PRICE = s.strategy === "price";
+    // Aaneengesloten blokken tekenen (bij prijsplanning kunnen de uren verspreid liggen)
+    const blocks = [];
+    for (const h of (d.best_hours || []).map((x) => Number(x.slice(0, 2))).sort((x, y) => x - y)) {
+      const last = blocks[blocks.length - 1];
+      if (last && last[1] === h) last[1] = h + 1; else blocks.push([h, h + 1]);
+    }
+    for (const [a, b] of blocks) {
+      strip += `<div class="best" style="left:${pos(a, 0)}%; width:${pos(b - a, 0)}%" title="${PRICE ? "Goedkoopste uren" : "Zonnigste uren"}"></div>`;
     }
     for (const t of d.ready_times || []) {
       strip += `<div class="ready" style="left:${pos(Number(t.slice(0, 2)), Number(t.slice(3, 5)))}%" title="Klaar om ${t}"></div>`;
     }
     strip += `<div class="now" style="left:${pos(now.getHours(), now.getMinutes())}%" title="Nu"></div>`;
-    const bestTxt = d.best_hours && d.best_hours.length
-      ? `${d.best_hours[0]}–${String(Number(d.best_hours[d.best_hours.length - 1].slice(0, 2)) + 1).padStart(2, "0")}:00` : null;
+    const bestTxt = blocks.length ? blocks.map(([a, b]) => `${String(a).padStart(2, "0")}–${String(b).padStart(2, "0")}`).join(", ") : null;
     const readyTxt = d.next_ready ? d.next_ready.slice(11, 16) : null;
     el.innerHTML = `
       <div class="dev-head">
@@ -461,13 +471,13 @@ function renderDevices(s) {
       <div class="strip" role="img" aria-label="Dagplanning">${strip}</div>
       <div class="strip-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
       <div class="facts">
-        ${bestTxt ? `<div class="fact"><i class="dot" style="background:var(--glow)"></i><span>Zonnigste uren vandaag <b>${bestTxt}</b></span></div>` : ""}
+        ${bestTxt ? `<div class="fact"><i class="dot" style="background:var(--glow)"></i><span>${PRICE ? "Goedkoopste uren gepland" : "Zonnigste uren vandaag"} <b>${bestTxt}</b></span></div>` : ""}
         ${readyTxt ? `<div class="fact"><i class="dot" style="background:${d.next_ready_ok ? "var(--good)" : "var(--ink)"}"></i><span>${
           d.next_ready_ok ? `${READY_WORD[d.kind] || "Klaar"} voor <b>${readyTxt}</b>: gelukt` : `${READY_WORD[d.kind] || "Klaar"} voor <b>${readyTxt}</b> gegarandeerd, desnoods met netstroom`}</span></div>` : ""}
         ${d.modulating ? `<div class="fact"><i class="dot" style="background:var(--sun)"></i><span>${d.on && d.setpoint_w
           ? `Laadt traploos mee met de zon: nu <b>${Math.round(d.setpoint_w / d.w_per_step)} A</b> (${kw(d.setpoint_w)} kW)`
           : `Laadt traploos tussen <b>${kw(d.min_w)}</b> en <b>${kw(d.max_w)} kW</b>`}</span></div>` : ""}
-        <div class="fact"><i class="dot" style="background:var(--sun)"></i><span>Deze maand <b>${nl(d.month.kwh_solar, 1)} kWh</b> zonnestroom, <b>${eur(d.month.eur_saved)}</b> bespaard</span></div>
+        <div class="fact"><i class="dot" style="background:var(--sun)"></i><span>Deze maand <b>${nl(d.month.kwh_solar, 1)} kWh</b> ${PRICE ? "slim ingepland" : "zonnestroom"}, <b>${eur(d.month.eur_saved)}</b> bespaard</span></div>
       </div>
       <div class="seg" role="group" aria-label="Bediening ${esc(d.name)}">
         <button data-mode="auto" class="${d.mode === "auto" ? "active" : ""}">Automatisch</button>

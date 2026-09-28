@@ -256,6 +256,7 @@ function zoeken() {
     <p class="lead" id="scanText">We kijken welke apparaten er in je netwerk zijn…</p>
     <div class="bar"><span id="scanBar"></span></div>
     <div id="found"></div>
+    ${W.addOnly ? "" : `<label class="check-row" style="margin-top:16px"><input type="checkbox" id="noPanels" ${W.noPanels ? "checked" : ""}> Ik heb geen zonnepanelen <span class="muted">— dan is geen meter nodig en draait alles in de goedkoopste uren (dynamisch contract nodig)</span></label>`}
     <details id="manual"><summary>Staat je apparaat er niet bij? Vul het IP-adres in</summary>
       <div class="row" style="margin-top:12px">
         <div class="field"><label for="manualIp">IP-adres</label><input id="manualIp" placeholder="192.168.1.50" inputmode="decimal" autocomplete="off"><span class="hint">Te vinden in de app van het apparaat, onder apparaatinformatie.</span></div>
@@ -266,7 +267,8 @@ function zoeken() {
   </section>`;
   $("back").onclick = () => go(0);
   $("again").onclick = startScan;
-  $("next").onclick = () => go(W.addOnly ? 3 : 2);
+  $("next").onclick = () => go(W.addOnly || !W.meter ? 3 : 2);
+  if ($("noPanels")) $("noPanels").onchange = () => { W.noPanels = $("noPanels").checked; if (W.noPanels) W.contract.type = "dynamic"; renderFound(); };
   $("manualBtn").onclick = async () => {
     const host = $("manualIp").value.trim();
     if (!host) return;
@@ -396,7 +398,7 @@ function renderFound() {
     const r = await api("api/setup/identify", { method: "POST", body: JSON.stringify({ host: b.dataset.recheck }) });
     if (r.found) { r.found._manual = true; FOUND = FOUND.filter((f) => f.host !== r.found.host).concat(r.found); renderFound(); if (r.found.ok) toast("Gelukt, nu bruikbaar"); }
   });
-  const ready = (W.addOnly || W.meter) && W.picks.length > 0;
+  const ready = (W.addOnly || W.meter || W.noPanels) && W.picks.length > 0;
   if ($("next")) $("next").disabled = !ready;
 }
 
@@ -507,7 +509,7 @@ function apparaten() {
     } catch (e) { d.tested = -1; setErr(e.message); }
     apparaten();
   };
-  $("back").onclick = () => { save(); if (devIdx > 0) { devIdx--; apparaten(); } else go(W.addOnly ? 1 : 2); };
+  $("back").onclick = () => { save(); if (devIdx > 0) { devIdx--; apparaten(); } else go(W.addOnly || !W.meter ? 1 : 2); };
   $("next").onclick = () => { save(); if (devIdx < W.devices.length - 1) { devIdx++; apparaten(); } else if (W.addOnly) saveAll(); else go(4); };
 }
 function testHtml(d) {
@@ -580,20 +582,23 @@ async function vragen() {
   const c = W.contract, s = W.solar;
   $("app").innerHTML = `<section class="card">
     <div class="eyebrow">Stap 5</div>
-    <h1 class="t">Nog drie vragen</h1>
+    <h1 class="t">Nog ${W.noPanels ? "twee" : "drie"} vragen</h1>
     <h2 class="t">1. Wat voor energiecontract heb je?</h2>
     <div class="chips" data-k="type"><button data-v="fixed" class="${c.type === "fixed" ? "on" : ""}">Vast of variabel</button><button data-v="dynamic" class="${c.type === "dynamic" ? "on" : ""}">Dynamisch (uur- of kwartierprijzen)</button></div>
     ${contractHtml(c)}
-    <h2 class="t">2. Hoe groot zijn je zonnepanelen?</h2>
-    <div class="row">
+    ${W.noPanels && c.type !== "dynamic" ? `<p class="problem" style="margin-top:10px">Zonder zonnepanelen bespaart Zonnestuur door te draaien als stroom het goedkoopst is. Dat kan alleen met een <b>dynamisch contract</b>.</p>` : ""}
+    <h2 class="t">2. Heb je zonnepanelen?</h2>
+    <div class="chips" id="pan"><button data-v="1" class="${W.noPanels ? "" : "on"}">Ja</button><button data-v="0" class="${W.noPanels ? "on" : ""}">Nee, stuur op de goedkoopste uren</button></div>
+    <div class="row" style="margin-top:14px" ${W.noPanels ? "hidden" : ""}>
       <div class="field"><label for="kwp">Totaal piekvermogen (kWp)</label><input id="kwp" type="number" step="0.1" min="0.5" max="50" value="${s.kwp}"><span class="hint">Aantal panelen × wattpiek per paneel ÷ 1000. Bijv. 10 × 400 = 4,0.</span></div>
       <div class="field"><label for="or">Richting</label><select id="or">${Object.keys(ORIENT).map((o) => `<option ${o === s.orient ? "selected" : ""}>${o}</option>`).join("")}</select></div>
     </div>
-    <h2 class="t">3. Waar woon je ongeveer?</h2>
-    <div class="field"><label for="rg">Provincie</label><select id="rg">${Object.keys(REGIONS).map((r) => `<option ${r === s.region ? "selected" : ""}>${r}</option>`).join("")}</select><span class="hint">Voor de weersverwachting. We slaan geen adres op.</span></div>
+    <h2 class="t" ${W.noPanels ? "hidden" : ""}>3. Waar woon je ongeveer?</h2>
+    <div class="field" ${W.noPanels ? "hidden" : ""}><label for="rg">Provincie</label><select id="rg">${Object.keys(REGIONS).map((r) => `<option ${r === s.region ? "selected" : ""}>${r}</option>`).join("")}</select><span class="hint">Voor de weersverwachting. We slaan geen adres op.</span></div>
     <div class="actions"><button class="btn ghost" id="back">← Terug</button><button class="btn" id="next">Opslaan en starten →</button></div>
   </section>`;
-  document.querySelectorAll(".chips button").forEach((b) => b.onclick = () => { read(); c.type = b.dataset.v; applySupplier(c, c.supplier); vragen(); });
+  document.querySelectorAll(".chips[data-k=type] button").forEach((b) => b.onclick = () => { read(); c.type = b.dataset.v; applySupplier(c, c.supplier); vragen(); });
+  document.querySelectorAll("#pan button").forEach((b) => b.onclick = () => { read(); W.noPanels = b.dataset.v === "0"; if (W.noPanels && c.type !== "dynamic") { c.type = "dynamic"; applySupplier(c, c.supplier); } vragen(); });
   bindContract(c, () => { readSolar(); vragen(); });
   const readSolar = () => { s.kwp = Number($("kwp").value) || 4; s.orient = $("or").value; s.region = $("rg").value; };
   const read = () => {
@@ -601,7 +606,11 @@ async function vragen() {
     s.kwp = Number($("kwp").value) || 4; s.orient = $("or").value; s.region = $("rg").value;
   };
   $("back").onclick = () => { read(); devIdx = W.devices.length - 1; go(3); };
-  $("next").onclick = async () => { read(); await saveAll(); };
+  $("next").onclick = async () => {
+    read();
+    if (W.noPanels && c.type !== "dynamic") { setErr("Kies een dynamisch contract, of geef aan dat je zonnepanelen hebt."); return; }
+    await saveAll();
+  };
 }
 
 function buildDevice(d, taken) {
@@ -627,13 +636,13 @@ async function saveAll() {
     next.devices = (next.devices || []).concat(newDevs.map((d, i) => ({ ...d, priority: (next.devices || []).length + i + 1 })));
   } else {
     const m = W.meter;
-    next.p1_host = m.type === "ha" ? "" : m.host;
-    next.meter = meterSpec(m, W.invert).meter;
+    next.p1_host = m && m.type !== "ha" ? m.host : "";
+    next.meter = m ? meterSpec(m, W.invert).meter : {};
     next.devices = newDevs.map((d, i) => ({ ...d, priority: i + 1 }));
     next.contract = Object.assign({}, next.contract || {}, W.contract);
     const [lat, lon] = REGIONS[W.solar.region];
     next.solar = Object.assign({}, next.solar || {}, { kwp: W.solar.kwp, azimuth: ORIENT[W.solar.orient], latitude: lat, longitude: lon,
-      tilt: W.solar.orient === "Oost-west" ? 15 : 35 });
+      tilt: W.solar.orient === "Oost-west" ? 15 : 35, has_panels: !W.noPanels });
   }
   try {
     CFG = await postCfg(next);
@@ -646,7 +655,7 @@ function klaar() {
   $("app").innerHTML = `<section class="card">
     <div class="done-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
     <h1 class="t">Zonnestuur staat aan</h1>
-    <p class="lead">Vanaf nu lopen je apparaten zo veel mogelijk op je eigen zonnestroom. Je hoeft verder niets te doen.</p>
+    <p class="lead">${W.noPanels ? "Vanaf nu draaien je apparaten in de goedkoopste uren van de dag." : "Vanaf nu lopen je apparaten zo veel mogelijk op je eigen zonnestroom."} Je hoeft verder niets te doen.</p>
     <div class="list">${W.devices.map((d) => `<div class="check"><span class="ic">${ICONS[d.kind].replace("<svg", '<svg width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"')}</span><div><b>${esc(d.name)}</b><div class="small muted">${nl(d.power_w)} W${d.ready_times && KIND_DEFAULTS[d.kind].ready_times.length ? " · klaar om " + esc(d.ready_times[0]) : ""}</div></div></div>`).join("")}</div>
     <p class="small muted" style="margin-top:18px">Tip: zet Zonnestuur op je beginscherm. In Safari of Chrome: deelknop of menu → <b>Zet op beginscherm</b>.</p>
     <div class="actions"><a class="btn ghost" href="instellingen">Instellingen</a><a class="btn" href="./">Naar het dashboard →</a></div>
@@ -673,6 +682,7 @@ async function settings() {
       <div id="cbox">${contractHtml(c)}</div>
     </section>
     <section class="card"><h2 class="t">Zonnepanelen</h2>
+      <label class="check-row" style="margin:-4px 0 12px"><input type="checkbox" id="s_haspan" ${s.has_panels === false ? "" : "checked"}> Ik heb zonnepanelen <span class="muted">(uit = alles in de goedkoopste uren, met dynamisch contract)</span></label>
       <div class="row">
         <div class="field"><label for="s_kwp">Piekvermogen (kWp)</label><input id="s_kwp" type="number" step="0.1" value="${s.kwp}"></div>
         <div class="field"><label for="s_or">Richting</label><select id="s_or">${Object.keys(ORIENT).map((o) => `<option ${o === orient ? "selected" : ""}>${o}</option>`).join("")}</select></div>
@@ -750,7 +760,7 @@ async function settings() {
     next.contract = Object.assign({}, next.contract, c);
     const [lat, lon] = REGIONS[$("s_rg").value];
     Object.assign(next.solar, { kwp: Number($("s_kwp").value), azimuth: ORIENT[$("s_or").value], latitude: lat, longitude: lon,
-      base_load_w: Number($("s_base").value), tilt: $("s_or").value === "Oost-west" ? 15 : 35 });
+      base_load_w: Number($("s_base").value), tilt: $("s_or").value === "Oost-west" ? 15 : 35, has_panels: $("s_haspan").checked });
     Object.assign(next, meterFromForm());
     try { CFG = await postCfg(next); toast("Opgeslagen"); setErr(""); }
     catch (e) { setErr(e.message); }
@@ -812,7 +822,7 @@ function editDevice(i) {
 (async () => {
   try {
     CFG = await api("api/config");
-    if (CFG.solar) { W.solar.kwp = CFG.solar.kwp; W.solar.region = nearestRegion(CFG.solar.latitude, CFG.solar.longitude); }
+    if (CFG.solar) { W.solar.kwp = CFG.solar.kwp; W.solar.region = nearestRegion(CFG.solar.latitude, CFG.solar.longitude); W.noPanels = CFG.solar.has_panels === false; }
     if (CFG.contract) Object.assign(W.contract, CFG.contract);
     if (CFG.has_ha) W.ha.url = CFG.homeassistant?.url || "";
     if (MODE === "settings") {

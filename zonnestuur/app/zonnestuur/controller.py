@@ -78,6 +78,8 @@ class Context:
     dt: float                      # seconden sinds vorige ronde
     cheapest_hours: dict[str, set] = field(default_factory=dict)  # device_id -> uren (lokale tijd) om bij te laden
     sunny_hours: dict[str, set] = field(default_factory=dict)     # device_id -> beste zonuren volgens de voorspelling
+    price_hours: dict[str, set] = field(default_factory=dict)     # device_id -> goedkoopste uren (zonder zonnepanelen)
+    price_now: Optional[float] = None                             # huidige afnameprijs €/kWh (dynamisch contract)
 
 
 class Controller:
@@ -138,11 +140,16 @@ class Controller:
             else:
                 free.append(d)
 
-        if ctx.grid_w is None:
+        if self.cfg.strategy == "price":
+            wanted.update(self._price(free, ctx))
+        elif ctx.grid_w is None:
             for d in free:
                 wanted[d.id] = (False, "geen meterdata")
         else:
             wanted.update(self._solar(free, ctx))
+            if ctx.price_now is not None and ctx.price_now < 0:
+                for d in free:                                # je krijgt geld toe om stroom te gebruiken
+                    wanted[d.id] = (True, "goedkoop: negatieve stroomprijs")
 
         decisions = []
         for d in devices:
@@ -225,6 +232,8 @@ class Controller:
             return False, "handmatig uit"
         if not d.ready_times or d.guarantee_min <= 0:
             return None
+        if self.cfg.strategy == "price" and ctx.price_hours.get(d.id):
+            return None                                   # het prijsplan zorgt al dat hij op tijd klaar is
         ready = self.next_unsatisfied(d, st, ctx.now)
         if ready is None:
             return None
@@ -289,6 +298,26 @@ class Controller:
         return out
 
 
+    def _price(self, devices: list[DeviceConfig], ctx: Context) -> dict[str, tuple[bool, str]]:
+        """Geen zonnepanelen: elk apparaat draait in zijn goedkoopste uren (vooraf gepland)."""
+        out: dict[str, tuple[bool, str]] = {}
+        hour = ctx.now.replace(minute=0, second=0, microsecond=0)
+        for d in devices:
+            st = self.states[d.id]
+            planned = ctx.price_hours.get(d.id, set())
+            if ctx.price_now is not None and ctx.price_now < 0:
+                out[d.id] = (True, "goedkoop: negatieve stroomprijs")
+            elif hour in planned:
+                out[d.id] = (True, "goedkoop uur")
+            elif st.on and ctx.mono - st.last_switch < d.min_on_s:
+                out[d.id] = (True, "goedkoop uur, loopt nog even door")
+            elif planned:
+                nxt = min((h for h in planned if h > hour), default=None)
+                out[d.id] = (False, f"wacht op goedkoop uur ({nxt:%H:%M})" if nxt else "vandaag klaar")
+            else:
+                out[d.id] = (False, "geen prijzen bekend" if ctx.price_now is None else "niets gepland")
+        return out
+
     @staticmethod
     def _in_best(d: DeviceConfig, ctx: Context) -> bool:
         hours = ctx.sunny_hours.get(d.id)
@@ -314,6 +343,21 @@ def plan_sunny_hours(surplus_by_hour: list[tuple[datetime, float]], run_minutes:
     if best_sum <= 0:
         return set()
     return {h for h, _ in best}
+
+
+def plan_cheapest_block(duration_s: float, candidates: list[tuple[datetime, datetime, float]]) -> Optional[datetime]:
+    """Goedkoopste aaneengesloten blok (voor witgoed dat een programma afmaakt). Geeft het beginuur terug."""
+    c = sorted(candidates, key=lambda x: x[0])
+    n = max(1, math.ceil(duration_s / 3600))
+    best, best_cost = None, math.inf
+    for i in range(len(c) - n + 1):
+        block = c[i:i + n]
+        if any(block[j + 1][0] != block[j][1] for j in range(n - 1)):
+            continue                                        # gat in de prijzen
+        cost = sum(p for _, _, p in block)
+        if cost < best_cost:
+            best, best_cost = block[0][0], cost
+    return best
 
 
 def plan_cheapest_hours(need_s: float, candidates: list[tuple[datetime, datetime, float]]) -> set:

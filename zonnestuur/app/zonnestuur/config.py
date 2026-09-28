@@ -93,6 +93,7 @@ class SolarConfig:
     tilt: float = 35.0          # hellingshoek in graden
     azimuth: float = 0.0        # 0 = zuid, -90 = oost, 90 = west
     base_load_w: float = 350.0  # gemiddeld sluipverbruik van het huis overdag
+    has_panels: bool = True     # False = geen zonnepanelen: sturen op de goedkoopste uren
     forecast_url: str = "https://api.open-meteo.com/v1/forecast"
 
 
@@ -119,9 +120,17 @@ class Config:
         return (self.meter or {}).get("driver") or "homewizard"
 
     @property
+    def strategy(self) -> str:
+        """'solar' = draaien op eigen zonnestroom, 'price' = geen panelen, draaien in de goedkoopste uren."""
+        return "solar" if self.solar.has_panels else "price"
+
+    @property
+    def has_meter(self) -> bool:
+        return bool(self.p1_host) if self.meter_driver in ("homewizard", "shelly_em") else bool(self.meter)
+
+    @property
     def configured(self) -> bool:
-        has_meter = bool(self.p1_host) if self.meter_driver in ("homewizard", "shelly_em") else bool(self.meter)
-        return has_meter and len(self.devices) > 0
+        return (self.has_meter or self.strategy == "price") and len(self.devices) > 0
 
     def device(self, device_id: str) -> DeviceConfig:
         for d in self.devices:
@@ -240,6 +249,8 @@ def config_from_dict(raw: dict) -> Config:
         raise ValueError("Elk apparaat moet een uniek id hebben")
     if cfg.contract.type not in ("fixed", "dynamic"):
         raise ValueError("contract.type moet 'fixed' of 'dynamic' zijn")
+    if cfg.strategy == "price" and cfg.contract.type != "dynamic" and cfg.devices:
+        raise ValueError("Zonder zonnepanelen stuurt Zonnestuur op de stroomprijs: daarvoor is een dynamisch contract nodig")
     for d in cfg.devices:
         for t in d.ready_times:
             hh, mm = t.split(":")
