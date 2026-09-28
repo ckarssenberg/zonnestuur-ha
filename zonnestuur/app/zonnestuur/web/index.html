@@ -20,6 +20,7 @@
     --shadow: 0 1px 2px rgba(14,17,22,.04), 0 8px 28px -12px rgba(14,17,22,.12);
     --ink: #0e1116; --ink-2: #5c6470; --ink-3: #8a919b; --rule: rgba(14, 17, 22, .08);
     --sun: #b86e00; --net: #2f5bdb;                 /* dataseries (gevalideerd op licht vlak) */
+    --cheap: #2a78d6; --dear: #e34948; --mid: #aeb4bc; /* prijs: goedkoop / duur / normaal (gevalideerd) */
     --glow: #ffb224; --glow-soft: rgba(255, 178, 36, .16);
     --good: #1f8a4c; --good-soft: rgba(31, 138, 76, .12); --warn: #b54708;
     --chip: rgba(14, 17, 22, .05); --seg: rgba(14, 17, 22, .06); --seg-on: #ffffff;
@@ -32,6 +33,7 @@
       --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 20px 50px -30px rgba(0,0,0,.8);
       --ink: #f2f4f7; --ink-2: #a3acb8; --ink-3: #6f7885; --rule: rgba(255, 255, 255, .07);
       --sun: #c98500; --net: #5b8cff;               /* dataseries (gevalideerd op donker vlak) */
+      --cheap: #3987e5; --dear: #e66767; --mid: #4b525c;
       --glow: #ffb224; --glow-soft: rgba(255, 178, 36, .14);
       --good: #4ade80; --good-soft: rgba(74, 222, 128, .12); --warn: #fdb022;
       --chip: rgba(255, 255, 255, .06); --seg: rgba(255, 255, 255, .06); --seg-on: rgba(255, 255, 255, .14);
@@ -44,12 +46,14 @@
     --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 20px 50px -30px rgba(0,0,0,.8);
     --ink: #f2f4f7; --ink-2: #a3acb8; --ink-3: #6f7885; --rule: rgba(255, 255, 255, .07);
     --sun: #c98500; --net: #5b8cff;
+    --cheap: #3987e5; --dear: #e66767; --mid: #4b525c;
     --glow: #ffb224; --glow-soft: rgba(255, 178, 36, .14);
     --good: #4ade80; --good-soft: rgba(74, 222, 128, .12); --warn: #fdb022;
     --chip: rgba(255, 255, 255, .06); --seg: rgba(255, 255, 255, .06); --seg-on: rgba(255, 255, 255, .14);
   }
 
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0; min-height: 100vh; color: var(--ink); background: var(--bg);
@@ -85,6 +89,17 @@
   .c-flow { grid-column: span 8; } .c-save { grid-column: span 4; }
   .c-dev { grid-column: span 5; } .c-today { grid-column: span 7; }
   .c-ring { grid-column: span 4; } .c-month { grid-column: span 8; }
+  .c-price, .c-usage { grid-column: span 12; }
+  .price-stats, .use-stats { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 6px 0 14px; }
+  .price-stats div, .use-stats div { display: grid; gap: 2px; }
+  .price-stats b, .use-stats b { font-family: "Inter Tight", Inter, sans-serif; font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .price-stats span, .use-stats span { font-size: 12px; color: var(--ink-3); }
+  .usage-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+  .seg.four { grid-template-columns: repeat(4, 1fr); min-width: 260px; }
+  .nav { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
+  .nav button { font: inherit; border: 0; background: var(--chip); color: var(--ink); width: 30px; height: 30px; border-radius: 10px; cursor: pointer; }
+  .nav button:disabled { opacity: .35; cursor: default; }
+  .empty { padding: 28px 8px; text-align: center; color: var(--ink-3); font-size: 13.5px; }
   .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
   .title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
   .muted { color: var(--ink-2); }
@@ -180,7 +195,7 @@
 
   @media (max-width: 980px) {
     .c-flow, .c-save, .c-dev, .c-today, .c-ring, .c-month { grid-column: span 12; }
-    .c-save { order: 2; } .c-dev { order: 3; } .c-today { order: 4; } .c-ring { order: 5; } .c-month { order: 6; }
+    .c-save { order: 2; } .c-price { order: 3; } .c-dev { order: 4; } .c-today { order: 5; } .c-usage { order: 6; } .c-ring { order: 7; } .c-month { order: 8; }
   }
   @media (max-width: 560px) {
     .flow .lbl { font-size: 15px; } .flow .val { font-size: 21px; }
@@ -271,6 +286,20 @@
       </div>
     </section>
 
+    <!-- stroomprijs -->
+    <section class="card c-price" aria-labelledby="priceTitle">
+      <div class="title-row"><span class="eyebrow" id="priceTitle">Stroomprijs</span><span class="small muted" id="priceNote"></span></div>
+      <div class="price-stats" id="priceStats"></div>
+      <div class="chart" id="priceChart"><svg id="priceSvg" role="img" aria-label="Stroomprijs per uur vandaag en morgen, inclusief belastingen"></svg><div class="tip" id="priceTip"></div></div>
+      <div class="legend" id="priceLegend">
+        <span><i class="sw" style="background:var(--cheap)"></i>Goedkoop</span>
+        <span><i class="sw" style="background:var(--mid)"></i>Normaal</span>
+        <span><i class="sw" style="background:var(--dear)"></i>Duur</span>
+        <span><i class="sw" style="background:var(--glow); height:4px"></i>Gepland voor je apparaten</span>
+      </div>
+      <details class="table" id="priceTableWrap"><summary>Toon als tabel</summary><table id="priceTable"></table></details>
+    </section>
+
     <!-- apparaten -->
     <section class="c-dev" id="devices" style="display:grid; gap:14px; min-width:0"></section>
 
@@ -283,6 +312,25 @@
         <span><i class="sw" style="background:var(--net)"></i>Van het net</span>
         <span><i class="sw line"></i>Zonvoorspelling</span>
       </div>
+    </section>
+
+    <!-- verbruik -->
+    <section class="card c-usage" aria-labelledby="useTitle">
+      <div class="usage-head">
+        <span class="eyebrow" id="useTitle">Verbruik van je hele huis</span>
+        <div class="seg four" role="group" aria-label="Periode" id="useSeg">
+          <button data-p="day" class="active">Dag</button><button data-p="week">Week</button><button data-p="month">Maand</button><button data-p="year">Jaar</button>
+        </div>
+        <span class="nav"><button id="usePrev" aria-label="Vorige periode">‹</button><span id="useLabel">vandaag</span><button id="useNext" aria-label="Volgende periode">›</button></span>
+      </div>
+      <div class="use-stats" id="useStats" style="margin-top:14px"></div>
+      <div class="chart" id="useChart"><svg id="useSvg" role="img" aria-label="Afname en teruglevering van het hele huis"></svg><div class="tip" id="useTip"></div></div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--net)"></i>Afgenomen van het net</span>
+        <span><i class="sw" style="background:var(--sun)"></i>Teruggeleverd</span>
+        <span class="muted">in kWh</span>
+      </div>
+      <details class="table"><summary>Toon als tabel</summary><table id="useTable"></table></details>
     </section>
 
     <!-- zelfverbruik -->
@@ -357,7 +405,7 @@ async function api(path, opts = {}) {
   return r.json();
 }
 
-let STATUS = null, TODAY = null, MONTH = [];
+let STATUS = null, TODAY = null, MONTH = [], PRICES = null, USAGE = null, USE_P = "day", USE_OFF = 0;
 
 function renderStatus(s) {
   STATUS = s;
@@ -630,7 +678,156 @@ function drawMonth() {
   el("polyline", { points: pts, fill: "none", stroke: "var(--glow)", "stroke-width": 2, "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round" }, sp);
 }
 
-function drawCharts() { drawToday(); drawMonth(); }
+
+// ---------- stroomprijs ----------
+const eur3 = (v) => (v < 0 ? "−€ " : "€ ") + nl(Math.abs(v), 3);
+function priceClass(p, avg) {
+  if (p < 0) return "cheap";
+  const band = Math.max(0.01, Math.abs(avg) * 0.15);
+  return p <= avg - band ? "cheap" : p >= avg + band ? "dear" : "mid";
+}
+const CLASS_WORD = { cheap: "goedkoop", mid: "normaal", dear: "duur" };
+function drawPrices() {
+  const P = PRICES; if (!P) return;
+  const stats = $("priceStats"), svg = $("priceSvg"), box = $("priceChart"), tip = $("priceTip");
+  if (P.type === "fixed") {
+    $("priceNote").textContent = P.supplier ? P.supplier + " · vast of variabel" : "vast of variabel contract";
+    stats.innerHTML = `<div><b>${eur3(P.import)}</b><span>per kWh afname</span></div>
+      <div><b>${eur3(P.feed_in)}</b><span>vergoeding per kWh teruglevering</span></div>
+      ${P.return_cost ? `<div><b>${eur3(P.return_cost)}</b><span>terugleverkosten per kWh</span></div>` : ""}
+      <div><b>${eur3(P.net_feed_in)}</b><span>netto per teruggeleverde kWh</span></div>`;
+    svg.innerHTML = ""; svg.setAttribute("height", 0);
+    $("priceLegend").hidden = true; $("priceTableWrap").hidden = true;
+    return;
+  }
+  $("priceLegend").hidden = false; $("priceTableWrap").hidden = false;
+  const rows = P.slots, now = Date.now() / 1000;
+  if (!rows.length) { stats.innerHTML = '<div class="empty" style="padding:8px 0">Nog geen prijzen opgehaald.</div>'; svg.innerHTML = ""; return; }
+  const dayEnd = P.start + 86400;
+  const today = rows.filter((r) => r.ts < dayEnd), tomorrow = rows.filter((r) => r.ts >= dayEnd);
+  const avgOf = (a) => a.reduce((x, r) => x + r.all_in, 0) / Math.max(1, a.length);
+  const avgT = avgOf(today), avgM = avgOf(tomorrow);
+  const cur = rows.find((r) => now >= r.ts && now < r.end);
+  const minT = today.reduce((a, r) => (r.all_in < a.all_in ? r : a), today[0]);
+  const maxT = today.reduce((a, r) => (r.all_in > a.all_in ? r : a), today[0]);
+  const hh = (ts) => new Date(ts * 1000).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+  $("priceNote").textContent = `${P.supplier ? P.supplier + " · " : ""}all-in per kWh, incl. belastingen`;
+  stats.innerHTML = `${cur ? `<div><b>${eur3(P.live_now ?? cur.all_in)}</b><span>nu (${CLASS_WORD[priceClass(cur.all_in, avgT)]})</span></div>` : ""}
+    <div><b>${eur3(avgT)}</b><span>gemiddeld vandaag</span></div>
+    <div><b>${eur3(minT.all_in)}</b><span>goedkoopst vandaag, ${hh(minT.ts)}</span></div>
+    <div><b>${eur3(maxT.all_in)}</b><span>duurst vandaag, ${hh(maxT.ts)}</span></div>
+    ${tomorrow.length ? `<div><b>${eur3(avgM)}</b><span>gemiddeld morgen</span></div>` : ""}`;
+  if (!tomorrow.length) $("priceNote").textContent += " · prijzen voor morgen komen rond 13:00";
+
+  const W = Math.max(300, box.clientWidth), H = 230, L = 44, R = 6, T = 22, B = 30;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("height", H); svg.innerHTML = "";
+  const n = tomorrow.length ? 48 : 24, slot = (W - L - R) / n, bw = Math.max(2, slot - 2);   // 2px ruimte tussen balken
+  const lo = Math.min(0, ...rows.map((r) => r.all_in)), hi = Math.max(0.05, ...rows.map((r) => r.all_in));
+  const sc = niceScale(hi - lo), ymin = lo < 0 ? -Math.ceil(-lo / sc.step) * sc.step : 0, ymax = ymin + Math.ceil((hi - ymin) / sc.step) * sc.step;
+  const Y = (v) => T + (1 - (v - ymin) / (ymax - ymin)) * (H - T - B);
+  for (let v = ymin; v <= ymax + 1e-9; v += sc.step) {
+    el("line", { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: "grid-l" }, svg);
+    el("text", { x: L - 6, y: Y(v) + 4, "text-anchor": "end", class: "axis" }, svg).textContent = nl(v, 2);
+  }
+  if (ymin < 0) el("line", { x1: L, x2: W - R, y1: Y(0), y2: Y(0), stroke: "var(--ink-3)", "stroke-width": 1 }, svg);
+  const X = (ts) => L + ((ts - P.start) / 3600) * slot;
+  // dagscheiding en labels
+  el("text", { x: L, y: 12, class: "axis", "font-weight": 600 }, svg).textContent = "Vandaag";
+  if (tomorrow.length) {
+    el("text", { x: X(dayEnd) + 2, y: 12, class: "axis", "font-weight": 600 }, svg).textContent = "Morgen";
+    el("line", { x1: X(dayEnd) - 1, x2: X(dayEnd) - 1, y1: T - 6, y2: H - B, stroke: "var(--rule)", "stroke-width": 1 }, svg);
+  }
+  for (const r of rows) {
+    const avg = r.ts < dayEnd ? avgT : avgM, cls = priceClass(r.all_in, avg);
+    const x = X(r.ts) + (slot - bw) / 2, y0 = Y(0), y1 = Y(r.all_in);
+    const d = r.all_in >= 0 ? roundedTop(x, y1, bw, y0 - y1, 3)
+      : `M${x},${y0} V${y1 - 3} Q${x},${y1} ${x + 3},${y1} H${x + bw - 3} Q${x + bw},${y1} ${x + bw},${y1 - 3} V${y0} Z`;
+    const past = r.end <= now;
+    el("path", { d, fill: `var(--${cls})`, opacity: past ? 0.4 : 1 }, svg);
+    if (r.planned.length) el("rect", { x, y: H - B + 4, width: bw, height: 4, rx: 2, fill: "var(--glow)", opacity: past ? 0.4 : 1 }, svg);
+    if (cur && r.ts === cur.ts) el("rect", { x: x - 2, y: Math.min(y0, y1) - 2, width: bw + 4, height: Math.abs(y0 - y1) + 4, rx: 4, fill: "none", stroke: "var(--ink)", "stroke-width": 2 }, svg);
+  }
+  for (let h = 0; h <= n; h += (n > 24 ? 6 : 3) * (W < 560 ? 2 : 1)) {
+    const lab = h % 24 === 0 ? "00" : String(h % 24).padStart(2, "0");
+    el("text", { x: L + h * slot, y: H - 6, "text-anchor": h === 0 ? "start" : h === n ? "end" : "middle", class: "axis" }, svg).textContent = lab + ":00";
+  }
+  // hover per balk (vlak groter dan de balk)
+  rows.forEach((r) => {
+    const hit = el("rect", { x: X(r.ts), y: T, width: slot, height: H - T - B + 10, fill: "transparent" }, svg);
+    hit.addEventListener("pointerenter", () => {
+      const avg = r.ts < dayEnd ? avgT : avgM, cls = priceClass(r.all_in, avg), t = new Date(r.ts * 1000);
+      showTip(tip, box, (X(r.ts) + slot / 2) * (box.clientWidth / W), `<b>${t.toLocaleDateString("nl-NL", { weekday: "short" })} ${hh(r.ts)}–${hh(r.end)}</b>
+        <div class="row"><i class="sw" style="background:var(--${cls})"></i>All-in (${CLASS_WORD[cls]})<em>${eur3(r.all_in)}</em></div>
+        <div class="row">Kale marktprijs<em>${eur3(r.market)}</em></div>
+        <div class="row">Teruglevering levert op<em>${eur3(r.feed_in)}</em></div>
+        ${r.planned.length ? `<div class="row"><i class="sw" style="background:var(--glow)"></i>Gepland<em>${esc(r.planned.join(", "))}</em></div>` : ""}`);
+    });
+    hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+  });
+  $("priceTable").innerHTML = "<tr><th>Uur</th><th>All-in</th><th>Markt</th><th>Teruglevering</th><th>Gepland</th></tr>" + rows.map((r) =>
+    `<tr><td>${new Date(r.ts * 1000).toLocaleDateString("nl-NL", { weekday: "short" })} ${hh(r.ts)}</td><td>${eur3(r.all_in)}</td><td>${eur3(r.market)}</td><td>${eur3(r.feed_in)}</td><td>${esc(r.planned.join(", "))}</td></tr>`).join("");
+}
+
+// ---------- verbruik ----------
+const PERIOD_WORD = { day: ["vandaag", "gisteren"], week: ["deze week", "vorige week"], month: ["deze maand", "vorige maand"], year: ["dit jaar", "vorig jaar"] };
+function drawUsage() {
+  const U = USAGE; if (!U) return;
+  const svg = $("useSvg"), box = $("useChart"), tip = $("useTip"), t = U.totals;
+  $("useLabel").textContent = PERIOD_WORD[U.period][U.offset] || U.title;
+  $("useNext").disabled = U.offset === 0;
+  if (!U.has_meter) { $("useStats").innerHTML = ""; svg.innerHTML = ""; svg.setAttribute("height", 0);
+    $("useStats").innerHTML = '<div class="empty">Zonder meter kan Zonnestuur je verbruik niet zien. Koppel een P1-meter of een sensor uit Home Assistant.</div>'; return; }
+  $("useStats").innerHTML = `<div><b>${nl(t.import_kwh, 1)} kWh</b><span>afgenomen · ${eur(t.cost)}</span></div>
+    <div><b>${nl(t.export_kwh, 1)} kWh</b><span>teruggeleverd · ${eur(t.revenue)}</span></div>
+    <div><b>${eur(t.net)}</b><span>netto kosten</span></div>
+    ${t.avg_paid != null ? `<div><b>${eur3(t.avg_paid)}</b><span>gemiddeld betaald per kWh</span></div>` : ""}`;
+  const W = Math.max(300, box.clientWidth), H = 220, L = 40, R = 6, T = 10, B = 26;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("height", H); svg.innerHTML = "";
+  if (!U.has_data) {
+    el("text", { x: W / 2, y: H / 2, "text-anchor": "middle", class: "axis" }, svg).textContent = "Nog geen gegevens voor deze periode. Zonnestuur houdt dit bij vanaf de installatie.";
+    $("useTable").innerHTML = ""; return;
+  }
+  const bk = U.buckets, up = Math.max(0.1, ...bk.map((b) => b.import_kwh)), down = Math.max(0, ...bk.map((b) => b.export_kwh));
+  const sc = niceScale(up + down), ymax = Math.ceil(up / sc.step) * sc.step, ymin = -Math.ceil(down / sc.step) * sc.step;
+  const Y = (v) => T + (1 - (v - ymin) / (ymax - ymin || 1)) * (H - T - B);
+  for (let v = ymin; v <= ymax + 1e-9; v += sc.step) {
+    el("line", { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: "grid-l" }, svg);
+    el("text", { x: L - 6, y: Y(v) + 4, "text-anchor": "end", class: "axis" }, svg).textContent = nl(Math.abs(v), sc.step % 1 ? 1 : 0);
+  }
+  el("line", { x1: L, x2: W - R, y1: Y(0), y2: Y(0), stroke: "var(--ink-3)", "stroke-width": 1 }, svg);
+  const n = bk.length, slot = (W - L - R) / n, bw = Math.max(2, Math.min(28, slot - 2));
+  const every = n > 24 ? 5 : n > 12 ? 3 : 1;
+  bk.forEach((b, i) => {
+    const x = L + i * slot + (slot - bw) / 2;
+    if (b.import_kwh > 0.005) el("path", { d: roundedTop(x, Y(b.import_kwh), bw, Y(0) - Y(b.import_kwh) - 1, 3), fill: "var(--net)" }, svg);
+    if (b.export_kwh > 0.005) {
+      const y1 = Y(-b.export_kwh), y0 = Y(0) + 1, r = Math.min(3, (y1 - y0) / 2);
+      el("path", { d: `M${x},${y0} V${y1 - r} Q${x},${y1} ${x + r},${y1} H${x + bw - r} Q${x + bw},${y1} ${x + bw},${y1 - r} V${y0} Z`, fill: "var(--sun)" }, svg);
+    }
+    if (i % every === 0) el("text", { x: L + i * slot + slot / 2, y: H - 6, "text-anchor": "middle", class: "axis" }, svg).textContent = b.label;
+    const hit = el("rect", { x: L + i * slot, y: T, width: slot, height: H - T - B, fill: "transparent" }, svg);
+    hit.addEventListener("pointerenter", () => {
+      showTip(tip, box, (L + i * slot + slot / 2) * (box.clientWidth / W), `<b>${esc(b.label)}</b>
+        <div class="row"><i class="sw" style="background:var(--net)"></i>Afgenomen<em>${nl(b.import_kwh, 2)} kWh · ${eur(b.cost)}</em></div>
+        <div class="row"><i class="sw" style="background:var(--sun)"></i>Teruggeleverd<em>${nl(b.export_kwh, 2)} kWh · ${eur(b.revenue)}</em></div>
+        ${b.dev_kwh > 0.01 ? `<div class="row">Waarvan apparaten Zonnestuur<em>${nl(b.dev_kwh, 2)} kWh</em></div>` : ""}`);
+    });
+    hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+  });
+  $("useTable").innerHTML = "<tr><th>Periode</th><th>Afgenomen</th><th>Kosten</th><th>Teruggeleverd</th><th>Opbrengst</th></tr>" + bk.map((b) =>
+    `<tr><td>${esc(b.label)}</td><td>${nl(b.import_kwh, 2)} kWh</td><td>${eur(b.cost)}</td><td>${nl(b.export_kwh, 2)} kWh</td><td>${eur(b.revenue)}</td></tr>`).join("");
+}
+async function loadUsage() {
+  try { USAGE = await api(`api/usage?period=${USE_P}&offset=${USE_OFF}`); drawUsage(); } catch (e) {}
+}
+document.querySelectorAll("#useSeg button").forEach((b) => b.onclick = () => {
+  USE_P = b.dataset.p; USE_OFF = 0;
+  document.querySelectorAll("#useSeg button").forEach((x) => x.classList.toggle("active", x === b)); loadUsage();
+});
+$("usePrev").onclick = () => { USE_OFF++; loadUsage(); };
+$("useNext").onclick = () => { if (USE_OFF > 0) { USE_OFF--; loadUsage(); } };
+
+function drawCharts() { drawToday(); drawMonth(); drawPrices(); drawUsage(); }
 
 async function refresh() {
   try { renderStatus(await api("api/status")); }
@@ -638,7 +835,12 @@ async function refresh() {
 }
 async function refreshCharts() {
   try {
-    [TODAY, MONTH] = await Promise.all([api("api/today"), api("api/history?days=31")]);
+    const r = await Promise.allSettled([api("api/today"), api("api/history?days=31"), api("api/prices"),
+      api(`api/usage?period=${USE_P}&offset=${USE_OFF}`)]);
+    const v = (i, d) => (r[i].status === "fulfilled" ? r[i].value : d);
+    TODAY = v(0, TODAY); MONTH = v(1, MONTH); PRICES = v(2, null); USAGE = v(3, null);
+    $("priceSvg").closest("section").hidden = !PRICES;
+    $("useSvg").closest("section").hidden = !USAGE;
     drawCharts();
   } catch (e) {}
 }

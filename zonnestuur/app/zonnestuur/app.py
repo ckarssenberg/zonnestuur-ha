@@ -142,6 +142,9 @@ class Engine:
                     self.controller.states[dec.device_id].on = not dec.on
 
             # 5. boekhouding
+            if self.grid_w is not None:
+                self.ledger.record_house(now, dt, self.grid_w, self.prices.import_price(now),
+                                         self.prices.feed_in_price(now), sum(max(0.0, p) for p in powers.values()))
             if self.cfg.strategy == "price":
                 # Besparing zonder panelen: wat je betaalt tegenover de gemiddelde prijs van vandaag
                 avg = self._avg_price_today(now)
@@ -473,6 +476,87 @@ class Engine:
                 "last_error": self.last_error,
             }
 
+    def prices_view(self) -> dict:
+        """Prijzen voor het dashboard: all-in per uur voor vandaag en morgen (dynamisch) of de vaste tarieven."""
+        now = datetime.now(self.tz)
+        c = self.cfg.contract
+        if c.type != "dynamic":
+            return {"type": "fixed", "import": c.import_price, "feed_in": c.feed_in_price, "return_cost": c.return_cost,
+                    "net_feed_in": round(c.feed_in_price - c.return_cost, 4), "supplier": _supplier_name(c)}
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=2)
+        with self.lock:
+            slots = [s for s in self.prices.slots if start.astimezone(timezone.utc) <= s.start < end.astimezone(timezone.utc)]
+            planned: dict[int, list] = {}
+            names = {d.id: d.name for d in self.cfg.devices}
+            for plans in (getattr(self, "_price_plans", {}), getattr(self, "_combo_plans", {})):
+                for dev_id, p in plans.items():
+                    for h in p.get("hours", ()):
+                        planned.setdefault(int(h.timestamp()), []).append(names.get(dev_id, dev_id))
+            rows = [{"ts": int(s.start.timestamp()), "end": int(s.end.timestamp()),
+                     "all_in": round(self.prices.import_price(s.start, live=False), 4), "market": round(s.market, 4),
+                     "feed_in": round(self.prices.feed_in_price(s.start), 4),
+                     "planned": sorted(set(planned.get(int(s.start.timestamp()), [])))} for s in slots]
+            live = self.prices._live(now)
+        today = [r for r in rows if r["ts"] < int((start + timedelta(days=1)).timestamp())]
+        avg = sum(r["all_in"] for r in today) / len(today) if today else None
+        return {"type": "dynamic", "supplier": _supplier_name(c), "start": int(start.timestamp()), "slots": rows,
+                "avg_today": None if avg is None else round(avg, 4), "live_now": live,
+                "tomorrow_known": any(r["ts"] >= int((start + timedelta(days=1)).timestamp()) for r in rows)}
+
+    def usage_view(self, period: str, offset: int) -> dict:
+        """Verbruik van het hele huis per uur (dag), per dag (week, maand) of per maand (jaar), met euro's."""
+        now = datetime.now(self.tz)
+        day0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        if period == "day":
+            start = day0 - timedelta(days=offset)
+            end = start + timedelta(days=1)
+            steps = [start + timedelta(hours=h) for h in range(24)]
+            key = lambda ts: datetime.fromtimestamp(ts, self.tz).replace(minute=0, second=0, microsecond=0)
+            label = lambda t: t.strftime("%H:00")
+            title = start.strftime("%d-%m-%Y")
+        elif period == "week":
+            monday = day0 - timedelta(days=day0.weekday())
+            start = monday - timedelta(weeks=offset)
+            end = start + timedelta(days=7)
+            steps = [start + timedelta(days=i) for i in range(7)]
+            key = lambda ts: datetime.fromtimestamp(ts, self.tz).replace(hour=0, minute=0, second=0, microsecond=0)
+            label = lambda t: ["ma", "di", "wo", "do", "vr", "za", "zo"][t.weekday()] + f" {t.day}"
+            title = f"week {start.isocalendar()[1]}"
+        elif period == "month":
+            m = (day0.year * 12 + day0.month - 1) - offset
+            start = day0.replace(year=m // 12, month=m % 12 + 1, day=1)
+            nm = m + 1
+            end = start.replace(year=nm // 12, month=nm % 12 + 1)
+            steps, t = [], start
+            while t < end:
+                steps.append(t)
+                t = (t + timedelta(days=1)).replace(hour=0)
+            key = lambda ts: datetime.fromtimestamp(ts, self.tz).replace(hour=0, minute=0, second=0, microsecond=0)
+            label = lambda t: str(t.day)
+            title = start.strftime("%m-%Y")
+        else:  # year
+            start = day0.replace(year=day0.year - offset, month=1, day=1)
+            end = start.replace(year=start.year + 1)
+            steps = [start.replace(month=i) for i in range(1, 13)]
+            key = lambda ts: datetime.fromtimestamp(ts, self.tz).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            label = lambda t: ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"][t.month - 1]
+            title = str(start.year)
+        rows = self.ledger.house_hours(int(start.timestamp()), int(end.timestamp()))
+        buckets = {t: {"label": label(t), "ts": int(t.timestamp()), "import_kwh": 0.0, "export_kwh": 0.0,
+                       "cost": 0.0, "revenue": 0.0, "dev_kwh": 0.0} for t in steps}
+        for r in rows:
+            b = buckets.get(key(r["ts"]))
+            if b:
+                for k in ("import_kwh", "export_kwh", "cost", "revenue", "dev_kwh"):
+                    b[k] += r[k]
+        out = [{k: (round(v, 3) if isinstance(v, float) else v) for k, v in b.items()} for b in buckets.values()]
+        tot = {k: round(sum(b[k] for b in out), 3) for k in ("import_kwh", "export_kwh", "cost", "revenue", "dev_kwh")}
+        tot["net"] = round(tot["cost"] - tot["revenue"], 2)
+        tot["avg_paid"] = round(tot["cost"] / tot["import_kwh"], 4) if tot["import_kwh"] > 0.05 else None
+        return {"period": period, "offset": offset, "title": title, "buckets": out, "totals": tot,
+                "has_data": bool(rows), "has_meter": self.cfg.has_meter}
+
     def today(self) -> dict:
         """Verloop van vandaag per 5 minuten, plus de zonvoorspelling per uur."""
         now = datetime.now(self.tz)
@@ -585,6 +669,17 @@ def make_handler(engine: Engine):
                 return self._json(200, _solar_history(engine.cfg, q.get("start", [""])[0], q.get("end", [""])[0]))
             if url.path == "/api/simulate":
                 return self._json(200, _simulate(engine.cfg, q))
+            if url.path == "/api/prices":
+                return self._json(200, engine.prices_view())
+            if url.path == "/api/usage":
+                period = q.get("period", ["day"])[0]
+                if period not in ("day", "week", "month", "year"):
+                    period = "day"
+                try:
+                    offset = max(0, min(400, int(q.get("offset", ["0"])[0])))
+                except ValueError:
+                    offset = 0
+                return self._json(200, engine.usage_view(period, offset))
             if url.path == "/api/suppliers":
                 from .suppliers import catalog
                 return self._json(200, catalog())
