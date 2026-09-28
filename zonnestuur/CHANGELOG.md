@@ -1,5 +1,8 @@
 # Wijzigingen
 
+## 0.11.1
+- Teruglevering-kaart toont zonder teruglevering je afname per uur en gemiddelde prijs.
+
 ## 0.11.0 – Minder terugleveren
 - Nieuwe dashboardkaart **Teruglevering**: hoeveel en op welke uren je teruglevert, wat dat per jaar kost, persoonlijk advies en een batterijsimulatie op je eigen uurdata.
 - Haalt bij de eerste start het afgelopen jaar op uit de statistieken van Home Assistant.

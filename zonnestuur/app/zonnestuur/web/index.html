@@ -859,17 +859,20 @@ function drawInsight() {
   body.innerHTML = `<div class="use-stats">
       <div><b>${nl(I.export_per_day, 1)} kWh</b><span>per dag teruggeleverd</span></div>
       <div><b>${nl(I.import_per_day, 1)} kWh</b><span>per dag afgenomen</span></div>
+      ${I.export_per_day < 0.1 ? `<div><b>${eur3(I.avg_import_price)}</b><span>gemiddeld betaald per kWh</span></div>
+      <div><b>${nl(I.import_per_day * 365)} kWh</b><span>per jaar van het net</span></div>` : `
       <div><b>€ ${nl(I.missed_eur_year)}</b><span>per jaar meer waard als je het zelf gebruikt*</span></div>
-      <div><b>${peak}</b><span>hier lever je het meest terug</span></div>
+      <div><b>${peak}</b><span>hier lever je het meest terug</span></div>`}
     </div>
     ${STATUS && STATUS.inverter ? `<p class="small" style="margin:10px 0 0"><span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:${STATUS.inverter.limited ? "var(--sun)" : "var(--ink-3)"}"></span>${STATUS.inverter.limited ? esc(STATUS.inverter.reason) : "Omvormer op vol vermogen; Zonnestuur knijpt hem af zodra terugleveren geld kost."}</p>` : ""}
     ${STATUS && STATUS.notifications && STATUS.notifications.length ? `<p class="small muted" style="margin:6px 0 0">Laatste melding (${new Date(STATUS.notifications[0].at).toLocaleString("nl-NL", { weekday: "short", hour: "2-digit", minute: "2-digit" })}): ${esc(STATUS.notifications[0].title)}</p>` : ""}
     <div class="chart" id="feedChart"><svg id="feedSvg" role="img" aria-label="Gemiddeld per uur van de dag: afname en teruglevering"></svg><div class="tip" id="feedTip"></div></div>
     <div class="legend"><span><i class="sw" style="background:var(--net)"></i>Gemiddeld afgenomen</span><span><i class="sw" style="background:var(--sun)"></i>Gemiddeld teruggeleverd</span><span class="muted">kWh per uur van de dag</span></div>
+    ${I.export_per_day < 0.1 ? `<p class="small muted" style="margin-top:12px">Je levert (bijna) niets terug: al je stroom komt van het net. Zonnestuur haalt bij jou de winst uit de goedkoopste uren. Komen er zonnepanelen bij? Dan zie je hier meteen waar je stroom heen gaat.</p>` : `
     ${I.advice.length ? `<div class="advice">${I.advice.map((a) => `<div><b>${esc(a.title)}</b><p>${esc(a.text)}</p></div>`).join("")}</div>` : ""}
     <div style="overflow-x:auto"><table class="batt"><tr><th>Batterij (richtprijs)</th><th class="hide-m">Laden uit teruglevering</th><th>Bespaart per jaar</th><th>Terugverdiend in</th></tr>
-      ${I.batteries.map((b) => `<tr><td>${esc(b.name)} · € ${nl(b.price)}</td><td class="hide-m">${nl(b.charged_kwh * 365 / I.days)} kWh/jaar</td><td>€ ${nl(b.saving_year)}</td><td>${b.payback_years ? nl(b.payback_years, 1) + " jaar" : "–"}</td></tr>`).join("")}</table></div>
-    <p class="small muted" style="margin-top:10px">* Bovengrens: wat je had bespaard als je al die stroom zelf had gebruikt (afnameprijs min wat teruglevering opleverde: gemiddeld ${eur3(I.avg_import_price)} tegen ${eur3(I.avg_export_value)} per kWh). Batterijen: simulatie op jouw uurdata, 90% rendement.
+      ${I.batteries.map((b) => `<tr><td>${esc(b.name)} · € ${nl(b.price)}</td><td class="hide-m">${nl(b.charged_kwh * 365 / I.days)} kWh/jaar</td><td>€ ${nl(b.saving_year)}</td><td>${b.payback_years ? nl(b.payback_years, 1) + " jaar" : "–"}</td></tr>`).join("")}</table></div>`}
+    <p class="small muted" style="margin-top:10px" ${I.export_per_day < 0.1 ? "hidden" : ""}>* Bovengrens: wat je had bespaard als je al die stroom zelf had gebruikt (afnameprijs min wat teruglevering opleverde: gemiddeld ${eur3(I.avg_import_price)} tegen ${eur3(I.avg_export_value)} per kWh). Batterijen: simulatie op jouw uurdata, 90% rendement.
       ${I.seasonal_warning ? "Minder dan een jaar aan gegevens: per-jaar-bedragen zijn doorgetrokken en hangen af van het seizoen." : ""}</p>`;
   const svg = $("feedSvg"), box = $("feedChart"), tip = $("feedTip");
   const W = Math.max(300, box.clientWidth), H = 180, L = 40, R = 6, T = 10, B = 24;
