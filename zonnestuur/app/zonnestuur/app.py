@@ -157,28 +157,56 @@ class Engine:
                 self._last_save = mono
 
     def _plan_guarantee(self, now: datetime) -> dict[str, set]:
-        """Dynamisch contract: kies goedkope uren om bij te laden als de zon het niet redt."""
-        if self.cfg.contract.type != "dynamic":
+        """Zon + goedkope stroom (dynamisch contract, met zonnepanelen).
+
+        Per apparaat: hoeveel moet er nog gebeuren vóór de klaar-tijd (of vandaag, zonder klaar-tijd), min wat de
+        zon naar verwachting levert. Het tekort komt in de goedkoopste uren van het hele venster, dus ook 's nachts
+        of op een grijze dag. Het plan blijft staan (verschuift niet elke ronde); alleen als er nieuwe prijzen bij
+        komen en het plan nog niet begonnen is, wordt opnieuw gepland.
+        """
+        if self.cfg.contract.type != "dynamic" or self.cfg.strategy != "solar" or not self.prices.slots:
             return {}
+        plans = getattr(self, "_combo_plans", {})
+        hour = now.replace(minute=0, second=0, microsecond=0)
         out: dict[str, set] = {}
         for d in self.cfg.devices:
-            if not d.ready_times or d.guarantee_min <= 0:
-                continue
             st = self.controller.states[d.id]
-            ready = self.controller.next_unsatisfied(d, st, now)
-            if ready is None:
+            if d.ready_times and d.guarantee_min > 0:
+                end = self.controller.next_unsatisfied(d, st, now)
+                if end is None:
+                    plans.pop(d.id, None)
+                    continue
+                start = end - timedelta(hours=d.full_lookback_h)
+                need_s = d.guarantee_min * 60
+            elif d.expected_run_min > 0 or d.one_shot:
+                end = now.replace(hour=23, minute=0, second=0, microsecond=0)
+                if end <= now:
+                    continue
+                start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                need_s = (d.expected_run_min or 120) * 60 - (0 if d.one_shot else st.run_seconds_today)
+            else:
                 continue
-            window_start = ready - timedelta(minutes=d.guarantee_min)
-            plan_start = max(now, ready - timedelta(hours=d.full_lookback_h))
-            if plan_start >= window_start:
+            old = plans.get(d.id)
+            key = (end.isoformat(), len(self.prices.slots))
+            if old and old["end"] == end.isoformat() and (old["key"] == key or any(h <= hour for h in old["hours"])):
+                out[d.id] = old["hours"]
                 continue
-            need = d.guarantee_min * 60
-            expected = self.forecast.expected_surplus_seconds(now, window_start, d.start_threshold_w) or 0.0
-            if 0.8 * expected >= need:
+            sun_s = self.forecast.expected_surplus_seconds(now, end, d.start_threshold_w) or 0.0
+            remaining = need_s - 0.8 * sun_s
+            if remaining <= 0:
+                plans[d.id] = {"end": end.isoformat(), "key": key, "hours": set()}
                 continue
-            candidates = self.prices.upcoming(plan_start.astimezone(timezone.utc), window_start.astimezone(timezone.utc))
-            hours = plan_cheapest_hours(need - 0.8 * expected, candidates)
-            out[d.id] = {h.astimezone(self.tz).replace(minute=0, second=0, microsecond=0) for h in hours}
+            plan_start = max(hour, start)
+            candidates = self.prices.upcoming(plan_start.astimezone(timezone.utc), end.astimezone(timezone.utc))
+            if d.one_shot:
+                b = plan_cheapest_block(remaining, candidates)
+                hours = {b} if b else set()
+            else:
+                hours = plan_cheapest_hours(remaining, candidates)
+            hours = {h.astimezone(self.tz).replace(minute=0, second=0, microsecond=0) for h in hours}
+            plans[d.id] = {"end": end.isoformat(), "key": key, "hours": hours}
+            out[d.id] = hours
+        self._combo_plans = plans
         return out
 
     def _best_hours(self, device_id: str, now: datetime) -> list:

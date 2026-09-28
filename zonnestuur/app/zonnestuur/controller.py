@@ -230,19 +230,21 @@ class Controller:
             return True, "handmatig aan"
         if st.mode == "off":
             return False, "handmatig uit"
-        if not d.ready_times or d.guarantee_min <= 0:
+        hour = ctx.now.replace(minute=0, second=0, microsecond=0)
+        cheap = ctx.cheapest_hours.get(d.id) or set()
+        ready = self.next_unsatisfied(d, st, ctx.now) if d.ready_times and d.guarantee_min > 0 else None
+        if hour in cheap:
+            # Zon + goedkoop: in een gepland goedkoop uur draait hij, ook zonder zon
+            return True, f"goedkoop uur, klaar om {ready:%H:%M}" if ready else "goedkoop uur (te weinig zon verwacht)"
+        if ready is None:
             return None
         if self.cfg.strategy == "price" and ctx.price_hours.get(d.id):
             return None                                   # het prijsplan zorgt al dat hij op tijd klaar is
-        ready = self.next_unsatisfied(d, st, ctx.now)
-        if ready is None:
-            return None
+        if any(h > hour for h in cheap):
+            return None                                   # er komt nog een gepland goedkoop uur vóór de klaar-tijd
         left_s = (ready - ctx.now).total_seconds()
         if left_s <= d.guarantee_min * 60:
             return True, f"garantie: klaar om {ready:%H:%M}"
-        hours = ctx.cheapest_hours.get(d.id)
-        if hours and ctx.now.replace(minute=0, second=0, microsecond=0) in hours:
-            return True, f"goedkoop uur, klaar om {ready:%H:%M}"
         return None
 
     def _solar(self, devices: list[DeviceConfig], ctx: Context) -> dict[str, tuple[bool, str]]:

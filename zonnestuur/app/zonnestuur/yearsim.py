@@ -12,6 +12,7 @@ Apparaten (standaard, allemaal aan te passen):
 Manieren van aansturen:
   gewoon         boiler warmt na gebruik op (07:00 en 20:00), auto laadt direct bij thuiskomst
   tijdklok       boiler 's nachts vanaf 23:00, auto laadt vanaf 23:00
+  tijdklok overdag  boiler 11:00-15:00 (de simpele concurrent voor wie panelen heeft), auto vanaf 23:00
   goedkoopst     alleen de goedkoopste uren binnen het venster (geen rekening met de zon)
   alleen zon     eerst zonne-overschot; wat ontbreekt vlak voor de klaar-tijd (vast contract-gedrag)
   zon+goedkoop   eerst zonne-overschot; wat ontbreekt in de goedkoopste uren binnen het venster
@@ -31,7 +32,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-STRATEGIES = ("gewoon", "tijdklok", "goedkoopst", "alleen zon", "zon+goedkoop")
+STRATEGIES = ("gewoon", "tijdklok", "tijdklok overdag", "goedkoopst", "alleen zon", "zon+goedkoop")
 
 # Huisverbruik zonder gestuurde apparaten, per uur (aandeel van een dag), grofweg het NEDU-profiel
 BASE_SHAPE = [0.030, 0.026, 0.024, 0.023, 0.023, 0.026, 0.036, 0.046, 0.045, 0.040, 0.038, 0.038,
@@ -165,6 +166,8 @@ def simulate(hh: Household, days: list[Day], strategy: str) -> dict:
                 plan.update(_hours_first([base_i - 4, base_i - 3], need * 0.4, hh.boiler_kw))
             elif strategy == "tijdklok":
                 plan = _hours_first(list(range(base_i - 1, base_i + 7)), need, hh.boiler_kw)
+            elif strategy == "tijdklok overdag":
+                plan = _hours_first(list(range(base_i + 11, base_i + 15)), need, hh.boiler_kw)
             elif strategy == "goedkoopst":
                 plan = _hours_cheapest([(i, imp_price(i)) for i in win], need, hh.boiler_kw)
             else:
@@ -193,7 +196,7 @@ def simulate(hh: Household, days: list[Day], strategy: str) -> dict:
             win = day_home + night
             if strategy == "gewoon":
                 plan = _hours_first(night, need, hh.ev_max_kw)
-            elif strategy == "tijdklok":
+            elif strategy in ("tijdklok", "tijdklok overdag"):
                 plan = _hours_first(list(range(base_i + 23, base_i + 31)), need, hh.ev_max_kw)
             elif strategy == "goedkoopst":
                 plan = _hours_cheapest([(i, imp_price(i)) for i in win], need, hh.ev_max_kw)
