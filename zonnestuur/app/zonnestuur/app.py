@@ -11,7 +11,7 @@ import logging
 import signal
 import threading
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import date as date_cls, date, datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Optional
@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
 from . import __version__
-from .adapters import DeviceError, HomeWizardP1, ShellySwitch, NotReady
+from .adapters import DeviceError, HomeWizardP1, ShellySwitch, NotReady, http_get_json
 from .config import Config, load_config, merge_public, public_dict, save_config, effective_ha
 from .discovery import PROBLEMS, Scanner, identify
 from .drivers import HomeAssistant, ha_candidates, make_meter, make_switch, ha_client
@@ -551,6 +551,10 @@ def make_handler(engine: Engine):
                 return self._json(200, engine.read_p1(host))
             if url.path == "/api/setup/ha":
                 return self._json(200, engine.ha_candidates())
+            if url.path == "/api/history/prices":
+                return self._json(200, _price_history(q.get("start", [""])[0], q.get("end", [""])[0]))
+            if url.path == "/api/history/solar":
+                return self._json(200, _solar_history(engine.cfg, q.get("start", [""])[0], q.get("end", [""])[0]))
             if url.path == "/api/suppliers":
                 from .suppliers import catalog
                 return self._json(200, catalog())
@@ -618,6 +622,56 @@ def make_handler(engine: Engine):
             return self._json(404, {"error": "niet gevonden"})
 
     return Handler
+
+
+def _check_range(start: str, end: str) -> tuple[date_cls, date_cls]:
+    d0, d1 = date_cls.fromisoformat(start), date_cls.fromisoformat(end)
+    if not (d0 < d1 and (d1 - d0).days <= 400):
+        raise ValueError("periode moet 1 tot 400 dagen zijn")
+    return d0, d1
+
+
+def _price_history(start: str, end: str) -> dict:
+    """Uurprijzen (kale marktprijs incl. btw, EnergyZero) voor een periode: voor de jaarberekening in de app."""
+    from .prices import ENERGYZERO_URL, _iso
+    try:
+        d0, d1 = _check_range(start, end)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    out: dict[str, float] = {}
+    cur = d0
+    while cur < d1:
+        nxt = min(d1, cur + timedelta(days=31))
+        a = datetime(cur.year, cur.month, cur.day, tzinfo=timezone.utc) - timedelta(hours=2)
+        b = datetime(nxt.year, nxt.month, nxt.day, tzinfo=timezone.utc)
+        url = f"{ENERGYZERO_URL}?fromDate={_iso(a)}&tillDate={_iso(b)}&interval=4&usageType=1&inclBtw=true"
+        try:
+            for p in http_get_json(url, timeout=20).get("Prices", []):
+                out[p["readingDate"]] = round(float(p["price"]), 5)
+        except DeviceError as exc:
+            return {"ok": False, "error": str(exc)}
+        cur = nxt
+    keys = sorted(out)
+    return {"ok": True, "source": "EnergyZero", "hours": [[k, out[k]] for k in keys]}
+
+
+def _solar_history(cfg: Config, start: str, end: str) -> dict:
+    """Zoninstraling per uur op het paneel (W/m², Open-Meteo archief) voor de ingestelde plek en stand."""
+    try:
+        d0, d1 = _check_range(start, end)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    s = cfg.solar
+    url = ("https://archive-api.open-meteo.com/v1/archive"
+           f"?latitude={s.latitude:.2f}&longitude={s.longitude:.2f}&start_date={d0}&end_date={d1 - timedelta(days=1)}"
+           f"&hourly=global_tilted_irradiance,temperature_2m&tilt={s.tilt:.0f}&azimuth={s.azimuth:.0f}&timezone=UTC")
+    try:
+        data = http_get_json(url, timeout=30)
+    except DeviceError as exc:
+        return {"ok": False, "error": str(exc)}
+    h = data.get("hourly", {})
+    return {"ok": True, "source": "Open-Meteo archief", "time": h.get("time", []),
+            "gti": h.get("global_tilted_irradiance", []), "temp": h.get("temperature_2m", [])}
 
 
 class _NoMeter(Exception):
