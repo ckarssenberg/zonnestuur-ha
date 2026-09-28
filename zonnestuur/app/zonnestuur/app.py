@@ -555,6 +555,8 @@ def make_handler(engine: Engine):
                 return self._json(200, _price_history(q.get("start", [""])[0], q.get("end", [""])[0]))
             if url.path == "/api/history/solar":
                 return self._json(200, _solar_history(engine.cfg, q.get("start", [""])[0], q.get("end", [""])[0]))
+            if url.path == "/api/simulate":
+                return self._json(200, _simulate(engine.cfg, q))
             if url.path == "/api/suppliers":
                 from .suppliers import catalog
                 return self._json(200, catalog())
@@ -672,6 +674,37 @@ def _solar_history(cfg: Config, start: str, end: str) -> dict:
     h = data.get("hourly", {})
     return {"ok": True, "source": "Open-Meteo archief", "time": h.get("time", []),
             "gti": h.get("global_tilted_irradiance", []), "temp": h.get("temperature_2m", [])}
+
+
+_SIM_CACHE: dict = {}
+
+
+def _simulate(cfg: Config, q: dict) -> dict:
+    """Jaarberekening met echte uurprijzen en zoninstraling. Data wordt per periode en plek bewaard."""
+    from dataclasses import replace
+    from .yearsim import build_days, household_from_query, run_all
+    start, end = q.get("start", [""])[0], q.get("end", [""])[0]
+    s = cfg.solar
+    loc = {k: float(q.get(k, [v])[0]) for k, v in (("lat", s.latitude), ("lon", s.longitude), ("tilt", s.tilt),
+                                                     ("azimuth", s.azimuth))}
+    key = (start, end, tuple(sorted(loc.items())))
+    if key not in _SIM_CACHE:
+        prices = _price_history(start, end)
+        if not prices.get("ok"):
+            return prices
+        solar_cfg = replace(cfg, solar=replace(s, latitude=loc["lat"], longitude=loc["lon"], tilt=loc["tilt"],
+                                               azimuth=loc["azimuth"]))
+        solar = _solar_history(solar_cfg, start, end)
+        _SIM_CACHE.clear()
+        _SIM_CACHE[key] = (prices, solar)
+    prices, solar = _SIM_CACHE[key]
+    hh = household_from_query(q, cfg)
+    days = build_days(hh, prices["hours"], solar if solar.get("ok") else None)
+    out = run_all(hh, days)
+    out.update({"ok": True, "solar_ok": bool(solar.get("ok")), "solar_error": solar.get("error"),
+                "household": hh.__dict__, "location": loc,
+                "avg_price": round(sum(p for d in days for p in d.price) / max(1, 24 * len(days)), 4)})
+    return out
 
 
 class _NoMeter(Exception):
