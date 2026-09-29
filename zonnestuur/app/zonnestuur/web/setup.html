@@ -1071,6 +1071,12 @@ async function editDevice(i) {
       <div class="field"><label for="e_look">Telt als klaar als hij binnen zoveel uur ervoor vol was</label><input id="e_look" type="number" min="1" max="24" step="0.5" value="${d.full_lookback_h}"></div>
     </div>`}
 
+    ${d.driver === "shelly" ? `<h3 class="sub-t">Vangnet</h3>
+    <label class="check-row"><input type="checkbox" id="e_fs" ${(P.failsafe ?? d.kind === "boiler") ? "checked" : ""}> Doet de Box het niet, dan zet de Shelly ${esc(d.name)} zelf aan</label>
+    <div class="row" style="margin-top:8px"><div class="field" style="flex:0 1 260px"><label for="e_fsw">Elke dag tussen</label>
+      <select id="e_fsw">${["10-13", "11-14", "12-15", "13-16", "11-15"].map((w) => `<option value="${w}" ${(P.failsafe_window || "12-15") === w ? "selected" : ""}>${w.replace("-", ":00 en ")}:00 uur</option>`).join("")}</select>
+      <span class="hint">Er komt een klein script op de Shelly. Hoort hij 3 uur niets van de Box, dan verwarmt hij zelf in dit venster. Zo is er altijd warm water.</span></div></div>` : ""}
+
     <h3 class="sub-t">Hoe lang per dag</h3>
     <label class="check-row"><input type="checkbox" id="e_learn" ${d.learn_run === false ? "" : "checked"}> Zelf leren uit wat ${esc(d.name)} echt gebruikt <span class="muted">(aanbevolen)</span></label>
     <p class="hint" style="margin:6px 0 8px">${esc(learnTxt)}</p>
@@ -1117,6 +1123,7 @@ async function editDevice(i) {
     n.start_surplus_w = $("e_start").value === "" ? null : num("e_start", null); n.start_delay_s = Math.max(0, num("e_sd", 60));
     n.stop_import_w = num("e_stop", 300); n.stop_delay_s = Math.max(0, num("e_xd", 120));
     n.min_on_s = Math.max(0, num("e_minon", 10)) * 60; n.min_off_s = Math.max(0, num("e_minoff", 5)) * 60; n.detect_full = $("e_full").checked;
+    if ($("e_fs")) { n.params = n.params || {}; n.params.failsafe = $("e_fs").checked; n.params.failsafe_window = $("e_fsw").value; }
     if ($("e_tn")) { n.params.normal_temp = num("e_tn", n.params.normal_temp); n.params.boost_temp = num("e_tb", n.params.boost_temp); }
     if ($("e_ph")) {
       Object.assign(n.params, { phases: Number($("e_ph").value), min_a: Math.max(6, num("e_mina", 6)), max_a: Math.min(32, num("e_maxa", 16)),

@@ -1,0 +1,78 @@
+# Bouwt het SD-kaartbeeld van de Zonnestuur Box en zet het bij de releases van deze repository.
+# Start vanzelf als box.json verandert (nieuwe Box-versie), of met de hand via Actions > Zonnestuur Box > Run workflow.
+name: Zonnestuur Box
+
+on:
+  push:
+    branches: [main]
+    paths: [box.json]
+  workflow_dispatch:
+    inputs:
+      proef:
+        description: "Proefversie met SSH-sleutel (geheim BOX_SSH_KEY) voor beheer op afstand in het thuisnetwerk"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Raspberry Pi OS Lite (64-bit) ophalen en controleren
+        run: |
+          URL="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://downloads.raspberrypi.com/raspios_lite_arm64_latest)"
+          echo "Beeld: $URL"
+          echo "RASPIOS_URL=$URL" >> "$GITHUB_ENV"
+          curl -fsSL -o raspios.img.xz "$URL"
+          curl -fsSL "$URL.sha256" | awk '{print $1"  raspios.img.xz"}' | sha256sum -c -
+
+      - name: Beeld bouwen
+        env:
+          BOX_SSH_KEY: ${{ inputs.proef && secrets.BOX_SSH_KEY || '' }}
+        run: |
+          V="$(python3 -c 'import json; print(json.load(open("box.json"))["version"])')"
+          SUFFIX=""
+          if [ -n "$BOX_SSH_KEY" ]; then SUFFIX="-proef"; fi
+          NAME="zonnestuur-box-$V$SUFFIX.img.xz"
+          echo "V=$V" >> "$GITHUB_ENV"
+          echo "NAME=$NAME" >> "$GITHUB_ENV"
+          sudo --preserve-env=BOX_SSH_KEY box/build-image.sh raspios.img.xz "$NAME" zonnestuur/app/zonnestuur box/units
+          ls -lh "$NAME"
+
+      - name: Controleren wat er in het beeld staat
+        run: |
+          xz -dc "$NAME" > check.img
+          LOOP="$(sudo losetup -Pf --show check.img)"
+          sudo mkdir -p /mnt/r /mnt/b
+          sudo mount -o ro "${LOOP}p2" /mnt/r
+          sudo mount -o ro "${LOOP}p1" /mnt/b
+          set -x
+          test "$(readlink /mnt/r/opt/zonnestuur/current)" = "releases/$V"
+          grep -q "__version__ = \"$V\"" /mnt/r/opt/zonnestuur/current/zonnestuur/__init__.py
+          test -L /mnt/r/etc/systemd/system/multi-user.target.wants/zonnestuur.service
+          test -L /mnt/r/etc/systemd/system/multi-user.target.wants/zonnestuur-net.service
+          test -L /mnt/r/etc/systemd/system/timers.target.wants/zonnestuur-update.timer
+          test -x /mnt/r/usr/bin/nmcli
+          test -x /mnt/r/usr/bin/python3
+          grep -q zonnestuur /mnt/r/etc/hostname
+          grep -q 'dialout:.*zonnestuur' /mnt/r/etc/group
+          grep -q ieee80211_regdom=NL /mnt/b/cmdline.txt
+          ls /mnt/b/user-data /mnt/b/userconf.txt 2>/dev/null || true
+          PYTHONPATH=/mnt/r/opt/zonnestuur/current python3 -c "import zonnestuur.app, zonnestuur.netsetup, zonnestuur.updater, zonnestuur.failsafe; print('code laadt')"
+          sudo umount /mnt/r /mnt/b
+          sudo losetup -d "$LOOP"
+          rm check.img
+
+      - name: Release maken
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="box-$V"
+          NOTES="SD-kaartbeeld voor de Zonnestuur Box (Raspberry Pi 4 of 5). Schrijf het met Raspberry Pi Imager (kies 'Eigen beeld') of balenaEtcher op een microSD-kaart. Kaart erin, netwerkkabel of stekker erin, en open http://zonnestuur.local. Zonder kabel verschijnt na anderhalve minuut de wifi 'Zonnestuur-instellen'. Gebouwd uit: $RASPIOS_URL"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "Zonnestuur Box $V" --notes "$NOTES"
+          gh release upload "$TAG" "$NAME" "$NAME.sha256" --clobber

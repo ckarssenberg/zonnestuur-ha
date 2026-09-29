@@ -1,0 +1,19 @@
+[Unit]
+Description=Zonnestuur - wifi instellen zonder kabel
+After=NetworkManager.service
+Wants=NetworkManager.service
+ConditionPathExists=/usr/bin/nmcli
+
+[Service]
+Type=simple
+Environment=PYTHONPATH=/opt/zonnestuur/current
+Environment=PYTHONDONTWRITEBYTECODE=1
+# wifi staat op een nieuwe Raspberry Pi geblokkeerd tot er een land is gekozen
+ExecStartPre=-/usr/sbin/rfkill unblock wifi
+ExecStartPre=-/usr/bin/nmcli radio wifi on
+ExecStart=/usr/bin/python3 -m zonnestuur.netsetup
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

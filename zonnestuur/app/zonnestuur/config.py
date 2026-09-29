@@ -123,6 +123,7 @@ class Config:
     mqtt: dict = field(default_factory=dict)               # {"host", "port", "username", "password"}
     homey: dict = field(default_factory=dict)              # {"url", "token"} (Homey Pro, lokale API-sleutel)
     ocpp: dict = field(default_factory=dict)               # {"enabled": true, "port": 8887}
+    auto_update: bool = True                               # Zonnestuur Box: nieuwe versies zelf installeren
 
     @property
     def meter_driver(self) -> str:

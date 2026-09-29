@@ -24,6 +24,8 @@ from .adapters import DeviceError, HomeWizardP1, ShellySwitch, NotReady, http_ge
 from .config import Config, load_config, merge_public, public_dict, save_config, effective_ha
 from .discovery import PROBLEMS, Scanner, identify
 from . import license as lic
+from . import netsetup
+from . import failsafe
 from .guard import InverterLimiter, Notifier, negative_window
 from .learn import HouseModel, learn as learn_house
 from .battery import BatteryConfig, BatteryRuntime, HourIn, hourly_profile, import_profile, plan as plan_battery, plan_value
@@ -55,6 +57,10 @@ class Engine:
         self.tz = ZoneInfo(cfg.timezone)
         self.meter = meter or self._safe_meter(cfg)
         self.switches = switches or self._make_switches(cfg)
+        # warmwater-vangnet op Shelly's (niet bij nagebootste apparaten in tests)
+        self.failsafe = failsafe.Guard() if switches is None and os.environ.get("ZONNESTUUR_NO_FAILSAFE") != "1" else None
+        if self.failsafe:
+            self.failsafe.sync(cfg.devices)
         self.prices = prices or PriceProvider(cfg.contract, enabled=cfg.use_prices)
         self.forecast = forecast or SolarForecast(cfg.solar, enabled=cfg.use_forecast)
         self.ledger = ledger or Ledger(cfg.db_path)
@@ -258,6 +264,8 @@ class Engine:
 
             if not self.cfg.configured:
                 return                      # nog niets gekoppeld: de koppel-assistent is aan zet
+            if self.failsafe:
+                self.failsafe.beat(self.cfg.devices)
 
             # 1. meter uitlezen
             reading = None
@@ -661,6 +669,8 @@ class Engine:
             self.cfg = new
             self.meter = self._safe_meter(new)
             self.switches = self._make_switches(new)
+            if self.failsafe:
+                self.failsafe.sync(new.devices)
             self.prices = PriceProvider(new.contract, enabled=new.use_prices)
             self.forecast = SolarForecast(new.solar, enabled=new.use_forecast)
             self.model.fallback_w = new.solar.base_load_w
@@ -858,6 +868,7 @@ class Engine:
                                 "ready_times": d.ready_times, "ready_days": d.ready_days, "guarantee_min": d.guarantee_min, "driver": d.driver,
                                 "modulating": d.modulating, "min_w": round(d.min_w), "max_w": round(d.max_w),
                                 "w_per_step": round(d.w_per_step),
+                                "failsafe": (self.failsafe.status.get(d.id, "") if self.failsafe else ""),
                                 "next_ready": ready[0].isoformat(timespec="minutes") if ready else None,
                                 "next_ready_ok": (self.controller.is_satisfied(d, self.controller.states[d.id], ready[0])
                                                   if ready else None),
@@ -1192,6 +1203,16 @@ def make_handler(engine: Engine):
                 return
             url = urlparse(self.path)
             q = parse_qs(url.query)
+            if netsetup.portal_active() and url.path not in ("/wifi", "/api/wifi") and url.path not in STATIC:
+                self.send_response(302)                     # instel-wifi: elke pagina (ook de telefoontest) naar de wifi-keuze
+                self.send_header("Location", f"http://{netsetup.HOTSPOT_IP}/wifi")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            if url.path == "/wifi":
+                return self._send(200, (WEB_DIR / "wifi.html").read_bytes(), "text/html; charset=utf-8")
+            if url.path == "/api/wifi":
+                return self._json(200, netsetup.portal_view())
             if url.path in PAGES:
                 page = PAGES[url.path]
                 if page == "index.html" and not engine.cfg.configured:
@@ -1265,6 +1286,15 @@ def make_handler(engine: Engine):
                 return
             url = urlparse(self.path)
             q = parse_qs(url.query)
+            if url.path == "/api/wifi":                     # alleen via de instel-wifi, dus wie bij de Box is
+                if not netsetup.portal_active():
+                    return self._json(409, {"error": "De Box heeft al netwerk"})
+                try:
+                    body = self._body()
+                    netsetup.submit(str(body.get("ssid", "")), str(body.get("password", "")))
+                except (ValueError, json.JSONDecodeError) as exc:
+                    return self._json(400, {"error": str(exc)})
+                return self._json(200, {"ok": True})
             if not self._authorized(q):
                 return self._json(401, {"error": "token vereist"})
             try:

@@ -1,5 +1,11 @@
 # Wijzigingen
 
+## 0.20.0 – Zonnestuur Box
+- Kant-en-klaar SD-kaartbeeld voor de Zonnestuur Box, gebouwd door GitHub Actions.
+- Wifi instellen zonder kabel: de Box maakt zelf de wifi "Zonnestuur-instellen" met een instelpagina.
+- Automatische updates op de Box, met controle en terugval naar de vorige versie.
+- Warmwater-vangnet: een script op de Shelly verwarmt de boiler zelf als de Box een paar uur stil is (ook voor de add-on).
+
 ## 0.19.0 – P1-kabel
 - Slimme meter rechtstreeks uitlezen via een P1-kabel (USB), zonder HomeWizard of andere dongel. De koppel-assistent vindt de kabel zelf.
 
