@@ -348,7 +348,34 @@ def make_meter(cfg):
     if kind == "ha":
         return HAMeter(ha_client(cfg), m.get("entity", ""), m.get("import_entity", ""), m.get("export_entity", ""),
                        bool(m.get("invert")))
+    from . import drivers_extra as X
+    if kind == "youless":
+        return X.YouLessMeter(m.get("host") or cfg.p1_host, bool(m.get("invert")))
+    if kind == "dsmr_reader":
+        return X.DSMRReaderMeter(m.get("host", ""), m.get("api_key", ""))
+    if kind == "esphome":
+        return X.ESPHomeMeter(m.get("host", ""), m.get("sensor", ""), m.get("export_sensor", ""), bool(m.get("invert")))
+    if kind == "mqtt":
+        from .config import effective_mqtt
+        return X.MQTTMeter(effective_mqtt(cfg), m)
+    if kind == "homey":
+        return X.HomeyMeter(homey_client(cfg), m.get("device", ""), bool(m.get("invert")))
     raise ValueError(f"Onbekende meter: {kind}")
+
+
+def homey_client(cfg):
+    from .drivers_extra import Homey
+    h = cfg.homey or {}
+    if not h.get("url") or not h.get("token"):
+        raise ValueError("Homey Pro is nog niet gekoppeld (adres en API-sleutel)")
+    return Homey(h["url"], h["token"])
+
+
+def _sub_device(d, spec: dict):
+    """Een relais binnen een samengesteld apparaat (SG-ready) als los apparaat bekijken."""
+    from dataclasses import replace
+    return replace(d, driver=spec.get("driver", "shelly"), host=spec.get("host", ""), switch_id=int(spec.get("switch_id", 0)),
+                   params=dict(spec.get("params") or {}))
 
 
 def make_switch(cfg, d):
@@ -361,6 +388,24 @@ def make_switch(cfg, d):
         return HomeWizardSocket(d.host)
     if drv == "tasmota":
         return TasmotaSwitch(d.host, d.switch_id)
+    from . import drivers_extra as X
+    if drv == "esphome":
+        return X.ESPHomeSwitch(d.host, p.get("switch", ""), p.get("power_sensor", ""))
+    if drv == "mqtt_switch":
+        from .config import effective_mqtt
+        return X.MQTTSwitch(effective_mqtt(cfg), p)
+    if drv == "homey_switch":
+        return X.HomeySwitch(homey_client(cfg), p["device"])
+    if drv == "homey_setpoint":
+        return X.HomeySetpoint(homey_client(cfg), p["device"], float(p.get("normal_temp", 20)), float(p.get("boost_temp", 22)))
+    if drv == "sg_ready":
+        a, b = make_switch(cfg, _sub_device(d, p["a"])), make_switch(cfg, _sub_device(d, p["b"]))
+        pw = make_switch(cfg, _sub_device(d, p["power"])) if p.get("power") else None
+        return X.SGReady(a, b, bool(p.get("force")), pw)
+    if drv == "ocpp":
+        from .ocpp import OCPPCharger, central_system
+        return OCPPCharger(central_system(int((cfg.ocpp or {}).get("port") or 8887)), p["cp_id"], int(p.get("phases", 3)),
+                           float(p.get("volts", 230)), float(p.get("min_a", 6)), float(p.get("max_a", 16)))
     ha = ha_client(cfg)
     if drv == "ha_switch":
         return HASwitch(ha, p["entity"], p.get("power_entity", ""))

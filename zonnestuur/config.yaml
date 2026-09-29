@@ -1,5 +1,5 @@
 name: Zonnestuur
-version: "0.16.0"
+version: "0.17.0"
 slug: zonnestuur
 description: Laat boiler, warmtepomp en auto draaien op je eigen zonnestroom
 url: https://github.com/ckarssenberg/zonnestuur-ha
@@ -17,6 +17,8 @@ panel_icon: mdi:solar-power-variant
 panel_title: Zonnestuur
 homeassistant_api: true     # geeft een token om apparaten via Home Assistant te sturen
 hassio_api: true            # om de toegewezen ingress-poort op te vragen
+services:
+  - mqtt:want               # gebruikt automatisch de Mosquitto-broker als die er is
 options:
   log_level: info
 schema:

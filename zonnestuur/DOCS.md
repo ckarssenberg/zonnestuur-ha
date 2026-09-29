@@ -24,6 +24,14 @@ Onder **Instellingen > Thuisbatterij** kies je de batterij die Zonnestuur in Hom
 HomeWizard Plug-In Battery) en vul je capaciteit en vermogen in. Zonnestuur plant daarna elk uur of de batterij
 zelf gebruikt, spaart of goedkoop laadt. De planning staat op het dashboard onder de prijsgrafiek.
 
+## Andere systemen
+
+- **MQTT:** heb je de Mosquitto-add-on, dan gebruikt Zonnestuur die automatisch. Zigbee2MQTT-, Tasmota- en
+  Shelly-apparaten voeg je toe onder **Instellingen → Apparaat toevoegen via MQTT…**
+- **Homey Pro:** vul het adres en een API-sleutel in onder **Instellingen → Andere systemen**.
+- **Laadpalen via OCPP:** zet de OCPP-server aan en stel in de laadpaal de server in op
+  `ws://<adres van Home Assistant>:8887/<naam>` (OCPP 1.6J).
+
 ## Veiligheid
 
 - De app is alleen te openen via Home Assistant. Wil je hem ook los op je netwerk openen (de poort staat bovenaan in het logboek),

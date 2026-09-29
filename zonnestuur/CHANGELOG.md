@@ -1,5 +1,12 @@
 # Wijzigingen
 
+## 0.17.0 – Koppelen met (bijna) alles
+- MQTT: Zigbee2MQTT-stekkers, Tasmota, Shelly en eigen topics; als add-on automatisch de Mosquitto-broker van Home Assistant.
+- Homey Pro: meter, schakelaars en thermostaten.
+- Meters: YouLess, DSMR-reader, ESPHome (SlimmeLezer), MQTT en Homey.
+- SG-ready warmtepompen via twee relais.
+- Laadpalen via OCPP 1.6J (Alfen, Peblar, Wallbox en andere): traploos laden zonder Home Assistant.
+
 ## 0.16.0 – Zonnecoach
 - Nieuw kerncijfer: hoeveel van je zonnestroom je zelf gebruikt (vandaag en deze week), plus hoeveel van je verbruik uit eigen zon komt.
 - Zonnecoach op het dashboard: je score met de laatste 14 dagen, het zonnevenster van vandaag of morgen, en persoonlijke tips met stappen en wat ze per jaar opleveren.

@@ -182,8 +182,18 @@ const ICONS = {
 ICONS.hw_socket = ICONS.shelly; ICONS.tasmota = ICONS.shelly; ICONS.shelly_em = ICONS.p1;
 const DRIVER_LABEL = {
   shelly: "Shelly", shelly_gen1: "Shelly (oud model)", homewizard_socket: "HomeWizard Energy Socket", tasmota: "Tasmota",
+  esphome: "ESPHome", mqtt_switch: "MQTT", homey_switch: "Homey · aan/uit", homey_setpoint: "Homey · temperatuur",
+  sg_ready: "SG-ready (2 relais)", ocpp: "Laadpaal · OCPP",
   ha_switch: "Home Assistant · schakelaar", ha_start_button: "Home Assistant · witgoed starten", ha_setpoint: "Home Assistant · temperatuur", ha_current: "Home Assistant · laadstroom",
 };
+const METERS = [["homewizard", "HomeWizard P1-meter"], ["shelly_em", "Shelly EM / Pro 3EM"], ["youless", "YouLess (LS120)"],
+  ["dsmr_reader", "DSMR-reader"], ["esphome", "ESPHome (SlimmeLezer e.a.)"], ["ha", "Sensor in Home Assistant", "has_ha"],
+  ["mqtt", "MQTT-topic", "mqtt"], ["homey", "Homey Pro", "has_homey_token"]];
+const ADD_TYPES = [["z2m", "Zigbee-stekker (Zigbee2MQTT)"], ["tasmota", "Tasmota via MQTT"], ["shellymqtt", "Shelly via MQTT"],
+  ["mqttfree", "Eigen MQTT-topics"], ["esphome", "ESPHome-schakelaar"], ["homey", "Homey-apparaat"], ["ocpp", "Laadpaal via OCPP"],
+  ["sgready", "SG-ready warmtepomp (2 relais)"]];
+let SYS = { mqtt: null, homey: null, ocpp: null };
+const hasSys = (need) => need === "mqtt" ? !!((CFG.mqtt && CFG.mqtt.host) || CFG.mqtt_addon) : !!CFG[need];
 const METER_KINDS = ["p1", "shelly_em"], SWITCH_KINDS = ["shelly", "hw_socket", "tasmota"];
 const isHA = (drv) => String(drv || "").startsWith("ha_");
 const KINDS = [
@@ -731,6 +741,7 @@ async function settings() {
   const c = JSON.parse(JSON.stringify(CFG.contract)), s = CFG.solar;
   const orient = Object.entries(ORIENT).find(([, v]) => v === s.azimuth)?.[0] || "Zuid";
   const md = (CFG.meter && CFG.meter.driver) || "homewizard";
+  CFG.mqtt = CFG.mqtt || {}; CFG.homey = CFG.homey || {}; CFG.ocpp = CFG.ocpp || {};
   $("app").innerHTML = `<div class="settings">
     <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:6px"><h1 class="t" style="margin:0">Instellingen</h1><a class="btn ghost small" href="./">← Dashboard</a></div>
     <section class="card" id="licCard"><h2 class="t">Zonnestuur Pro</h2><p class="small muted">Laden…</p></section>
@@ -779,15 +790,40 @@ async function settings() {
     </section>
     <section class="card"><h2 class="t">Meter</h2>
       <div class="row">
-        <div class="field" style="flex:0 1 240px"><label for="s_md">Soort meter</label><select id="s_md">
-          <option value="homewizard" ${md === "homewizard" ? "selected" : ""}>HomeWizard P1-meter</option>
-          <option value="shelly_em" ${md === "shelly_em" ? "selected" : ""}>Shelly EM / Pro 3EM</option>
-          <option value="ha" ${md === "ha" ? "selected" : ""} ${CFG.has_ha ? "" : "disabled"}>Sensor in Home Assistant</option></select></div>
-        <div class="field"><label for="s_p1" id="s_p1l">${md === "ha" ? "Sensor (sensor.…)" : "Adres"}</label><input id="s_p1" value="${esc(md === "ha" ? (CFG.meter.entity || CFG.meter.import_entity || "") : CFG.p1_host)}"></div>
-        <div class="field" id="s_expf" ${md === "ha" ? "" : "hidden"}><label for="s_exp">Aparte sensor teruglevering (optioneel)</label><input id="s_exp" value="${esc(CFG.meter.export_entity || "")}"></div>
+        <div class="field" style="flex:0 1 280px"><label for="s_md">Soort meter</label><select id="s_md">${METERS.map(([v, l, need]) =>
+          `<option value="${v}" ${md === v ? "selected" : ""} ${need && !hasSys(need) ? "disabled" : ""}>${l}${need && !hasSys(need) && md !== v ? " (eerst koppelen)" : ""}</option>`).join("")}</select></div>
+        <div id="s_mf" class="row" style="flex:1;margin:0"></div>
         <div class="field" style="flex:0 0 auto"><button class="btn ghost" id="p1test">Controleren</button></div></div>
       <label class="check-row"><input type="checkbox" id="s_inv" ${CFG.meter && CFG.meter.invert ? "checked" : ""}> Plus en min omdraaien</label>
       <p class="small muted" id="p1res"></p>
+    </section>
+    <section class="card" id="sysCard"><h2 class="t">Andere systemen</h2>
+      <p class="small muted" style="margin-top:-4px">Zonnestuur werkt ook zonder Home Assistant: met MQTT (Zigbee2MQTT, Tasmota, Shelly, ESPHome, P1-lezers), een Homey Pro, of laadpalen via OCPP.</p>
+      <h3 class="sub-t">MQTT-broker</h3>
+      ${CFG.mqtt_addon ? `<p class="small" style="margin:-2px 0 8px">✓ De Mosquitto-broker van Home Assistant wordt automatisch gebruikt. Hieronder alleen invullen voor een andere broker.</p>` : ""}
+      <div class="row"><div class="field"><label for="q_host">Adres</label><input id="q_host" placeholder="192.168.1.10 of core-mosquitto" value="${esc(CFG.mqtt?.host || "")}"></div>
+        <div class="field" style="flex:0 1 110px"><label for="q_port">Poort</label><input id="q_port" type="number" value="${CFG.mqtt?.port || 1883}"></div>
+        <div class="field"><label for="q_user">Gebruiker</label><input id="q_user" autocomplete="off" value="${esc(CFG.mqtt?.username || "")}"></div>
+        <div class="field"><label for="q_pass">Wachtwoord${CFG.has_mqtt_password ? " (leeg = houden)" : ""}</label><input id="q_pass" type="password" autocomplete="new-password"></div>
+        <div class="field" style="flex:0 0 auto"><button class="btn ghost" id="q_btn">Verbinden en zoeken</button></div></div>
+      <p class="small muted" id="q_res" role="status"></p>
+      <h3 class="sub-t">Homey Pro</h3>
+      <div class="row"><div class="field"><label for="h_url">Adres</label><input id="h_url" placeholder="http://192.168.1.20" value="${esc(CFG.homey?.url || "")}"></div>
+        <div class="field"><label for="h_tok">API-sleutel${CFG.has_homey_token ? " (leeg = houden)" : ""}</label><input id="h_tok" type="password" autocomplete="off"><span class="hint">Homey-app → Instellingen → API-sleutels → nieuwe sleutel met 'Apparaten'.</span></div>
+        <div class="field" style="flex:0 0 auto"><button class="btn ghost" id="h_btn">Koppelen</button></div></div>
+      <p class="small muted" id="h_res" role="status"></p>
+      <h3 class="sub-t">Laadpalen via OCPP</h3>
+      <label class="check-row"><input type="checkbox" id="o_on" ${CFG.ocpp?.enabled ? "checked" : ""}> OCPP-server aanzetten</label>
+      <div class="row" style="margin-top:8px"><div class="field" style="flex:0 1 140px"><label for="o_port">Poort</label><input id="o_port" type="number" value="${CFG.ocpp?.port || 8887}"></div></div>
+      <p class="small muted" id="o_res">Stel in de laadpaal (app of installateur) de OCPP-server in op <b>ws://${esc(location.hostname)}:${CFG.ocpp?.port || 8887}/<i>naam-van-je-laadpaal</i></b> (OCPP 1.6J).</p>
+    </section>
+    <section class="card" id="addCard"><h2 class="t">Apparaat toevoegen via MQTT, ESPHome, Homey, OCPP of SG-ready</h2>
+      <p class="small muted" style="margin-top:-4px">Voor apparaten die niet via Home Assistant of de netwerkscan gaan.</p>
+      <div class="row"><div class="field"><label for="x_type">Koppeling</label><select id="x_type">${ADD_TYPES.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></div>
+        <div class="field"><label for="x_name">Naam</label><input id="x_name" placeholder="bijv. Boiler"></div>
+        <div class="field"><label for="x_kind">Soort</label><select id="x_kind">${KINDS.map((k) => `<option value="${k.id}">${k.label}</option>`).join("")}</select></div></div>
+      <div id="x_fields"></div>
+      <div class="actions"><span class="small muted" id="x_res"></span><button class="btn small" id="x_add">Toevoegen</button></div>
     </section>
     ${CFG.ha_addon ? `<section class="card"><h2 class="t">Home Assistant</h2>
       <p class="small muted" style="margin-top:-4px">Zonnestuur draait als add-on en is automatisch gekoppeld. Warmtepompen, laadpalen en auto's voeg je toe via <b>+ Apparaat toevoegen</b>.</p>
@@ -813,13 +849,105 @@ async function settings() {
     document.querySelectorAll("#ctype button").forEach((x) => x.classList.toggle("on", x === b)); redraw();
   });
   document.querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => editDevice(Number(b.dataset.edit)));
-  const meterFromForm = () => {
-    const drv = $("s_md").value, v = $("s_p1").value.trim(), inv = $("s_inv").checked;
-    const exp = $("s_exp").value.trim();
-    if (drv === "ha") return { p1_host: "", meter: exp ? { driver: "ha", import_entity: v, export_entity: exp, invert: inv } : { driver: "ha", entity: v, invert: inv } };
-    return { p1_host: v, meter: { driver: drv, host: v, invert: inv } };
+  const M = CFG.meter || {};
+  const f = (id, label, val, extra = "") => `<div class="field"><label for="${id}">${label}</label><input id="${id}" value="${esc(val ?? "")}" ${extra}></div>`;
+  const meterFields = () => {
+    const drv = $("s_md").value, box = $("s_mf"), same = drv === (M.driver || "homewizard");
+    const v = (k, d = "") => (same ? M[k] : "") ?? d;
+    box.innerHTML = drv === "ha" ? f("m_a", "Sensor (sensor.…)", v("entity") || v("import_entity")) + f("m_b", "Aparte sensor teruglevering (optioneel)", v("export_entity"))
+      : drv === "dsmr_reader" ? f("m_a", "Adres", v("host")) + f("m_b", "API-sleutel", v("api_key"), 'autocomplete="off"')
+      : drv === "esphome" ? f("m_a", "Adres", v("host")) + f("m_b", "Sensor afname (id)", v("sensor"), 'placeholder="bijv. power_consumed"') + f("m_c", "Sensor teruglevering (optioneel)", v("export_sensor"))
+      : drv === "mqtt" ? `<div class="field"><label for="m_p">Soort</label><select id="m_p"><option value="">Eigen topic</option><option value="dsmr_reader" ${v("profile") === "dsmr_reader" ? "selected" : ""}>DSMR-reader</option></select></div>`
+          + f("m_a", "Topic (vermogen)", v("topic"), 'placeholder="bijv. p1/power"') + f("m_b", "JSON-veld (optioneel)", v("key"), 'placeholder="bijv. ENERGY.Power"')
+          + `<div class="field" style="flex:0 1 110px"><label for="m_u">Eenheid</label><select id="m_u"><option ${v("unit") !== "kW" ? "selected" : ""}>W</option><option ${v("unit") === "kW" ? "selected" : ""}>kW</option></select></div>`
+      : drv === "homey" ? `<div class="field"><label for="m_a">Apparaat in Homey</label><select id="m_a">${(SYS.homey?.meters || []).map((x) => `<option value="${esc(x.device)}" ${x.device === v("device") ? "selected" : ""}>${esc(x.name)}</option>`).join("") || `<option value="${esc(v("device"))}">${esc(v("device") || "koppel eerst Homey hieronder")}</option>`}</select></div>`
+      : f("m_a", "Adres", v("host") || (same ? CFG.p1_host : ""), 'placeholder="bijv. 192.168.1.30"');
   };
-  $("s_md").onchange = () => { const ha = $("s_md").value === "ha"; $("s_p1l").textContent = ha ? "Sensor (sensor.…)" : "Adres"; $("s_expf").hidden = !ha; };
+  const meterFromForm = () => {
+    const drv = $("s_md").value, inv = $("s_inv").checked, g = (id) => ($(id) ? $(id).value.trim() : "");
+    if (drv === "ha") return { p1_host: "", meter: g("m_b") ? { driver: "ha", import_entity: g("m_a"), export_entity: g("m_b"), invert: inv } : { driver: "ha", entity: g("m_a"), invert: inv } };
+    if (drv === "dsmr_reader") return { p1_host: "", meter: { driver: drv, host: g("m_a"), api_key: g("m_b"), invert: inv } };
+    if (drv === "esphome") return { p1_host: "", meter: { driver: drv, host: g("m_a"), sensor: g("m_b"), export_sensor: g("m_c"), invert: inv } };
+    if (drv === "mqtt") return { p1_host: "", meter: { driver: drv, profile: g("m_p"), topic: g("m_a"), key: g("m_b"), unit: g("m_u"), invert: inv } };
+    if (drv === "homey") return { p1_host: "", meter: { driver: drv, device: g("m_a"), invert: inv } };
+    return { p1_host: g("m_a"), meter: { driver: drv, host: g("m_a"), invert: inv } };
+  };
+  $("s_md").onchange = meterFields;
+  meterFields();
+  // ---- andere systemen
+  const mqttConf = () => ({ host: $("q_host").value.trim(), port: Number($("q_port").value) || 1883, username: $("q_user").value.trim(), password: $("q_pass").value });
+  $("q_btn").onclick = async () => {
+    $("q_res").textContent = "Verbinden…";
+    const r = await api("api/setup/mqtt", { method: "POST", body: JSON.stringify(mqttConf()) });
+    SYS.mqtt = r.ok ? r : null;
+    $("q_res").innerHTML = r.ok ? `Verbonden. Gevonden: ${r.zigbee2mqtt.length} Zigbee2MQTT-apparaten, ${r.tasmota.length} Tasmota, ${r.shelly.length} Shelly${r.dsmr_reader ? ", DSMR-reader" : ""}. Sla op om te gebruiken.` : esc(r.error);
+    addFields();
+  };
+  $("h_btn").onclick = async () => {
+    $("h_res").textContent = "Verbinden…";
+    const r = await api("api/setup/homey", { method: "POST", body: JSON.stringify({ url: $("h_url").value.trim(), token: $("h_tok").value.trim() }) });
+    SYS.homey = r.ok ? r : null;
+    $("h_res").textContent = r.ok ? `Gekoppeld: ${r.count} apparaten, waarvan ${r.devices.length} te sturen en ${r.meters.length} met een energiemeting. Sla op om te gebruiken.` : r.error;
+    meterFields(); addFields();
+  };
+  api("api/ocpp").then((o) => { SYS.ocpp = o; if (o.points && o.points.length) $("o_res").innerHTML += `<br>Verbonden: ${o.points.map((p) => `<b>${esc(p.id)}</b> (${esc([p.chargePointVendor, p.chargePointModel].filter(Boolean).join(" ") || "laadpaal")}, ${p.connected ? esc(p.status) : "niet verbonden"})`).join(", ")}`; addFields(); }).catch(() => {});
+  if (CFG.mqtt?.host || CFG.mqtt_addon) api("api/setup/mqtt", { method: "POST", body: JSON.stringify(CFG.mqtt || {}) }).then((r) => {
+    if (r.ok) { SYS.mqtt = r; $("q_res").textContent = `Verbonden: ${r.zigbee2mqtt.length} Zigbee2MQTT, ${r.tasmota.length} Tasmota, ${r.shelly.length} Shelly.`; addFields(); }
+    else $("q_res").textContent = r.error; }).catch(() => {});
+  if (CFG.homey?.url && CFG.has_homey_token) api("api/setup/homey", { method: "POST", body: JSON.stringify({ url: CFG.homey.url }) }).then((r) => { if (r.ok) { SYS.homey = r; meterFields(); addFields(); } }).catch(() => {});
+  // ---- apparaat toevoegen
+  const relay = (p, label) => `<div class="row"><div class="field" style="flex:0 1 220px"><label for="${p}_t">${label}</label><select id="${p}_t"><option value="shelly">Shelly (Gen2/3)</option><option value="shelly_gen1">Shelly Gen1</option>${CFG.has_ha ? '<option value="ha_switch">Home Assistant-schakelaar</option>' : ""}${hasSys("mqtt") ? '<option value="z2m">Zigbee2MQTT</option>' : ""}</select></div>
+      ${f(p + "_a", "Adres, entity of naam", "")}${f(p + "_c", "Kanaal", "0", 'type="number" min="0" max="3" style="max-width:90px"')}</div>`;
+  const addFields = () => {
+    const t = $("x_type").value, box = $("x_fields");
+    const z = SYS.mqtt?.zigbee2mqtt || [], tas = SYS.mqtt?.tasmota || [], sh = SYS.mqtt?.shelly || [], hd = SYS.homey?.devices || [], cps = SYS.ocpp?.points || [];
+    const listOr = (id, label, items, ph) => items.length ? `<div class="field"><label for="${id}">${label}</label><select id="${id}">${items.map((x) => `<option>${esc(x)}</option>`).join("")}</select></div>` : f(id, label, "", `placeholder="${ph}"`);
+    const pw = t === "ocpp" ? "" : f("x_pw", "Vermogen als hij aan staat (W)", "2000", 'type="number" step="50"');
+    box.innerHTML = `<div class="row">${
+      t === "z2m" ? listOr("x_a", "Apparaat (friendly name)", z.map((x) => x.name), "bijv. boiler_stekker")
+      : t === "tasmota" ? listOr("x_a", "Topic", tas, "bijv. tasmota_1A2B3C")
+      : t === "shellymqtt" ? listOr("x_a", "Shelly-id", sh, "bijv. shellyplus1pm-a8032ab1c2d3")
+      : t === "mqttfree" ? f("x_a", "Topic met toestand", "", 'placeholder="bijv. huis/boiler/state"') + f("x_b", "JSON-veld toestand (optioneel)", "") + f("x_c", "Opdracht-topic", "", 'placeholder="bijv. huis/boiler/set"')
+      : t === "esphome" ? f("x_a", "Adres", "", 'placeholder="192.168.1.40"') + f("x_b", "Schakelaar (id)", "", 'placeholder="relay"') + f("x_c", "Vermogen-sensor (optioneel)", "")
+      : t === "homey" ? `<div class="field"><label for="x_a">Apparaat in Homey</label><select id="x_a">${hd.map((x, i) => `<option value="${i}">${esc(x.name)} (${x.driver === "homey_setpoint" ? "temperatuur" : "aan/uit"})</option>`).join("") || "<option>koppel eerst Homey hierboven</option>"}</select></div>`
+      : t === "ocpp" ? listOr("x_a", "Naam (ID) van de laadpaal", cps.map((c) => c.id), "zoals ingesteld in de laadpaal") + `<div class="field" style="flex:0 1 100px"><label for="x_ph">Fasen</label><select id="x_ph"><option>1</option><option selected>3</option></select></div>` + f("x_min", "Min. A", "6", 'type="number"') + f("x_max", "Max. A", "16", 'type="number"')
+      : ""}${pw}</div>
+      ${t === "mqttfree" ? `<div class="row">${f("x_d", "Topic met vermogen (optioneel)", "")}${f("x_e", "JSON-veld vermogen", "")}${f("x_on", "Bericht aan", "ON")}${f("x_off", "Bericht uit", "OFF")}</div>` : ""}
+      ${t === "sgready" ? `${relay("ra", "Relais A (SG-ready ingang 1)")}${relay("rb", "Relais B (SG-ready ingang 2)")}<label class="check-row"><input type="checkbox" id="x_force"> Bij veel zon stand 4 (opdracht) in plaats van stand 3 (aanbeveling)</label>` : ""}
+      ${t === "homey" ? `<div class="row">${f("x_tn", "Normale temperatuur (°C)", "20", 'type="number" step="0.5"')}${f("x_tb", "Temperatuur bij zon (°C)", "22", 'type="number" step="0.5"')}</div>` : ""}
+      ${(t === "z2m" || t === "tasmota" || t === "shellymqtt" || t === "mqttfree") && !hasSys("mqtt") ? `<p class="small" style="color:var(--warn)">Vul hierboven eerst je MQTT-broker in en sla op.</p>` : ""}
+      ${t === "ocpp" && !CFG.ocpp?.enabled ? `<p class="small" style="color:var(--warn)">Zet hierboven de OCPP-server aan en sla op; verbind daarna de laadpaal.</p>` : ""}`;
+    if (t === "ocpp") $("x_kind").value = "ev";
+    if (t === "sgready") $("x_kind").value = "heatpump";
+  };
+  $("x_type").onchange = addFields;
+  addFields();
+  const relaySpec = (p) => { const t = $(p + "_t").value, a = $(p + "_a").value.trim(), ch = Number($(p + "_c").value) || 0;
+    return t === "ha_switch" ? { driver: "ha_switch", params: { entity: a } } : t === "z2m" ? { driver: "mqtt_switch", params: { profile: "zigbee2mqtt", name: a } } : { driver: t, host: a, switch_id: ch }; };
+  $("x_add").onclick = async () => {
+    const t = $("x_type").value, g = (id) => ($(id) ? $(id).value.trim() : ""), name = g("x_name") || ADD_TYPES.find((x) => x[0] === t)[1];
+    const kind = $("x_kind").value;
+    let dev = { name, kind, power_w: Number(g("x_pw")) || 2000, host: "" };
+    if (t === "z2m") dev = { ...dev, driver: "mqtt_switch", params: { profile: "zigbee2mqtt", name: g("x_a") } };
+    else if (t === "tasmota") dev = { ...dev, driver: "mqtt_switch", params: { profile: "tasmota", name: g("x_a") } };
+    else if (t === "shellymqtt") dev = { ...dev, driver: "mqtt_switch", params: { profile: "shelly", name: g("x_a") } };
+    else if (t === "mqttfree") dev = { ...dev, driver: "mqtt_switch", params: { state: g("x_a"), state_key: g("x_b"), command: g("x_c"), power: g("x_d"), power_key: g("x_e"), on: g("x_on") || "ON", off: g("x_off") || "OFF" } };
+    else if (t === "esphome") dev = { ...dev, driver: "esphome", host: g("x_a"), params: { switch: g("x_b"), power_sensor: g("x_c") } };
+    else if (t === "homey") { const hdv = (SYS.homey?.devices || [])[Number(g("x_a"))]; if (!hdv) { $("x_res").textContent = "Koppel eerst je Homey."; return; }
+      dev = { ...dev, driver: hdv.driver, params: hdv.driver === "homey_setpoint" ? { device: hdv.device, normal_temp: Number(g("x_tn")), boost_temp: Number(g("x_tb")) } : { device: hdv.device } }; }
+    else if (t === "ocpp") { const ph = Number(g("x_ph")), mx = Number(g("x_max")) || 16;
+      dev = { ...dev, driver: "ocpp", params: { cp_id: g("x_a"), phases: ph, min_a: Number(g("x_min")) || 6, max_a: mx }, power_w: Math.min(25000, mx * 230 * ph) }; }
+    else if (t === "sgready") dev = { ...dev, driver: "sg_ready", params: { a: relaySpec("ra"), b: relaySpec("rb"), force: $("x_force").checked } };
+    const need = { z2m: "x_a", tasmota: "x_a", shellymqtt: "x_a", mqttfree: "x_c", esphome: "x_b", ocpp: "x_a" }[t];
+    if (need && !g(need)) { $("x_res").textContent = "Vul eerst in welk apparaat het is."; $(need).focus(); return; }
+    if (t === "esphome" && !g("x_a")) { $("x_res").textContent = "Vul het adres van het ESPHome-apparaat in."; return; }
+    if (t === "sgready" && (!$("ra_a").value.trim() || !$("rb_a").value.trim())) { $("x_res").textContent = "Vul voor beide relais het adres of de naam in."; return; }
+    const base = name.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "apparaat";
+    let id = base, n = 2; while (CFG.devices.some((d) => d.id === id)) id = `${base}-${n++}`;
+    const next = JSON.parse(JSON.stringify(CFG));
+    next.devices.push({ id, ...KIND_DEFAULTS[kind], ...dev, priority: CFG.devices.length + 1 });
+    try { CFG = await postCfg(next); toast(`${name} toegevoegd`); settings(); } catch (e) { $("x_res").textContent = e.message; }
+  };
   $("p1test").onclick = async () => {
     const m = meterFromForm();
     const r = await api("api/setup/meter", { method: "POST", body: JSON.stringify({ host: m.p1_host, meter: m.meter }) });
@@ -885,6 +1013,9 @@ async function settings() {
     Object.assign(next.solar, { kwp: Number($("s_kwp").value), azimuth: ORIENT[$("s_or").value], latitude: lat, longitude: lon,
       base_load_w: Number($("s_base").value), pv_entity: $("s_pv") ? $("s_pv").value.trim() : (next.solar.pv_entity || ""), tilt: $("s_or").value === "Oost-west" ? 15 : 35, has_panels: $("s_haspan").checked });
     Object.assign(next, meterFromForm());
+    next.mqtt = $("q_host").value.trim() ? mqttConf() : {};
+    next.homey = $("h_url").value.trim() ? { url: $("h_url").value.trim(), token: $("h_tok").value.trim() } : {};
+    next.ocpp = { enabled: $("o_on").checked, port: Number($("o_port").value) || 8887 };
     if (CFG.has_ha) {
       next.batteries = readBattery(B);
       const ent = $("i_ent").value.trim();

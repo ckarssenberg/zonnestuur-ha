@@ -77,6 +77,7 @@ class Engine:
         self.pv_w: Optional[float] = None
         self._pv_read = -1e9
         self._wire_model()
+        self._start_ocpp()
         self._restore_state()
 
     # Laatste fout, met tijdstip: het dashboard toont alleen wat nu nog speelt.
@@ -109,6 +110,69 @@ class Engine:
                 msg = msg.replace(k, v)
             out.append({"level": "info", "text": msg})
         return out
+
+    # ---- andere systemen ---------------------------------------------------
+    def _start_ocpp(self) -> None:
+        o = self.cfg.ocpp or {}
+        if o.get("enabled") or any(d.driver == "ocpp" for d in self.cfg.devices):
+            try:
+                from .ocpp import central_system
+                central_system(int(o.get("port") or 8887))
+            except OSError as exc:
+                self.last_error = f"OCPP-server: poort {o.get('port') or 8887} niet beschikbaar ({exc})"
+                log.warning(self.last_error)
+
+    def ocpp_view(self) -> dict:
+        from .ocpp import _SYSTEMS
+        port = int((self.cfg.ocpp or {}).get("port") or 8887)
+        cs = _SYSTEMS.get(port)
+        return {"enabled": cs is not None, "port": port, "points": cs.overview() if cs else []}
+
+    def mqtt_test(self, conf: dict) -> dict:
+        """Verbinden met de broker en kijken welke apparaten er zijn (Zigbee2MQTT, Tasmota, Shelly)."""
+        from .mqtt import MQTTClient
+        from .config import effective_mqtt
+        if not conf.get("host"):
+            conf = effective_mqtt(self.cfg)                # add-on: de Mosquitto-broker van Home Assistant
+        if not conf.get("host"):
+            return {"ok": False, "error": "Vul het adres van je MQTT-broker in (bijv. 192.168.1.10 of core-mosquitto)"}
+        c = MQTTClient(conf["host"], int(conf.get("port") or 1883), conf.get("username", ""), conf.get("password", ""),
+                       client_id=f"zonnestuur-test-{int(time.time()) % 10000}")
+        try:
+            if not c.connected.wait(5):
+                return {"ok": False, "error": f"Geen verbinding met de broker: {c.error or 'geen antwoord'}"}
+            for t in ("zigbee2mqtt/bridge/devices", "tele/+/LWT", "tele/+/SENSOR", "+/online", "dsmr/reading/#", "homeassistant/sensor/+/+/config"):
+                c.subscribe(t)
+            time.sleep(2.5)
+            z2m = []
+            raw = c.get("zigbee2mqtt/bridge/devices")
+            if raw:
+                try:
+                    for d in json.loads(raw):
+                        exposes = json.dumps((d.get("definition") or {}).get("exposes") or [])
+                        if d.get("type") != "Coordinator" and '"state"' in exposes:
+                            z2m.append({"name": d.get("friendly_name"), "power": '"power"' in exposes,
+                                        "model": ((d.get("definition") or {}).get("model") or "")})
+                except ValueError:
+                    pass
+            tas = sorted({t.split("/")[1] for t in c.topics("tele/+/LWT")})
+            shelly = sorted({t.split("/")[0] for t, v in c.topics("+/online").items() if t.split("/")[0].startswith("shelly")})
+            dsmr = bool(c.topics("dsmr/reading/#"))
+            return {"ok": True, "zigbee2mqtt": z2m, "tasmota": tas, "shelly": shelly, "dsmr_reader": dsmr,
+                    "power_topics": sorted(t for t in c.topics("tele/+/SENSOR"))[:30]}
+        finally:
+            c.close()
+
+    def homey_test(self, url: str, token: str) -> dict:
+        from .drivers_extra import Homey, homey_candidates
+        if not url or not token:
+            return {"ok": False, "error": "Vul het adres van je Homey Pro en een API-sleutel in"}
+        try:
+            devs = Homey(url, token).devices()
+        except DeviceError as exc:
+            msg = str(exc)
+            return {"ok": False, "error": "Homey weigert de API-sleutel" if "401" in msg or "403" in msg else f"Homey niet bereikbaar: {msg}"}
+        return {"ok": True, "count": len(devs), **homey_candidates(devs)}
 
     # ---- leren -------------------------------------------------------------
     def _wire_model(self) -> None:
@@ -617,6 +681,7 @@ class Engine:
                     old_lim.apply(ha_client(new), old_lim._value(old_lim.max_w))
                 except Exception as exc:
                     log.warning("omvormer terugzetten mislukt: %s", exc)
+            self._start_ocpp()
             old_b, self.batteries = self.batteries, {b["id"]: BatteryRuntime(BatteryConfig.from_dict(b)) for b in new.batteries}
             for bid, rt in self.batteries.items():
                 if bid in old_b:
@@ -724,11 +789,22 @@ class Engine:
 
     def read_meter(self, spec: dict) -> dict:
         """Meter proberen uit te lezen voordat hij wordt opgeslagen (koppel-assistent)."""
-        cfg = Config(p1_host=str(spec.get("host", "")), meter=dict(spec.get("meter") or {}), homeassistant=self.cfg.homeassistant)
+        cfg = Config(p1_host=str(spec.get("host", "")), meter=dict(spec.get("meter") or {}), homeassistant=self.cfg.homeassistant,
+                     mqtt=self.cfg.mqtt, homey=self.cfg.homey)
         try:
-            r = make_meter(cfg).read()
+            meter = make_meter(cfg)
+            for _ in range(30 if cfg.meter_driver == "mqtt" else 1):     # MQTT: even wachten op het eerste bericht
+                try:
+                    r = meter.read()
+                    break
+                except DeviceError:
+                    if cfg.meter_driver != "mqtt":
+                        raise
+                    time.sleep(0.1)
+            else:
+                r = meter.read()
             return {"ok": True, "grid_w": round(r.grid_w)}
-        except (DeviceError, ValueError) as exc:
+        except (DeviceError, ValueError, KeyError) as exc:
             if cfg.meter_driver == "homewizard":
                 return self.read_p1(cfg.p1_host)
             return {"ok": False, "problem": "meter", "problem_text": f"Deze meter geeft geen waarde: {exc}"}
@@ -1142,6 +1218,8 @@ def make_handler(engine: Engine):
                 return self._json(200, _simulate(engine.cfg, q))
             if url.path == "/api/license":
                 return self._json(200, engine.license_state(force=True).to_dict())
+            if url.path == "/api/ocpp":
+                return self._json(200, engine.ocpp_view())
             if url.path == "/api/coach":
                 return self._json(200, engine.coach_view())
             if url.path == "/api/learned":
@@ -1197,6 +1275,14 @@ def make_handler(engine: Engine):
                 return self._json(200, public_dict(engine.cfg))
             if url.path == "/api/license":
                 return self._json(200, engine.set_license(str(body.get("key", ""))))
+            if url.path == "/api/setup/mqtt":
+                conf = dict(body)
+                if not conf.get("password") and (engine.cfg.mqtt or {}).get("host") == conf.get("host"):
+                    conf["password"] = (engine.cfg.mqtt or {}).get("password", "")
+                return self._json(200, engine.mqtt_test(conf))
+            if url.path == "/api/setup/homey":
+                tok = str(body.get("token", "")) or (engine.cfg.homey or {}).get("token", "")
+                return self._json(200, engine.homey_test(str(body.get("url", "")), tok))
             if url.path == "/api/notify/test":
                 return self._json(200, engine.notify_test(str(body.get("service", ""))))
             if url.path == "/api/setup/scan":

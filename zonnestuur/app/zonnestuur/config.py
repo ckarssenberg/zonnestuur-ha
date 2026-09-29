@@ -47,7 +47,7 @@ class DeviceConfig:
     @property
     def modulating(self) -> bool:
         """Traploos regelbaar (laadstroom instellen) in plaats van alleen aan/uit."""
-        return self.driver == "ha_current"
+        return self.driver in ("ha_current", "ocpp")
 
     @property
     def w_per_step(self) -> float:
@@ -120,6 +120,9 @@ class Config:
     inverter: dict = field(default_factory=dict)           # {"entity": number.x, "max_w": 5000, "unit": "W"|"%"}
     notify: dict = field(default_factory=dict)             # {"service": "notify.mobile_app_x", "tips": true, "alerts": true}
     batteries: list = field(default_factory=list)          # thuisbatterijen, zie battery.BatteryConfig
+    mqtt: dict = field(default_factory=dict)               # {"host", "port", "username", "password"}
+    homey: dict = field(default_factory=dict)              # {"url", "token"} (Homey Pro, lokale API-sleutel)
+    ocpp: dict = field(default_factory=dict)               # {"enabled": true, "port": 8887}
 
     @property
     def meter_driver(self) -> str:
@@ -132,7 +135,9 @@ class Config:
 
     @property
     def has_meter(self) -> bool:
-        return bool(self.p1_host) if self.meter_driver in ("homewizard", "shelly_em") else bool(self.meter)
+        if self.meter_driver in ("homewizard", "shelly_em", "youless"):
+            return bool(self.p1_host or (self.meter or {}).get("host"))
+        return bool(self.meter)
 
     @property
     def configured(self) -> bool:
@@ -166,8 +171,42 @@ def effective_ha(cfg: "Config") -> dict:
     return {"url": SUPERVISOR_URL, "token": tok, "addon": True} if tok else {}
 
 
+_SUP_MQTT: dict = {}
+
+
+def effective_mqtt(cfg: "Config") -> dict:
+    """MQTT-broker: wat de gebruiker instelde, of als add-on automatisch de Mosquitto-broker van Home Assistant."""
+    m = dict(getattr(cfg, "mqtt", None) or {})
+    if m.get("host"):
+        return m
+    tok = supervisor_token()
+    if not tok:
+        return {}
+    if not _SUP_MQTT:
+        try:
+            import json as _j
+            import urllib.request as _u
+            base = SUPERVISOR_URL.rsplit("/core", 1)[0]
+            req = _u.Request(f"{base}/services/mqtt", headers={"Authorization": f"Bearer {tok}"})
+            with _u.urlopen(req, timeout=4) as r:
+                d = (_j.loads(r.read().decode()).get("data") or {})
+            if d.get("host"):
+                import socket as _s
+                try:
+                    _s.gethostbyname(d["host"])
+                except OSError:
+                    d["host"] = "127.0.0.1"         # host-netwerk: Mosquitto luistert ook op de host zelf
+                _SUP_MQTT.update({"host": d["host"], "port": int(d.get("port") or 1883), "username": d.get("username", ""),
+                                  "password": d.get("password", ""), "addon": True})
+        except Exception:
+            return {}
+    return dict(_SUP_MQTT)
+
+
 DRIVERS = ("shelly", "shelly_gen1", "homewizard_socket", "tasmota", "ha_switch", "ha_setpoint", "ha_current",
-           "ha_start_button")
+           "ha_start_button", "esphome", "mqtt_switch", "homey_switch", "homey_setpoint", "sg_ready", "ocpp")
+METER_DRIVERS = ("homewizard", "shelly_em", "ha", "youless", "dsmr_reader", "esphome", "mqtt", "homey")
+HOST_DRIVERS = ("shelly", "shelly_gen1", "homewizard_socket", "tasmota", "esphome")
 SERVER_KEYS = ("interval_s", "web_host", "web_port", "web_token", "db_path", "timezone", "scan_extra")
 
 
@@ -196,11 +235,16 @@ def public_dict(cfg: Config) -> dict:
     ha = dict(d.get("homeassistant") or {})
     eff = effective_ha(cfg)
     d["has_ha"] = bool(eff.get("url") and eff.get("token"))
+    d["mqtt_addon"] = bool(not (cfg.mqtt or {}).get("host") and effective_mqtt(cfg).get("host"))
     d["ha_addon"] = bool(eff.get("addon"))
     if eff.get("addon") and not ha.get("url"):
         ha = {"url": "Home Assistant (deze installatie)"}
     ha.pop("token", None)
     d["homeassistant"] = ha
+    for key, secret in (("mqtt", "password"), ("homey", "token")):
+        sec = dict(d.get(key) or {})
+        d[f"has_{key}_{secret}"] = bool(sec.pop(secret, ""))
+        d[key] = sec
     return d
 
 
@@ -217,6 +261,13 @@ def merge_public(current: Config, incoming: dict) -> Config:
         if not ha.get("url") or not str(ha["url"]).startswith("http"):
             ha = {}
         incoming["homeassistant"] = ha
+    for key, secret in (("mqtt", "password"), ("homey", "token")):
+        if key in incoming:
+            sec = dict(incoming[key] or {})
+            if not sec.get(secret):
+                sec[secret] = (getattr(current, key) or {}).get(secret, "")   # geheim blijft bewaard
+            incoming[key] = sec
+    incoming = {k: v for k, v in incoming.items() if not (k.startswith("has_") and k.endswith(("_password", "_token")))}
     base.update(incoming)
     if isinstance(new_token, str):
         base["web_token"] = new_token.strip()      # leeg = wachtwoord uit
@@ -242,8 +293,16 @@ def config_from_dict(raw: dict) -> Config:
             raise ValueError(f"Onbekende koppeling voor {d.name}: {d.driver}")
         if not d.id or not d.name:
             raise ValueError("Elk apparaat heeft een id en naam nodig")
-        if not d.driver.startswith("ha_") and not d.host:
+        if d.driver in HOST_DRIVERS and not d.host:
             raise ValueError(f"{d.name} heeft een adres nodig")
+        if d.driver == "mqtt_switch" and not effective_mqtt(cfg).get("host"):
+            raise ValueError(f"{d.name} gaat via MQTT: vul eerst de MQTT-broker in")
+        if d.driver.startswith("homey_") and not (cfg.homey or {}).get("token"):
+            raise ValueError(f"{d.name} gaat via Homey: koppel eerst je Homey Pro")
+        if d.driver == "ocpp" and not (d.params or {}).get("cp_id"):
+            raise ValueError(f"{d.name}: vul de naam (ID) van de laadpaal in zoals ingesteld in de laadpaal")
+        if d.driver == "sg_ready" and not ((d.params or {}).get("a") and (d.params or {}).get("b")):
+            raise ValueError(f"{d.name}: kies twee relais voor SG-ready")
         if d.driver.startswith("ha_") and not effective_ha(cfg).get("token"):
             raise ValueError(f"{d.name} gebruikt Home Assistant, maar Home Assistant is nog niet gekoppeld")
         if not (100 <= d.power_w <= 25000):
