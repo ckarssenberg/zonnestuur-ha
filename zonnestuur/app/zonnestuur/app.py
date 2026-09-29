@@ -879,6 +879,7 @@ class Engine:
                 "today": self.ledger.totals(today),
                 "month": self.ledger.totals(month_start),
                 "year": self.ledger.totals(year_start),
+                "value": self._value_view(today, month_start, year_start),
                 "last_error": self.last_error,
                 "problems": self.problems(),
                 "license": self.license_state().to_dict(),
@@ -891,6 +892,19 @@ class Engine:
                 "batteries": self._batteries_view(today),
                 "learned": self.learned_view(),
             }
+
+    def _value_view(self, today, month_start, year_start) -> dict:
+        """Wat Zonnestuur oplevert: apparaten (zon en goedkope uren) plus de thuisbatterij."""
+        from datetime import date as _d
+        out = {}
+        for key, since in (("today", today), ("month", month_start), ("year", year_start), ("total", _d(2000, 1, 1))):
+            dev = self.ledger.totals(since)["eur_saved"]
+            bat = sum(v["eur"] for v in self.ledger.battery_totals(since).values())
+            out[key] = {"devices": round(dev, 2), "battery": round(bat, 2), "eur": round(dev + bat, 2)}
+        with self.ledger.lock:
+            row = self.ledger.conn.execute("SELECT MIN(day) FROM device_day").fetchone()
+        out["since"] = row[0] if row and row[0] else None
+        return out
 
     def learned_view(self) -> dict:
         out = self.model.to_dict()

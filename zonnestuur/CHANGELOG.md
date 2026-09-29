@@ -1,5 +1,10 @@
 # Wijzigingen
 
+## 0.18.0 – Overzichtelijker dashboard
+- Indeling in Nu, Planning, Apparaten en Inzicht, met een vaste navigatiebalk bovenaan.
+- Nieuwe kaart "Wat Zonnestuur je oplevert": deze maand, vandaag, dit jaar en sinds de start, inclusief de thuisbatterij, met de opbrengst per dag.
+- Dubbele adviezen samengevoegd in de Zonnecoach; op de telefoon staat de opbrengst direct onder 'Nu'.
+
 ## 0.17.0 – Koppelen met (bijna) alles
 - MQTT: Zigbee2MQTT-stekkers, Tasmota, Shelly en eigen topics; als add-on automatisch de Mosquitto-broker van Home Assistant.
 - Homey Pro: meter, schakelaars en thermostaten.

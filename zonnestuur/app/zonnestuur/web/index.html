@@ -94,7 +94,30 @@
   .card { position: relative; background: linear-gradient(180deg, var(--card-hi), var(--card)); border: 1px solid var(--card-line);
           border-radius: 26px; padding: 22px; box-shadow: var(--shadow); backdrop-filter: blur(22px) saturate(150%);
           -webkit-backdrop-filter: blur(22px) saturate(150%); min-width: 0; }
-  .c-hero, .c-plan, .c-usage, .c-feed, .c-learn, .c-coach { grid-column: span 12; }
+  .c-hero, .c-plan, .c-usage, .c-feed, .c-learn { grid-column: span 12; }
+  .c-coach { grid-column: span 8; } .c-value { grid-column: span 4; }
+  .c-today { grid-column: span 12 !important; }
+  .c-devs { grid-column: span 8; } .c-batt { grid-column: span 4; align-self: start; }
+  .c-devs:has(+ .c-batt[hidden]) { grid-column: span 12; }
+  .sec-head { grid-column: span 12; margin: 26px 4px 2px; scroll-margin-top: 70px; }
+  .sec-head h2 { font: 650 clamp(22px, 2.2vw, 28px)/1.15 "Inter Tight", Inter, sans-serif; letter-spacing: -.03em; margin: 0; }
+  .sec-head p { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; }
+  #hero { scroll-margin-top: 70px; }
+  .secnav { position: sticky; top: 0; z-index: 30; display: flex; gap: 4px; width: max-content; max-width: 100%; overflow-x: auto; margin: -6px auto 14px;
+            padding: 4px; border-radius: 14px; background: color-mix(in srgb, var(--card-solid) 70%, transparent); border: 1px solid var(--card-line);
+            backdrop-filter: blur(16px) saturate(150%); -webkit-backdrop-filter: blur(16px) saturate(150%); scrollbar-width: none; }
+  .secnav a { text-decoration: none; color: var(--ink-2); font-size: 13.5px; font-weight: 600; padding: 7px 16px; border-radius: 10px; white-space: nowrap; transition: background .2s, color .2s; }
+  .secnav a.on { background: var(--seg-on); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .save .sub.three { grid-template-columns: repeat(3, 1fr); }
+  .split { display: grid; gap: 6px; margin-top: 14px; }
+  .split .row2 { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-2); }
+  .split .row2 b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .split .bar { height: 8px; border-radius: 4px; background: var(--chip); display: flex; overflow: hidden; gap: 2px; }
+  .split .bar i { display: block; height: 100%; }
+  .roi { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--good-soft); color: var(--ink); }
+  .card { animation: rise .5s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .card { animation: none; } }
   .coach-grid { display: grid; grid-template-columns: minmax(250px, 340px) minmax(0, 1fr); gap: 26px; align-items: start; }
   .score { display: flex; gap: 18px; align-items: center; }
   .score svg { width: 124px; height: 124px; flex: none; }
@@ -117,11 +140,7 @@
   @media (max-width: 860px) { .coach-grid { grid-template-columns: 1fr; } }
   .c-devs { grid-column: span 8; } .c-side { grid-column: span 4; display: grid; gap: 14px; align-content: start; min-width: 0; }
   .c-today { grid-column: span 7; } .c-month { grid-column: span 5; }
-  @media (min-width: 1021px) {
-    /* zijkolom (batterij + besparing) loopt door naast 'vandaag': geen gat onder de apparaten */
-    .c-side { grid-row: span 2; }
-    .c-today { grid-column: span 8; } .c-month { grid-column: span 12; }
-  }
+
   .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
   .title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
   h2.sec { font: 650 20px/1.2 "Inter Tight", Inter, sans-serif; letter-spacing: -.02em; margin: 2px 0 0; }
@@ -263,7 +282,8 @@
   @media (max-width: 1020px) {
     .hero-grid { grid-template-columns: 1fr; }
     .flow { max-width: 520px; margin: 0 auto; width: 100%; }
-    .c-devs, .c-side, .c-today, .c-month { grid-column: span 12; }
+    .c-devs, .c-side, .c-today, .c-month, .c-coach, .c-value, .c-batt { grid-column: span 12; }
+    .c-hero { order: -2; } .c-value { order: -1; }
     .c-side { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
   }
   @media (max-width: 640px) {
@@ -300,6 +320,9 @@
     </button>
   </header>
 
+  <nav class="secnav" aria-label="Onderdelen" id="secnav">
+    <a href="#hero" data-s="hero">Nu</a><a href="#s-planning" data-s="s-planning">Planning</a><a href="#s-apparaten" data-s="s-apparaten">Apparaten</a><a href="#s-inzicht" data-s="s-inzicht">Inzicht</a>
+  </nav>
   <div class="grid">
     <!-- nu -->
     <section class="card c-hero" id="hero" aria-labelledby="headline">
@@ -321,6 +344,29 @@
       <div id="coachBody"><div class="empty">Laden…</div></div>
     </section>
 
+    <!-- opbrengst -->
+    <section class="card c-value save" aria-labelledby="saveTitle">
+      <div class="title-row"><div><div class="eyebrow">Opbrengst</div><h2 class="sec" id="saveTitle">Wat Zonnestuur je oplevert</h2></div><span class="small muted" id="valueNow"></span></div>
+      <div class="hero num" id="sMonth">–</div>
+      <div class="small muted" id="sMonthNote">deze maand</div>
+      <div class="sub three">
+        <div><div class="small muted">Vandaag</div><div class="v num" id="sToday">–</div></div>
+        <div><div class="small muted">Dit jaar</div><div class="v num" id="sYear">–</div></div>
+        <div><div class="small muted" id="sTotalL">Sinds start</div><div class="v num" id="sTotal">–</div></div>
+      </div>
+      <div class="split" id="vSplit"></div>
+      <div class="eyebrow" style="margin:16px 0 6px">Gestuurd per dag, laatste 31 dagen</div>
+      <div class="chart" id="monthChart"><svg id="monthSvg" role="img" aria-label="Verbruik van gestuurde apparaten per dag"></svg><div class="tip" id="monthTip"></div></div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--sun)"></i><span class="lbl-sun">Uit eigen zon</span></span>
+        <span><i class="sw" style="background:var(--net)"></i>Van het net</span>
+      </div>
+      <details class="table"><summary>Toon als tabel</summary><table id="monthTable"></table></details>
+      <p class="small muted" id="solarShare" style="margin:12px 0 0"></p>
+      <p class="small roi" id="roi" hidden></p>
+      <svg class="spark" id="spark" viewBox="0 0 300 44" preserveAspectRatio="none" aria-hidden="true" hidden></svg>
+    </section>
+    <div class="sec-head" id="s-planning"><h2>Planning</h2><p>Wanneer Zonnestuur wat laat draaien, op zon en de goedkoopste uren.</p></div>
     <!-- dagplan -->
     <section class="card c-plan" aria-labelledby="priceTitle">
       <div class="title-row"><div><div class="eyebrow">Stroomprijs en planning</div><h2 class="sec" id="priceTitle">Zo plant Zonnestuur je dag</h2></div><span class="small muted" id="priceNote"></span></div>
@@ -339,29 +385,6 @@
       <details class="table" id="priceTableWrap"><summary>Toon als tabel</summary><table id="priceTable"></table></details>
     </section>
 
-    <!-- apparaten -->
-    <section class="c-devs" aria-labelledby="devTitle">
-      <div class="devs-head"><h2 class="sec" id="devTitle">Apparaten</h2><a class="small muted" href="instellingen">Beheren</a></div>
-      <div class="devs" id="devices"></div>
-    </section>
-
-    <div class="c-side">
-      <!-- batterij -->
-      <section class="card c-batt" id="battCard" hidden aria-labelledby="battTitle"></section>
-      <!-- besparing -->
-      <section class="card save" aria-labelledby="saveTitle">
-        <div class="title-row"><span class="eyebrow" id="saveTitle">Bespaard deze maand</span><span class="small muted" id="valueNow"></span></div>
-        <div class="hero num" id="sMonth">–</div>
-        <div class="small muted" id="sMonthNote">met eigen zonnestroom</div>
-        <svg class="spark" id="spark" viewBox="0 0 300 44" preserveAspectRatio="none" aria-hidden="true"></svg>
-        <div class="sub">
-          <div><div class="small muted">Vandaag</div><div class="v num" id="sToday">–</div></div>
-          <div><div class="small muted">Dit jaar</div><div class="v num" id="sYear">–</div></div>
-        </div>
-        <p class="small muted" id="solarShare" style="margin:12px 0 0"></p>
-      </section>
-    </div>
-
     <!-- vandaag -->
     <section class="card c-today" aria-labelledby="todayTitle">
       <div class="title-row"><span class="eyebrow" id="todayTitle">Vandaag · gestuurde apparaten</span><span class="small muted" id="todayNote"></span></div>
@@ -373,17 +396,16 @@
       </div>
     </section>
 
-    <!-- 31 dagen -->
-    <section class="card c-month" aria-labelledby="monthTitle">
-      <div class="title-row"><span class="eyebrow" id="monthTitle">Laatste 31 dagen</span><span class="small muted">kWh per dag</span></div>
-      <div class="chart" id="monthChart"><svg id="monthSvg" role="img" aria-label="Verbruik van gestuurde apparaten per dag"></svg><div class="tip" id="monthTip"></div></div>
-      <div class="legend">
-        <span><i class="sw" style="background:var(--sun)"></i><span class="lbl-sun">Uit eigen zon</span></span>
-        <span><i class="sw" style="background:var(--net)"></i>Van het net</span>
-      </div>
-      <details class="table"><summary>Toon als tabel</summary><table id="monthTable"></table></details>
+    <div class="sec-head" id="s-apparaten"><h2>Apparaten</h2><p>Wat Zonnestuur stuurt, en wat het deze maand opleverde.</p></div>
+    <!-- apparaten -->
+    <section class="c-devs" aria-labelledby="devTitle">
+      <div class="devs-head" style="justify-content:flex-end;margin-top:-6px"><span id="devTitle" hidden>Apparaten</span><a class="small muted" href="instellingen">Apparaten beheren →</a></div>
+      <div class="devs" id="devices"></div>
     </section>
 
+    <!-- batterij -->
+    <section class="card c-batt" id="battCard" hidden aria-labelledby="battTitle"></section>
+    <div class="sec-head" id="s-inzicht"><h2>Inzicht</h2><p>Je hele huis: verbruik, teruglevering en wat Zonnestuur over je huis geleerd heeft.</p></div>
     <!-- verbruik -->
     <section class="card c-usage" aria-labelledby="useTitle">
       <div class="usage-head">
@@ -559,7 +581,7 @@ function renderStatus(s) {
   const sc = COACH && COACH.scores;
   if (s.has_panels && sc && (sc.today.self_use_pct != null || sc.week.self_use_pct != null)) {
     const td = sc.today.self_use_pct, wk = sc.week.self_use_pct;
-    k.push(["Zonnestroom zelf gebruikt", td != null ? `${nl(td)}<small>%</small>` : `${nl(wk)}<small>%</small>`, td != null ? `vandaag · deze week ${wk != null ? nl(wk) + "%" : "–"}` : "deze week"]);
+    k.push(["Zon zelf gebruikt", td != null ? `${nl(td)}<small>%</small>` : `${nl(wk)}<small>%</small>`, td != null ? `vandaag · deze week ${wk != null ? nl(wk) + "%" : "–"}` : "deze week"]);
   } else if (!s.has_panels && sc && sc.cheap_pct_week != null) k.push(["In goedkope uren", `${nl(sc.cheap_pct_week)}<small>%</small>`, "van je stroom, deze week"]);
   else if (bat) k.push(["Batterij", bat.soc == null ? "–" : `${nl(bat.soc)}<small>%</small>`, bat.online ? BACT[bat.action] || "" : "niet bereikbaar"]);
   else if (s.has_panels) k.push(["Uit eigen zon", pct(s.month.solar_pct || 0), `${nl(s.month.kwh_solar, 1)} kWh deze maand`]);
@@ -571,11 +593,24 @@ function renderStatus(s) {
   renderBattery(s);
 
   // besparing
-  $("sMonth").textContent = eur(s.month.eur_saved);
-  $("sToday").textContent = eur(s.today.eur_saved);
-  $("sYear").textContent = eur(s.year.eur_saved);
+  const V = s.value || { today: { eur: s.today.eur_saved }, month: { eur: s.month.eur_saved }, year: { eur: s.year.eur_saved }, total: { eur: s.year.eur_saved } };
+  $("sMonth").textContent = eur(V.month.eur);
+  $("sToday").textContent = eur(V.today.eur);
+  $("sYear").textContent = eur(V.year.eur);
+  $("sTotal").textContent = eur(V.total.eur);
+  $("sTotalL").textContent = V.since ? "Sinds " + new Date(V.since).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }) : "Sinds start";
+  const md = V.month.devices || 0, mb = V.month.battery || 0, tot = Math.max(0.01, Math.abs(md) + Math.abs(mb));
+  $("vSplit").innerHTML = mb ? `<div class="bar"><i style="width:${100 * Math.abs(md) / tot}%;background:var(--sun)"></i><i style="width:${100 * Math.abs(mb) / tot}%;background:var(--batt)"></i></div>
+      <div class="row2"><span><i class="sw" style="background:var(--sun)"></i> ${s.strategy === "price" ? "Apparaten in goedkope uren" : "Apparaten op zon"}</span><b>${eur(md)}</b></div>
+      <div class="row2"><span><i class="sw" style="background:var(--batt)"></i> Thuisbatterij</span><b>${eur(mb)}</b></div>` : "";
+  const L0 = s.license || {};
+  const roi = $("roi");
+  if (V.year.eur > 1 && L0.plan !== "basic") {
+    roi.hidden = false;
+    roi.textContent = V.year.eur >= 49 ? `Zonnestuur leverde dit jaar ${eur(V.year.eur)} op: ${nl(V.year.eur / 49, 1)}× wat Pro per jaar kost.` : `Dit jaar ${eur(V.year.eur)} opgeleverd. Hoe meer apparaten Zonnestuur stuurt, hoe meer het oplevert.`;
+  } else roi.hidden = true;
   $("valueNow").textContent = s.strategy === "price" ? "" : eur(s.value_own_kwh) + " per eigen kWh";
-  $("sMonthNote").textContent = s.strategy === "price" ? "door te draaien in de goedkoopste uren" : "met eigen zonnestroom";
+  $("sMonthNote").textContent = s.strategy === "price" ? "deze maand, door te draaien in de goedkoopste uren" : "deze maand, door je eigen zonnestroom slim te gebruiken";
   $("solarShare").textContent = s.has_panels && s.month.kwh > 0 ? `${pct(s.month.solar_pct)} van het verbruik van je apparaten kwam deze maand uit eigen zon (${nl(s.month.kwh_solar, 1)} kWh).`
     : s.month.kwh > 0 ? `${nl(s.month.kwh, 1)} kWh deze maand slim ingepland.` : "Zodra je apparaten stroom gebruiken, zie je hier wat het oplevert.";
   if (s.strategy === "price") document.querySelectorAll(".lbl-sun").forEach((e) => { e.textContent = "In goedkope uren"; });
@@ -877,7 +912,7 @@ function drawToday() {
 
 function drawMonth() {
   const svg = $("monthSvg"), box = $("monthChart"), tip = $("monthTip");
-  const W = Math.max(280, box.clientWidth), H = 200, L = 30, R = 4, T = 10, B = 24, n = 31;
+  const W = Math.max(260, box.clientWidth), H = box.clientWidth < 520 ? 150 : 200, L = 30, R = 4, T = 10, B = 24, n = 31;
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("height", H);
   svg.innerHTML = "";
   const byDay = Object.fromEntries(MONTH.map((d) => [d.day, d]));
@@ -1106,11 +1141,8 @@ function drawInsight() {
     ${STATUS && STATUS.notifications && STATUS.notifications.length ? `<p class="small muted" style="margin:6px 0 0">Laatste melding (${new Date(STATUS.notifications[0].at).toLocaleString("nl-NL", { weekday: "short", hour: "2-digit", minute: "2-digit" })}): ${esc(STATUS.notifications[0].title)}</p>` : ""}
     <div class="chart" id="feedChart"><svg id="feedSvg" role="img" aria-label="Gemiddeld per uur van de dag: afname en teruglevering"></svg><div class="tip" id="feedTip"></div></div>
     <div class="legend"><span><i class="sw" style="background:var(--net)"></i>Gemiddeld afgenomen</span><span><i class="sw" style="background:var(--sun)"></i>Gemiddeld teruggeleverd</span><span class="muted">kWh per uur van de dag</span></div>
-    ${I.export_per_day < 0.1 ? `<p class="small muted" style="margin-top:12px">Je levert (bijna) niets terug: al je stroom komt van het net. Zonnestuur haalt bij jou de winst uit de goedkoopste uren. Komen er zonnepanelen bij? Dan zie je hier meteen waar je stroom heen gaat.</p>` : `
-    ${I.advice.length ? `<div class="advice">${I.advice.map((a) => `<div><b>${esc(a.title)}</b><p>${esc(a.text)}</p></div>`).join("")}</div>` : ""}
-    <div style="overflow-x:auto"><table class="batt"><tr><th>Batterij (richtprijs)</th><th class="hide-m">Laden uit teruglevering</th><th>Bespaart per jaar</th><th>Terugverdiend in</th></tr>
-      ${I.batteries.map((b) => `<tr><td>${esc(b.name)} · € ${nl(b.price)}</td><td class="hide-m">${nl(b.charged_kwh * 365 / I.days)} kWh/jaar</td><td>€ ${nl(b.saving_year)}</td><td>${b.payback_years ? nl(b.payback_years, 1) + " jaar" : "–"}</td></tr>`).join("")}</table></div>`}
-    <p class="small muted" style="margin-top:10px" ${I.export_per_day < 0.1 ? "hidden" : ""}>* Bovengrens: wat je had bespaard als je al die stroom zelf had gebruikt (afnameprijs min wat teruglevering opleverde: gemiddeld ${eur3(I.avg_import_price)} tegen ${eur3(I.avg_export_value)} per kWh). Batterijen: simulatie op jouw uurdata, 90% rendement.
+    ${I.export_per_day < 0.1 ? `<p class="small muted" style="margin-top:12px">Je levert (bijna) niets terug: al je stroom komt van het net. Zonnestuur haalt bij jou de winst uit de goedkoopste uren.</p>` : `<p class="small muted" style="margin-top:12px">Wat je hieraan kunt doen, staat bij de <a href="#hero">Zonnecoach</a> bovenaan.</p>`}
+    <p class="small muted" style="margin-top:10px" ${I.export_per_day < 0.1 ? "hidden" : ""}>* Bovengrens: wat je had bespaard als je al die stroom zelf had gebruikt (afnameprijs min wat teruglevering opleverde: gemiddeld ${eur3(I.avg_import_price)} tegen ${eur3(I.avg_export_value)} per kWh). 
       ${I.seasonal_warning ? "Minder dan een jaar aan gegevens: per-jaar-bedragen zijn doorgetrokken en hangen af van het seizoen." : ""}</p>`;
   const svg = $("feedSvg"), box = $("feedChart"), tip = $("feedTip");
   const W = Math.max(300, box.clientWidth), H = 180, L = 40, R = 6, T = 10, B = 24;
@@ -1278,6 +1310,14 @@ function drawCoach() {
     });
   }
 }
+(function () {
+  const links = [...document.querySelectorAll("#secnav a")];
+  const io = new IntersectionObserver((es) => {
+    es.forEach((e) => { if (e.isIntersecting) links.forEach((a) => a.classList.toggle("on", a.dataset.s === e.target.id)); });
+  }, { rootMargin: "-40% 0px -55% 0px" });
+  links.forEach((a) => { const t = document.getElementById(a.dataset.s); if (t) io.observe(t); });
+  links[0].classList.add("on");
+})();
 function drawCharts() { drawCoach(); drawToday(); drawMonth(); drawPrices(); drawUsage(); drawInsight(); drawLanes(); drawLearned(); }
 
 async function refresh() {
