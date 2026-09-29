@@ -1,5 +1,8 @@
 # Wijzigingen
 
+## 0.20.1
+- Welkomstscherm van de koppel-assistent noemt ook de P1-kabel van de Zonnestuur Box.
+
 ## 0.20.0 – Zonnestuur Box
 - Kant-en-klaar SD-kaartbeeld voor de Zonnestuur Box, gebouwd door GitHub Actions.
 - Wifi instellen zonder kabel: de Box maakt zelf de wifi "Zonnestuur-instellen" met een instelpagina.

@@ -253,9 +253,9 @@ function welkom() {
     <p class="lead">${W.addOnly ? "We zoeken de nieuwe schakelaar in je netwerk en testen hem even." :
       "We zoeken je apparaten in je thuisnetwerk. Je hoeft geen adressen of codes over te typen."}</p>
     <div class="list">
-      ${W.addOnly ? "" : `<div class="check"><span class="ic">1</span><div><b>Een meter die ziet wat je teruglevert</b><div class="small muted">HomeWizard P1-meter (zet in de HomeWizard-app <b>Lokale API</b> aan), een Shelly EM / Pro 3EM, of een sensor in Home Assistant.</div></div></div>`}
-      <div class="check"><span class="ic">${W.addOnly ? 1 : 2}</span><div><b>Iets om te sturen</b><div class="small muted">Een slimme stekker of schakelaar (Shelly, HomeWizard Energy Socket, Tasmota), of alles wat in Home Assistant zit: warmtepomp, laadpaal, auto.</div></div></div>
-      <div class="check"><span class="ic">${W.addOnly ? 2 : 3}</span><div><b>Alles op hetzelfde netwerk</b><div class="small muted">Zonnestuur moet je meter en apparaten (of Home Assistant) kunnen bereiken.</div></div></div>
+      ${W.addOnly ? "" : `<div class="check"><span class="ic">1</span><div><b>Je slimme meter</b><div class="small muted">Via de P1-kabel van de Zonnestuur Box, of een HomeWizard P1-meter (zet in de HomeWizard-app <b>Lokale API</b> aan), YouLess, Shelly EM of Home Assistant.</div></div></div>`}
+      <div class="check"><span class="ic">${W.addOnly ? 1 : 2}</span><div><b>Iets om te sturen</b><div class="small muted">Een Shelly-schakelaar voor de boiler, een slimme stekker, een laadpaal, een warmtepomp, of wat er in Home Assistant of Homey zit.</div></div></div>
+      <div class="check"><span class="ic">${W.addOnly ? 2 : 3}</span><div><b>Alles in hetzelfde thuisnetwerk</b><div class="small muted">Meter en apparaten zitten op dezelfde wifi of router als Zonnestuur.</div></div></div>
     </div>
     <div class="actions"><span class="small muted">${W.addOnly ? '<a href="instellingen">Terug naar instellingen</a>' : ""}</span>
       <button class="btn" id="next">Start zoeken →</button></div>
