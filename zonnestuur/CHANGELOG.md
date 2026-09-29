@@ -1,9 +1,8 @@
 # Wijzigingen
 
-## 0.14.0 – De app
-- Nieuw thuisscherm: je huis als levende illustratie (echte zonsopkomst en -ondergang, panelen, auto aan de laadpaal, batterij), de prijsbalk van vandaag en tegels die je aantikt.
-- Per apparaat een eigen scherm: wat hij doet en waarom ("Laadt morgen 02:00–05:00 voor gemiddeld 19,9 ct"), tijdlijn met geplande uren, Direct laden / Nu opwarmen, en de vertrektijd per weekdag.
-- Onderaan op je telefoon een tabbalk: Thuis, Planning, Inzicht, Instellingen.
+## 0.14.1
+- Dashboard terug naar het vertrouwde ontwerp van 0.13.
+- Klaar-tijden kunnen nu per weekdag gelden (bijvoorbeeld alleen op werkdagen).
 
 ## 0.13.0 – Zonnestuur Pro
 - 30 dagen alles proberen; daarna Zonnestuur Basis (gratis) of Pro (€ 49 per jaar). Zie PRO.md.
