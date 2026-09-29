@@ -663,8 +663,44 @@ function klaar() {
 }
 
 // ---------- instellingen ----------
+function batteryHtml(b) {
+  const f = (id, label, val, type = "text", extra = "") => `<div class="field" ${extra}><label for="${id}">${label}</label><input id="${id}" type="${type}" ${type === "number" ? 'step="any"' : ""} value="${esc(val ?? "")}"></div>`;
+  const m = b.mode_map || {};
+  return `<p class="small muted" style="margin-top:-4px">Zonnestuur plant elk uur wanneer de batterij laadt, spaart of levert: op je eigen verbruik, de zonvoorspelling en de uurprijzen. Zon-overschot gaat eerst naar je apparaten, de batterij krijgt de rest.</p>
+    <div class="chips" id="b_found" style="margin:10px 0"></div>
+    <label class="check-row"><input type="checkbox" id="b_on" ${b.soc_entity ? "checked" : ""}> Zonnestuur stuurt mijn thuisbatterij</label>
+    <div id="b_form" ${b.soc_entity ? "" : "hidden"}>
+      <div class="row">${f("b_name", "Naam", b.name || "Thuisbatterij")}${f("b_cap", "Capaciteit (kWh)", b.capacity_kwh ?? 5, "number")}${f("b_minsoc", "Altijd minimaal in batterij (%)", b.min_soc ?? 10, "number")}</div>
+      <div class="row">${f("b_ch", "Max. laden (W)", b.max_charge_w ?? 800, "number")}${f("b_dis", "Max. ontladen (W)", b.max_discharge_w ?? 800, "number")}</div>
+      <label class="check-row"><input type="checkbox" id="b_grid" ${b.grid_charge === false ? "" : "checked"}> Mag laden van het net als dat duidelijk goedkoper is (dynamisch contract, negatieve prijzen)</label>
+      <details style="margin-top:10px"><summary class="small">Geavanceerd: welke instellingen in Home Assistant</summary>
+        <div class="row" style="margin-top:10px">
+          <div class="field"><label for="b_drv">Sturing</label><select id="b_drv">
+            <option value="mode" ${b.driver === "mode" ? "selected" : ""}>Stand kiezen (batterij regelt zelf nul op de meter)</option>
+            <option value="setpoint" ${b.driver === "setpoint" ? "selected" : ""}>Eén vermogen-instelling (+/−)</option>
+            <option value="split" ${b.driver === "split" ? "selected" : ""}>Aparte laad- en ontlaadinstelling</option></select></div>
+          ${f("b_soc", "Laadniveau (sensor, %)", b.soc_entity)}${f("b_pw", "Vermogen (sensor, optioneel)", b.power_entity)}</div>
+        <div class="row">${f("b_mode", "Stand (select.…)", b.mode_entity)}${f("m_auto", "Stand: nul op de meter", m.auto)}${f("m_save", "Stand: alleen laden", m.save)}${f("m_charge", "Stand: vol laden", m.charge)}</div>
+        <div class="row">${f("m_idle", "Stand: stand-by", m.idle)}${f("m_manual", "Stand: handmatig/API", m.manual)}${f("b_sp", "Vermogen-instelling (number.…)", b.setpoint_entity)}</div>
+        <div class="row">${f("b_ce", "Laadvermogen (number.…)", b.charge_entity)}${f("b_de", "Ontlaadvermogen (number.…)", b.discharge_entity)}</div>
+        <label class="check-row"><input type="checkbox" id="b_spp" ${b.setpoint_charge_positive === false ? "" : "checked"}> Positief vermogen = laden (uit bij o.a. Sessy)</label>
+      </details>
+    </div>`;
+}
+function readBattery(prev) {
+  if (!$("b_on") || !$("b_on").checked) return [];
+  const v = (id) => $(id).value.trim(), n = (id) => Number($(id).value);
+  const map = {}; for (const k of ["auto", "save", "charge", "idle", "manual"]) if (v("m_" + k)) map[k] = v("m_" + k);
+  const pos = $("b_spp").checked;
+  return [Object.assign({}, prev || {}, { id: (prev && prev.id) || "batterij", name: v("b_name") || "Thuisbatterij", capacity_kwh: n("b_cap"),
+    min_soc: n("b_minsoc"), max_charge_w: n("b_ch"), max_discharge_w: n("b_dis"), grid_charge: $("b_grid").checked,
+    driver: v("b_drv"), soc_entity: v("b_soc"), power_entity: v("b_pw"), mode_entity: v("b_mode"), mode_map: map,
+    setpoint_entity: v("b_sp"), charge_entity: v("b_ce"), discharge_entity: v("b_de"),
+    setpoint_charge_positive: pos, power_charge_positive: (prev && prev.power_charge_positive !== undefined) ? prev.power_charge_positive : pos })];
+}
 async function settings() {
   await loadSuppliers();
+  const B = (CFG.batteries && CFG.batteries[0]) || {};
   const c = JSON.parse(JSON.stringify(CFG.contract)), s = CFG.solar;
   const orient = Object.entries(ORIENT).find(([, v]) => v === s.azimuth)?.[0] || "Zuid";
   const md = (CFG.meter && CFG.meter.driver) || "homewizard";
@@ -689,6 +725,9 @@ async function settings() {
         <div class="field"><label for="s_rg">Provincie</label><select id="s_rg">${Object.keys(REGIONS).map((r) => `<option ${r === nearestRegion(s.latitude, s.longitude) ? "selected" : ""}>${r}</option>`).join("")}</select></div>
       </div>
       <div class="row"><div class="field"><label for="s_base">Sluipverbruik huis overdag (W)</label><input id="s_base" type="number" step="10" value="${s.base_load_w}"></div></div>
+    </section>
+    <section class="card" id="batCard"><h2 class="t">Thuisbatterij</h2>
+      ${CFG.has_ha ? batteryHtml(B) : `<p class="small muted" style="margin-top:-4px">Koppel Home Assistant om een thuisbatterij (HomeWizard, Zendure, Marstek, Sessy, Victron…) slim te laten laden en ontladen.</p>`}
     </section>
     <section class="card" id="feedCard"><h2 class="t">Minder terugleveren</h2>
       ${CFG.has_ha ? `<p class="small muted" style="margin-top:-4px">Zonnestuur laat je apparaten al op je eigen zonnestroom draaien. Hiermee gaat hij nog een stap verder.</p>
@@ -765,6 +804,8 @@ async function settings() {
       CFG = await api("api/config"); settings(); toast(`Gekoppeld: ${r.devices.length} apparaten beschikbaar`);
     } catch (e) { $("s_hares").textContent = e.message; }
   };
+  const bindBattery = () => { if ($("b_on")) $("b_on").onchange = () => { $("b_form").hidden = !$("b_on").checked; }; };
+  bindBattery();
   if (CFG.has_ha) {
     (async () => {
       try {
@@ -774,6 +815,16 @@ async function settings() {
         const inv = r.inverter_limits || [];
         $("i_hint").textContent = inv.length ? `Gevonden: ${inv.map((x) => x.name).join(", ")}.` : "Geen omvormer-begrenzing gevonden in Home Assistant. Veel omvormers (SolarEdge, Huawei, Growatt, Hoymiles via OpenDTU) hebben er een via hun integratie.";
         $("i_ent").onchange = () => { const x = inv.find((y) => y.entity === $("i_ent").value); if (x) $("i_unit").value = ["W", "kW", "%"].includes(x.unit) ? x.unit : "W"; };
+        const bats = r.batteries || [];
+        $("b_found").innerHTML = bats.length ? bats.map((b, i) => `<button type="button" data-bi="${i}">🔋 ${esc(b.name)}</button>`).join("")
+          : `<span class="small muted">Geen thuisbatterij gevonden in Home Assistant. Vul de instellingen hieronder zelf in.</span>`;
+        document.querySelectorAll("[data-bi]").forEach((btn) => btn.onclick = () => {
+          const b = bats[Number(btn.dataset.bi)];
+          $("batCard").innerHTML = `<h2 class="t">Thuisbatterij</h2>` + batteryHtml(Object.assign({}, b, { soc_entity: b.soc_entity || " " }));
+          $("b_on").checked = true; $("b_form").hidden = false; bindBattery();
+          $("b_found").innerHTML = `<span class="small muted">Overgenomen: ${esc(b.name)}. Controleer capaciteit en vermogen en sla op.</span>`;
+          B.power_charge_positive = b.power_charge_positive;
+        });
         const cur = CFG.notify?.service || "";
         $("n_svc").innerHTML = `<option value="">Geen meldingen</option>` + [...new Set([...(r.notify_services || []), ...(cur ? [cur] : [])])]
           .map((v) => `<option ${v === cur ? "selected" : ""} value="${esc(v)}">${esc(v.replace("notify.mobile_app_", "📱 ").replace("notify.", ""))}</option>`).join("");
@@ -802,6 +853,7 @@ async function settings() {
       base_load_w: Number($("s_base").value), tilt: $("s_or").value === "Oost-west" ? 15 : 35, has_panels: $("s_haspan").checked });
     Object.assign(next, meterFromForm());
     if (CFG.has_ha) {
+      next.batteries = readBattery(B);
       const ent = $("i_ent").value.trim();
       next.inverter = ent ? { entity: ent, max_w: Number($("i_max").value) || 0, unit: $("i_unit").value } : {};
       next.notify = $("n_svc").value ? { service: $("n_svc").value, tips: $("n_tips").checked, alerts: $("n_alerts").checked } : {};

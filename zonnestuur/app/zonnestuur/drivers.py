@@ -513,8 +513,141 @@ def ha_candidates(states: list[dict]) -> dict:
             name = (a.get("friendly_name") or prefix).rsplit(" ", 1)[0]
             readonly.append({"name": name, "brand": "zaptec" if any("fallback_current" in e for e in siblings) else "",
                              "via": "een andere koppeling, zoals Tibber"})
+    batteries = battery_candidates(states)
+    taken = {b.get(k) for b in batteries for k in ("mode_entity", "setpoint_entity", "charge_entity", "discharge_entity")}
+    devices = [d for d in devices if not ({d.get("entity"), (d.get("params") or {}).get("entity"),
+                                           (d.get("params") or {}).get("current_entity")} & taken)]
     return {"power_sensors": power_sensors, "devices": devices, "price_sensors": price_sensors, "readonly_chargers": readonly,
-            "inverter_limits": inverter_limits}
+            "inverter_limits": inverter_limits, "batteries": batteries}
+
+
+# ---------------------------------------------------------------- thuisbatterijen herkennen
+_SOC_WORDS = ("state_of_charge", "soc", "battery_level", "electric_level", "laadniveau", "battery_percentage",
+              "charge_level", "batterijniveau")
+_MODE_KEYS = [  # volgorde telt: 'zero_charge_only' is sparen, geen laden
+    ("save", ("zero_charge_only", "charge_only", "smart_charging", "alleen laden")),
+    ("idle", ("standby", "idle", "stop", "stand-by")),
+    ("charge", ("to_full", "force_charge", "forcible_charge", "charge", "laden", "full")),
+    ("manual", ("manual", "api", "remote", "handmatig", "custom")),
+    ("auto", ("zero", "anti_feed", "self_consumption", "self-consumption", "nom", "smart", "auto", "nul op de meter", "eigen verbruik")),
+]
+_BATTERY_BRANDS = ("homewizard", "zendure", "solarflow", "hyper", "marstek", "venus", "sessy", "victron", "anker", "solix",
+                   "ecoflow", "growatt", "huawei", "luna", "sungrow", "byd", "pylontech", "sonnen", "tesla powerwall",
+                   "powerwall", "battery", "batterij", "accu", "plug_in", "plug-in", "ess")
+
+
+def _map_modes(options: list) -> dict:
+    out: dict[str, str] = {}
+    for opt in options or []:
+        o = str(opt).lower()
+        for key, words in _MODE_KEYS:
+            if key not in out and any(o == w or o.startswith(w) or w in o.split("_") or w == o.replace(" ", "_") for w in words):
+                out[key] = opt
+                break
+    return out
+
+
+def _prefix_len(a: str, b: str) -> int:
+    ta, tb = a.split(".", 1)[-1].split("_"), b.split(".", 1)[-1].split("_")
+    n = 0
+    for x, y in zip(ta, tb):
+        if x != y:
+            break
+        n += 1
+    return n
+
+
+def battery_candidates(states: list[dict]) -> list[dict]:
+    """Thuisbatterijen in Home Assistant: een laadniveau-sensor mét iets om hem te sturen (stand of vermogen).
+
+    Alleen sensoren met een stuur-instelling ernaast tellen, zodat telefoons, auto's en Zigbee-sensoren wegvallen."""
+    by_id = {s.get("entity_id", ""): s for s in states}
+    socs = [e for e, s in by_id.items() if e.startswith("sensor.") and (s.get("attributes") or {}).get("unit_of_measurement") == "%"
+            and any(w in e for w in _SOC_WORDS)]
+    powers = [e for e, s in by_id.items() if e.startswith("sensor.") and _is_power(s) and ("battery" in e or "batterij" in e)]
+    out, used = [], set()
+
+    def near(ref: str, pool: list[str], minlen: int = 1) -> list[str]:
+        scored = sorted(((_prefix_len(ref, e), e) for e in pool), reverse=True)
+        return [e for n, e in scored if n >= minlen and n == scored[0][0]] if scored else []
+
+    # 1. HomeWizard P1 met Plug-In Batteries: select met 'zero' / 'to_full' / 'standby'
+    for e, s in by_id.items():
+        opts = (s.get("attributes") or {}).get("options") or []
+        if not e.startswith("select.") or "zero" not in opts or not ({"to_full", "standby"} & set(opts)):
+            continue
+        hw_socs = ([x for x in socs if "state_of_charge" in x and ("plug_in" in x or "homewizard" in x)]
+                   or [x for x in socs if "state_of_charge" in x and not any(b in x for b in _BATTERY_BRANDS[1:9])])
+        n = max(1, len(hw_socs))
+        pw = [x for x in powers if "battery_group_power" in x] or near(e, powers)
+        out.append({"name": "HomeWizard Plug-In Battery" + (f" ({n}×)" if n > 1 else ""), "brand": "homewizard", "driver": "mode",
+                    "mode_entity": e, "mode_map": _map_modes(opts), "soc_entity": ",".join(hw_socs),
+                    "power_entity": pw[0] if pw else "", "capacity_kwh": round(2.7 * n, 1),
+                    "max_charge_w": 800 * n, "max_discharge_w": 800 * n, "options": opts})
+        used.add(e)
+    # 2. Andere merken: stand-select of vermogens-instellingen naast een laadniveau-sensor
+    for e, s in by_id.items():
+        if e in used or not e.startswith(("select.", "number.", "input_select.")):
+            continue
+        a = s.get("attributes") or {}
+        t = _text(e, a.get("friendly_name") or "")
+        if not any(b in t for b in _BATTERY_BRANDS):
+            continue
+        soc = near(e, [x for x in socs if x not in used], 1)
+        if not soc:
+            continue
+        soc = soc[0]
+        key = soc
+        cand = next((c for c in out if c.get("_key") == key), None)
+        if cand is None:
+            name = (by_id[soc].get("attributes") or {}).get("friendly_name") or soc
+            for w in (" State of charge", " state of charge", " Laadniveau", " laadniveau", " SOC", " Soc", " Battery level",
+                      " Electric level", " Battery Level"):
+                name = name.replace(w, "")
+            pw = near(e, powers)
+            cand = {"_key": key, "name": name.strip() or "Thuisbatterij", "brand": next((b for b in _BATTERY_BRANDS if b in t), ""),
+                    "driver": "", "soc_entity": soc, "power_entity": pw[0] if pw else "", "mode_entity": "", "mode_map": {},
+                    "setpoint_entity": "", "charge_entity": "", "discharge_entity": "", "capacity_kwh": 5.0,
+                    "max_charge_w": 2500, "max_discharge_w": 2500}
+            out.append(cand)
+        if e.startswith(("select.", "input_select.")):
+            m = _map_modes(a.get("options") or [])
+            if m.get("auto") or m.get("manual"):
+                cand["mode_entity"], cand["mode_map"], cand["options"] = e, m, a.get("options") or []
+        elif "discharge" in t or "output_limit" in e or "ontla" in t:
+            cand["discharge_entity"] = cand["discharge_entity"] or e
+            cand["max_discharge_w"] = _max_w(a) or cand["max_discharge_w"]
+        elif "setpoint" in t:
+            cand["setpoint_entity"] = e
+            cand["max_charge_w"] = cand["max_discharge_w"] = _max_w(a) or cand["max_charge_w"]
+        elif "charge" in t or "input_limit" in e or "laad" in t:
+            cand["charge_entity"] = cand["charge_entity"] or e
+            cand["max_charge_w"] = _max_w(a) or cand["max_charge_w"]
+    for c in out:
+        if c.get("brand") == "sessy":           # Sessy: positief = ontladen (setpoint = batterij + net)
+            c["setpoint_charge_positive"] = c["power_charge_positive"] = False
+        if c.get("driver"):
+            continue
+        m = c.get("mode_map") or {}
+        if m.get("auto") and (m.get("save") or m.get("charge")):
+            c["driver"] = "mode"
+        elif c.get("setpoint_entity"):
+            c["driver"] = "setpoint"
+        elif c.get("charge_entity") and c.get("discharge_entity"):
+            c["driver"] = "split"
+        elif m.get("auto"):
+            c["driver"] = "mode"
+    return [{k: v for k, v in c.items() if k != "_key"} for c in out if c.get("driver")]
+
+
+def _max_w(attrs: dict) -> Optional[float]:
+    try:
+        v = float(attrs.get("max"))
+    except (TypeError, ValueError):
+        return None
+    if attrs.get("unit_of_measurement") == "kW":
+        v *= 1000
+    return v if 100 <= v <= 50000 else None
 
 
 _INVERTER_WORDS = ("inverter", "omvormer", "solaredge", "growatt", "huawei", "sungrow", "fronius", "goodwe", "solis",

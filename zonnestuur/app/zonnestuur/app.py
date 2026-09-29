@@ -8,6 +8,7 @@ import argparse
 import json
 import os
 import logging
+import re
 import signal
 import threading
 import time
@@ -23,6 +24,7 @@ from .adapters import DeviceError, HomeWizardP1, ShellySwitch, NotReady, http_ge
 from .config import Config, load_config, merge_public, public_dict, save_config, effective_ha
 from .discovery import PROBLEMS, Scanner, identify
 from .guard import InverterLimiter, Notifier, negative_window
+from .battery import BatteryConfig, BatteryRuntime, HourIn, hourly_profile, import_profile, plan as plan_battery, plan_value
 from .drivers import HomeAssistant, ha_candidates, make_meter, make_switch, ha_client
 from .controller import Context, Controller, plan_cheapest_hours, plan_sunny_hours, plan_cheapest_block, plan_day, Need
 from .forecast import SolarForecast
@@ -66,7 +68,39 @@ class Engine:
         self._last_on: dict[str, Optional[bool]] = {}
         self.limiter = InverterLimiter.from_config(cfg.inverter)
         self.notifier = Notifier.from_config(cfg.notify)
+        self.batteries = {b["id"]: BatteryRuntime(BatteryConfig.from_dict(b)) for b in cfg.batteries}
         self._restore_state()
+
+    # Laatste fout, met tijdstip: het dashboard toont alleen wat nu nog speelt.
+    @property
+    def last_error(self) -> str:
+        return getattr(self, "_last_error", "")
+
+    @last_error.setter
+    def last_error(self, v: str) -> None:
+        self._last_error = v
+        self._last_error_at = time.monotonic() if v else None
+
+    def problems(self) -> list[dict]:
+        """Wat de gebruiker nu moet weten, in gewone taal (zonder URL's of foutcodes)."""
+        out = []
+        if self.cfg.has_meter and not self.meter_online:
+            out.append({"level": "warn", "text": "Meter even niet bereikbaar: Zonnestuur stuurt nu op tijd en prijs"})
+        for d in self.cfg.devices:
+            st = self.controller.states.get(d.id)
+            if st and not st.online and not st.offline_reason:
+                out.append({"level": "warn", "text": f"{d.name} reageert niet"})
+        for b in self.batteries.values():
+            if not b.online:
+                out.append({"level": "warn", "text": f"{b.cfg.name}: {b.error or 'niet bereikbaar'}"})
+        at = getattr(self, "_last_error_at", None)
+        if not out and self.last_error and at is not None and time.monotonic() - at < 180:
+            msg = re.sub(r"https?://\S+", "", self.last_error).replace("  ", " ").strip(" :")
+            for k, v in (("timed out", "reageerde even niet"), ("Connection refused", "niet bereikbaar"),
+                         ("Name or service not known", "niet gevonden op het netwerk"), (": :", ":")):
+                msg = msg.replace(k, v)
+            out.append({"level": "info", "text": msg})
+        return out
 
     # ---- regelronde ------------------------------------------------------
     def tick(self, now: Optional[datetime] = None, mono: Optional[float] = None) -> None:
@@ -117,6 +151,9 @@ class Engine:
                     self.last_error = f"{d.name}: {exc}"
                     log.warning(self.last_error)
 
+            # 2b. thuisbatterijen uitlezen
+            self._read_batteries()
+
             # 3. prijzen en zonvoorspelling bijwerken, garantie-planning maken
             self.prices.refresh(now)
             self._read_live_price(now, mono)
@@ -144,14 +181,22 @@ class Engine:
                     log.warning(self.last_error)
                     self.controller.states[dec.device_id].on = not dec.on
 
+            # 4a. thuisbatterijen: plan per uur, nu uitvoeren (na de apparaten: die gaan voor)
+            self._run_batteries(now, mono)
+
             # 4b. omvormer begrenzen als terugleveren geld kost, en meldingen
             self._limit_inverter(now, mono)
             self._notify(now, mono)
 
             # 5. boekhouding
             if self.grid_w is not None:
+                batt_w = sum(b.power_w or 0.0 for b in self.batteries.values() if b.online)
                 self.ledger.record_house(now, dt, self.grid_w, self.prices.import_price(now),
-                                         self.prices.feed_in_price(now), sum(max(0.0, p) for p in powers.values()))
+                                         self.prices.feed_in_price(now), sum(max(0.0, p) for p in powers.values()), batt_w)
+            for b in self.batteries.values():
+                if b.online and b.power_w is not None:
+                    self.ledger.record_battery(now, dt, b.cfg.id, b.power_w, self.grid_w, self.prices.import_price(now),
+                                               self.prices.feed_in_price(now))
             if self.cfg.strategy == "price":
                 # Besparing zonder panelen: wat je betaalt tegenover de gemiddelde prijs van vandaag
                 avg = self._avg_price_today(now)
@@ -170,12 +215,84 @@ class Engine:
         """Is de omvormer afgeknepen, dan ziet de meter geen overschot meer. Voor de apparaten tellen we het
         weggeknepen deel (volgens de zonvoorspelling) als overschot mee: liever zelf gebruiken dan weggooien."""
         g = self.grid_w
-        if g is None or not (self.limiter and self.limiter.active):
+        if g is None:
+            return g
+        # Wat de batterij nu van de zon laadt, is voor de apparaten nog beschikbaar (die gaan voor);
+        # wat hij ontlaadt, telt als afname (de batterij mag geen boiler verwarmen).
+        g -= sum(b.power_w or 0.0 for b in self.batteries.values() if b.online and b.action in ("auto", "save"))
+        if not (self.limiter and self.limiter.active):
             return g
         fc = self.forecast.production_w(now)
         if fc is None:
             return g
         return g - max(0.0, min(self.limiter.max_w, fc) - self.limiter.limit_w)
+
+    # ---- thuisbatterijen ----------------------------------------------------
+    def _read_batteries(self) -> None:
+        if not self.batteries:
+            return
+        try:
+            ha = ha_client(self.cfg)
+        except ValueError:
+            return
+        for b in self.batteries.values():
+            b.read(ha)
+
+    def _battery_hours(self, now: datetime, b: BatteryRuntime) -> list[HourIn]:
+        start = now.replace(minute=0, second=0, microsecond=0)
+        rows = self.ledger.house_hours(int((now - timedelta(days=15)).timestamp()), int(now.timestamp()) + 3600)
+        net = hourly_profile(rows, self.tz)
+        imp = import_profile(rows, self.tz)
+        base = self.cfg.solar.base_load_w / 1000
+        if net is None:
+            net = [base] * 24
+            imp = [base] * 24
+        if self.cfg.contract.type == "dynamic" and self.prices.slots:
+            per_hour: dict[datetime, list[float]] = {}
+            for s, e, p in self.prices.upcoming(start, start + timedelta(hours=36)):
+                per_hour.setdefault(s.astimezone(self.tz).replace(minute=0, second=0, microsecond=0), []).append(p)
+            times = sorted(t for t in per_hour if t >= start)[:36]
+            price = {t: sum(v) / len(v) for t, v in per_hour.items()}
+        else:
+            times = [start + timedelta(hours=i) for i in range(24)]
+            price = {t: self.prices.import_price(t, live=False) for t in times}
+        hours = []
+        for t in times:
+            h = t.hour
+            n = net[h]
+            if self.cfg.solar.has_panels:
+                fc = self.forecast.production_w(t)
+                if fc is not None:                   # zonvoorspelling vervangt het zon-deel van het profiel
+                    n = max(imp[h], base) - fc / 1000
+            hours.append(HourIn(t, price[t], self.prices.feed_in_price(t), n))
+        return hours
+
+    def _run_batteries(self, now: datetime, mono: float) -> None:
+        if not self.batteries:
+            return
+        cheap_devices = any(st.on and (st.reason.startswith("goedkoop") or st.reason.startswith("garantie"))
+                            for st in self.controller.states.values())
+        try:
+            ha = ha_client(self.cfg)
+        except ValueError:
+            return
+        for b in self.batteries.values():
+            if not b.online or b.soc is None:
+                continue
+            key = f"{now:%Y%m%d%H}:{len(self.prices.slots)}:{self.forecast.production_w(now) is not None}"
+            if key != b.plan_key:
+                hours = self._battery_hours(now, b)
+                b.plan = plan_battery(b.cfg, b.soc, hours)
+                b.value = plan_value(b.cfg, b.soc, hours, b.plan)
+                b.plan_key = key
+            b.decide_action(now, cheap_devices)
+            try:
+                msg = b.apply(ha, mono, self.grid_w)
+                if msg:
+                    log.info("%s: %s -> %s", b.cfg.name, b.reason, msg)
+            except (DeviceError, ValueError, OSError) as exc:
+                self.last_error = f"{b.cfg.name}: {exc}"
+                log.warning(self.last_error)
 
     def _limit_inverter(self, now: datetime, mono: float) -> None:
         if not self.limiter:
@@ -368,6 +485,10 @@ class Engine:
                     old_lim.apply(ha_client(new), old_lim._value(old_lim.max_w))
                 except Exception as exc:
                     log.warning("omvormer terugzetten mislukt: %s", exc)
+            old_b, self.batteries = self.batteries, {b["id"]: BatteryRuntime(BatteryConfig.from_dict(b)) for b in new.batteries}
+            for bid, rt in self.batteries.items():
+                if bid in old_b:
+                    rt.soc, rt.power_w, rt.online = old_b[bid].soc, old_b[bid].power_w, old_b[bid].online
             old_n, self.notifier = self.notifier, Notifier.from_config(new.notify)
             if old_n and self.notifier:
                 self.notifier.sent, self.notifier.history = old_n.sent, old_n.history
@@ -551,11 +672,27 @@ class Engine:
                 "month": self.ledger.totals(month_start),
                 "year": self.ledger.totals(year_start),
                 "last_error": self.last_error,
+                "problems": self.problems(),
+                "has_panels": self.cfg.solar.has_panels,
                 "inverter": ({"entity": self.limiter.entity, "limited": self.limiter.active,
                               "limit_w": self._rounded(self.limiter.limit_w), "reason": self.limiter.reason}
                              if self.limiter else None),
                 "notifications": self.notifier.history[:5] if self.notifier else [],
+                "batteries": self._batteries_view(today),
             }
+
+    def _batteries_view(self, today) -> list:
+        if not self.batteries:
+            return []
+        t_day = self.ledger.battery_totals(today)
+        t_month = self.ledger.battery_totals(today.replace(day=1))
+        out = []
+        for b in self.batteries.values():
+            d = b.to_dict(self.tz)
+            d["today"] = t_day.get(b.cfg.id, {"charged_kwh": 0, "grid_kwh": 0, "discharged_kwh": 0, "eur": 0})
+            d["month"] = t_month.get(b.cfg.id, {"charged_kwh": 0, "grid_kwh": 0, "discharged_kwh": 0, "eur": 0})
+            out.append(d)
+        return out
 
     def backfill_history(self, days: int = 365) -> dict:
         """Verbruik en teruglevering van het afgelopen jaar uit Home Assistant halen (meter-sensoren)."""

@@ -116,6 +116,7 @@ class Config:
     homeassistant: dict = field(default_factory=dict)      # {"url": ..., "token": ...}
     inverter: dict = field(default_factory=dict)           # {"entity": number.x, "max_w": 5000, "unit": "W"|"%"}
     notify: dict = field(default_factory=dict)             # {"service": "notify.mobile_app_x", "tips": true, "alerts": true}
+    batteries: list = field(default_factory=list)          # thuisbatterijen, zie battery.BatteryConfig
 
     @property
     def meter_driver(self) -> str:
@@ -132,7 +133,7 @@ class Config:
 
     @property
     def configured(self) -> bool:
-        return (self.has_meter or self.strategy == "price") and len(self.devices) > 0
+        return (self.has_meter or self.strategy == "price") and (len(self.devices) > 0 or len(self.batteries) > 0)
 
     def device(self, device_id: str) -> DeviceConfig:
         for d in self.devices:
@@ -261,6 +262,14 @@ def config_from_dict(raw: dict) -> Config:
             raise ValueError("Omvormer: vul het maximale vermogen in (100–100.000 W)")
         if not effective_ha(cfg).get("token"):
             raise ValueError("Omvormer begrenzen gaat via Home Assistant, maar die is nog niet gekoppeld")
+    from .battery import BatteryConfig
+    for b in cfg.batteries:
+        bc = BatteryConfig.from_dict(b)
+        bc.validate()
+        if not effective_ha(cfg).get("token"):
+            raise ValueError(f"{bc.name} gaat via Home Assistant, maar die is nog niet gekoppeld")
+    if len({b.get("id") for b in cfg.batteries}) != len(cfg.batteries):
+        raise ValueError("Elke batterij moet een uniek id hebben")
     if (cfg.notify or {}).get("service") and not str(cfg.notify["service"]).startswith("notify."):
         raise ValueError("Meldingen: kies een dienst die met 'notify.' begint")
     for d in cfg.devices:

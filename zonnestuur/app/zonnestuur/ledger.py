@@ -27,6 +27,11 @@ CREATE TABLE IF NOT EXISTS house_hour (
     import_kwh REAL NOT NULL DEFAULT 0, export_kwh REAL NOT NULL DEFAULT 0,
     cost_eur REAL NOT NULL DEFAULT 0, revenue_eur REAL NOT NULL DEFAULT 0,
     market_x_kwh REAL NOT NULL DEFAULT 0, dev_kwh REAL NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS battery_day (
+    day TEXT NOT NULL, battery_id TEXT NOT NULL,
+    charged_kwh REAL NOT NULL DEFAULT 0, grid_kwh REAL NOT NULL DEFAULT 0,
+    discharged_kwh REAL NOT NULL DEFAULT 0, eur REAL NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, battery_id));
 CREATE TABLE IF NOT EXISTS sample (
     ts INTEGER PRIMARY KEY,            -- begin van het 5-minutenblok (unix-tijd)
     grid_w REAL, dev_w REAL, dev_solar_w REAL);
@@ -47,6 +52,11 @@ class Ledger:
     def __init__(self, path: str):
         self.conn = sqlite3.connect(path, check_same_thread=False)
         self.conn.executescript(SCHEMA)
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(house_hour)")}
+        if "batt_kwh" not in cols:                # netto geladen door de thuisbatterij (+ laden, − ontladen)
+            self.conn.execute("ALTER TABLE house_hour ADD COLUMN batt_kwh REAL NOT NULL DEFAULT 0")
+            self.conn.commit()
+        self._batt: dict[tuple[str, str], list[float]] = {}
         self.lock = threading.Lock()
         self._pending: dict[tuple[str, str], list[float]] = {}
         self._bucket: Optional[list] = None   # [ts, n, som grid, som apparaten, som zon]
@@ -74,7 +84,7 @@ class Ledger:
             acc[2] += kwh_solar * value_per_kwh
 
     def record_house(self, now: datetime, dt: float, grid_w: float, import_price: float, feed_price: float,
-                     dev_w: float = 0.0) -> None:
+                     dev_w: float = 0.0, batt_w: float = 0.0) -> None:
         """Hele huis per uur: afname, teruglevering en wat dat kostte/opleverde (voor het verbruiksoverzicht)."""
         if dt <= 0 or dt > 600:
             return
@@ -82,7 +92,7 @@ class Ledger:
         if self._hour is not None and self._hour[0] != ts:
             self._write_hour()
         if self._hour is None:
-            self._hour = [ts, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            self._hour = [ts, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         kwh = grid_w * dt / 3_600_000
         h = self._hour
         if kwh >= 0:
@@ -93,17 +103,43 @@ class Ledger:
             h[2] += -kwh
             h[4] += -kwh * feed_price
         h[6] += max(0.0, dev_w) * dt / 3_600_000
+        h[7] += batt_w * dt / 3_600_000
+
+    def record_battery(self, now: datetime, dt: float, battery_id: str, power_w: float, grid_w: Optional[float],
+                       import_price: float, feed_price: float) -> None:
+        """Per dag: geladen (waarvan van het net), ontladen, en wat de batterij opleverde t.o.v. geen batterij."""
+        if dt <= 0 or dt > 600:
+            return
+        kwh = power_w * dt / 3_600_000
+        rec = self._batt.setdefault((now.date().isoformat(), battery_id), [0.0, 0.0, 0.0, 0.0])
+        if kwh > 0:
+            from_grid = min(kwh, max(0.0, (grid_w or 0.0) * dt / 3_600_000))
+            rec[0] += kwh
+            rec[1] += from_grid
+            rec[3] -= from_grid * import_price + (kwh - from_grid) * feed_price
+        else:
+            rec[2] += -kwh
+            rec[3] += -kwh * import_price
+
+    def battery_totals(self, since: date) -> dict[str, dict]:
+        self.flush()
+        with self.lock:
+            rows = self.conn.execute(
+                "SELECT battery_id, SUM(charged_kwh), SUM(grid_kwh), SUM(discharged_kwh), SUM(eur) FROM battery_day "
+                "WHERE day >= ? GROUP BY battery_id", (since.isoformat(),)).fetchall()
+        return {r[0]: {"charged_kwh": round(r[1], 2), "grid_kwh": round(r[2], 2), "discharged_kwh": round(r[3], 2),
+                       "eur": round(r[4], 2)} for r in rows}
 
     def _write_hour(self, keep: bool = False) -> None:
-        ts, imp, exp, cost, rev, mx, dev = self._hour
-        self._hour = [ts, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] if keep else None
+        ts, imp, exp, cost, rev, mx, dev, batt = self._hour
+        self._hour = [ts, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] if keep else None
         with self.lock:
             self.conn.execute(
-                "INSERT INTO house_hour(ts, import_kwh, export_kwh, cost_eur, revenue_eur, market_x_kwh, dev_kwh) "
-                "VALUES (?,?,?,?,?,?,?) ON CONFLICT(ts) DO UPDATE SET import_kwh=import_kwh+excluded.import_kwh, "
+                "INSERT INTO house_hour(ts, import_kwh, export_kwh, cost_eur, revenue_eur, market_x_kwh, dev_kwh, batt_kwh) "
+                "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(ts) DO UPDATE SET import_kwh=import_kwh+excluded.import_kwh, "
                 "export_kwh=export_kwh+excluded.export_kwh, cost_eur=cost_eur+excluded.cost_eur, "
                 "revenue_eur=revenue_eur+excluded.revenue_eur, market_x_kwh=market_x_kwh+excluded.market_x_kwh, "
-                "dev_kwh=dev_kwh+excluded.dev_kwh", (ts, imp, exp, cost, rev, mx, dev))
+                "dev_kwh=dev_kwh+excluded.dev_kwh, batt_kwh=batt_kwh+excluded.batt_kwh", (ts, imp, exp, cost, rev, mx, dev, batt))
             self.conn.execute("DELETE FROM house_hour WHERE ts < ?", (ts - 800 * 86400,))
             self.conn.commit()
 
@@ -123,16 +159,17 @@ class Ledger:
     def house_hours(self, start_ts: int, end_ts: int) -> list[dict]:
         with self.lock:
             rows = self.conn.execute(
-                "SELECT ts, import_kwh, export_kwh, cost_eur, revenue_eur, dev_kwh FROM house_hour "
+                "SELECT ts, import_kwh, export_kwh, cost_eur, revenue_eur, dev_kwh, batt_kwh FROM house_hour "
                 "WHERE ts >= ? AND ts < ? ORDER BY ts", (start_ts, end_ts)).fetchall()
-        out = [{"ts": r[0], "import_kwh": r[1], "export_kwh": r[2], "cost": r[3], "revenue": r[4], "dev_kwh": r[5]}
-               for r in rows]
+        out = [{"ts": r[0], "import_kwh": r[1], "export_kwh": r[2], "cost": r[3], "revenue": r[4], "dev_kwh": r[5],
+                "batt_kwh": r[6]} for r in rows]
         h = self._hour
         if h is not None and start_ts <= h[0] < end_ts:
             prev = next((o for o in out if o["ts"] == h[0]), None)
-            add = {"ts": h[0], "import_kwh": h[1], "export_kwh": h[2], "cost": h[3], "revenue": h[4], "dev_kwh": h[6]}
+            add = {"ts": h[0], "import_kwh": h[1], "export_kwh": h[2], "cost": h[3], "revenue": h[4], "dev_kwh": h[6],
+                   "batt_kwh": h[7]}
             if prev:
-                for k in ("import_kwh", "export_kwh", "cost", "revenue", "dev_kwh"):
+                for k in ("import_kwh", "export_kwh", "cost", "revenue", "dev_kwh", "batt_kwh"):
                     prev[k] += add[k]
             else:
                 out.append(add)
@@ -188,6 +225,16 @@ class Ledger:
     def flush(self) -> None:
         if self._hour is not None:
             self._write_hour(keep=True)           # lopend uur alvast bewaren (bijv. bij herstart)
+        if self._batt:
+            with self.lock:
+                for (day, bid), (ch, gr, dis, eur) in self._batt.items():
+                    self.conn.execute(
+                        "INSERT INTO battery_day(day, battery_id, charged_kwh, grid_kwh, discharged_kwh, eur) VALUES (?,?,?,?,?,?) "
+                        "ON CONFLICT(day, battery_id) DO UPDATE SET charged_kwh=charged_kwh+excluded.charged_kwh, "
+                        "grid_kwh=grid_kwh+excluded.grid_kwh, discharged_kwh=discharged_kwh+excluded.discharged_kwh, "
+                        "eur=eur+excluded.eur", (day, bid, ch, gr, dis, eur))
+                self.conn.commit()
+                self._batt.clear()
         if not self._pending:
             return
         with self.lock:

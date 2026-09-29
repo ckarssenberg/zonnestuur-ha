@@ -18,6 +18,12 @@ in plaats van die stroom voor bijna niets terug te leveren.
 - Onder **Instellingen > Minder terugleveren** kun je je omvormer laten begrenzen als terugleveren geld kost,
   en meldingen op je telefoon aanzetten.
 
+## Thuisbatterij
+
+Onder **Instellingen > Thuisbatterij** kies je de batterij die Zonnestuur in Home Assistant vond (bijvoorbeeld de
+HomeWizard Plug-In Battery) en vul je capaciteit en vermogen in. Zonnestuur plant daarna elk uur of de batterij
+zelf gebruikt, spaart of goedkoop laadt. De planning staat op het dashboard onder de prijsgrafiek.
+
 ## Veiligheid
 
 - De app is alleen te openen via Home Assistant. Wil je hem ook los op je netwerk openen (de poort staat bovenaan in het logboek),

@@ -1,5 +1,10 @@
 # Wijzigingen
 
+## 0.12.0 – Thuisbatterij en nieuw dashboard
+- **Thuisbatterij sturen**: HomeWizard Plug-In Battery, Zendure, Marstek, Sessy, Victron en andere batterijen in Home Assistant. Zonnestuur plant elk uur wanneer de batterij zelf gebruikt, spaart voor de dure uren of goedkoop laadt, op basis van je eigen verbruik, de zonvoorspelling en de uurprijzen. Zon-overschot gaat eerst naar je apparaten.
+- **Nieuw dashboard**: in één zin wat er nu gebeurt, live energiestroom met batterij, en een dagplanning per apparaat en batterij onder de prijsgrafiek.
+- Zonder zonnepanelen kloppen alle teksten; lege grafieken tonen uitleg; storingen in gewone taal en alleen zolang ze spelen.
+
 ## 0.11.1
 - Teruglevering-kaart toont zonder teruglevering je afname per uur en gemiddelde prijs.
 

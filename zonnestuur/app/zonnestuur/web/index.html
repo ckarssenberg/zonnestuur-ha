@@ -15,41 +15,44 @@
 
   :root {
     color-scheme: light;
-    --bg: #f3f2ec; --bg-glow-1: rgba(255, 178, 36, .16); --bg-glow-2: rgba(47, 91, 219, .10);
-    --card: rgba(255, 255, 255, .78); --card-solid: #ffffff; --card-line: rgba(14, 17, 22, .07);
-    --shadow: 0 1px 2px rgba(14,17,22,.04), 0 8px 28px -12px rgba(14,17,22,.12);
-    --ink: #0e1116; --ink-2: #5c6470; --ink-3: #8a919b; --rule: rgba(14, 17, 22, .08);
-    --sun: #b86e00; --net: #2f5bdb;                 /* dataseries (gevalideerd op licht vlak) */
-    --cheap: #2a78d6; --dear: #e34948; --mid: #aeb4bc; /* prijs: goedkoop / duur / normaal (gevalideerd) */
-    --glow: #ffb224; --glow-soft: rgba(255, 178, 36, .16);
-    --good: #1f8a4c; --good-soft: rgba(31, 138, 76, .12); --warn: #b54708;
-    --chip: rgba(14, 17, 22, .05); --seg: rgba(14, 17, 22, .06); --seg-on: #ffffff;
+    --bg: #f4f3ee; --aura-1: rgba(255, 170, 30, .20); --aura-2: rgba(47, 91, 219, .12); --aura-3: rgba(13, 148, 136, .10);
+    --card: rgba(255, 255, 255, .72); --card-hi: rgba(255, 255, 255, .95); --card-solid: #ffffff; --card-line: rgba(14, 17, 22, .07);
+    --shadow: 0 1px 2px rgba(14,17,22,.04), 0 12px 40px -18px rgba(14,17,22,.18);
+    --ink: #0d1015; --ink-2: #555d69; --ink-3: #868d98; --rule: rgba(14, 17, 22, .08);
+    --sun: #b86e00; --net: #2f5bdb; --batt: #0d9488;          /* dataseries (gevalideerd op licht vlak) */
+    --cheap: #2a78d6; --dear: #e34948; --mid: #aeb4bc;         /* prijs: goedkoop / duur / normaal (gevalideerd) */
+    --glow: #ffb224; --glow-soft: rgba(255, 178, 36, .18);
+    --good: #1f8a4c; --good-soft: rgba(31, 138, 76, .12); --warn: #b54708; --warn-soft: rgba(181, 71, 8, .10);
+    --chip: rgba(14, 17, 22, .045); --seg: rgba(14, 17, 22, .06); --seg-on: #ffffff;
+    --sun-ink: #8f5500;
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) {
       color-scheme: dark;
-      --bg: #07090c; --bg-glow-1: rgba(255, 178, 36, .13); --bg-glow-2: rgba(91, 140, 255, .12);
-      --card: rgba(255, 255, 255, .045); --card-solid: #11151b; --card-line: rgba(255, 255, 255, .08);
-      --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 20px 50px -30px rgba(0,0,0,.8);
-      --ink: #f2f4f7; --ink-2: #a3acb8; --ink-3: #6f7885; --rule: rgba(255, 255, 255, .07);
-      --sun: #c98500; --net: #5b8cff;               /* dataseries (gevalideerd op donker vlak) */
+      --bg: #05070a; --aura-1: rgba(255, 170, 30, .12); --aura-2: rgba(91, 140, 255, .13); --aura-3: rgba(25, 158, 112, .10);
+      --card: rgba(255, 255, 255, .04); --card-hi: rgba(255, 255, 255, .075); --card-solid: #10141a; --card-line: rgba(255, 255, 255, .075);
+      --shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 24px 60px -30px rgba(0,0,0,.85);
+      --ink: #f3f5f8; --ink-2: #a2abb7; --ink-3: #6c7582; --rule: rgba(255, 255, 255, .07);
+      --sun: #c98500; --net: #5b8cff; --batt: #199e70;
       --cheap: #3987e5; --dear: #e66767; --mid: #4b525c;
       --glow: #ffb224; --glow-soft: rgba(255, 178, 36, .14);
-      --good: #4ade80; --good-soft: rgba(74, 222, 128, .12); --warn: #fdb022;
-      --chip: rgba(255, 255, 255, .06); --seg: rgba(255, 255, 255, .06); --seg-on: rgba(255, 255, 255, .14);
+      --good: #4ade80; --good-soft: rgba(74, 222, 128, .12); --warn: #fdb022; --warn-soft: rgba(253, 176, 34, .12);
+      --chip: rgba(255, 255, 255, .055); --seg: rgba(255, 255, 255, .06); --seg-on: rgba(255, 255, 255, .14);
+      --sun-ink: #ffc24d;
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --bg: #07090c; --bg-glow-1: rgba(255, 178, 36, .13); --bg-glow-2: rgba(91, 140, 255, .12);
-    --card: rgba(255, 255, 255, .045); --card-solid: #11151b; --card-line: rgba(255, 255, 255, .08);
-    --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 20px 50px -30px rgba(0,0,0,.8);
-    --ink: #f2f4f7; --ink-2: #a3acb8; --ink-3: #6f7885; --rule: rgba(255, 255, 255, .07);
-    --sun: #c98500; --net: #5b8cff;
+    --bg: #05070a; --aura-1: rgba(255, 170, 30, .12); --aura-2: rgba(91, 140, 255, .13); --aura-3: rgba(25, 158, 112, .10);
+    --card: rgba(255, 255, 255, .04); --card-hi: rgba(255, 255, 255, .075); --card-solid: #10141a; --card-line: rgba(255, 255, 255, .075);
+    --shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 24px 60px -30px rgba(0,0,0,.85);
+    --ink: #f3f5f8; --ink-2: #a2abb7; --ink-3: #6c7582; --rule: rgba(255, 255, 255, .07);
+    --sun: #c98500; --net: #5b8cff; --batt: #199e70;
     --cheap: #3987e5; --dear: #e66767; --mid: #4b525c;
     --glow: #ffb224; --glow-soft: rgba(255, 178, 36, .14);
-    --good: #4ade80; --good-soft: rgba(74, 222, 128, .12); --warn: #fdb022;
-    --chip: rgba(255, 255, 255, .06); --seg: rgba(255, 255, 255, .06); --seg-on: rgba(255, 255, 255, .14);
+    --good: #4ade80; --good-soft: rgba(74, 222, 128, .12); --warn: #fdb022; --warn-soft: rgba(253, 176, 34, .12);
+    --chip: rgba(255, 255, 255, .055); --seg: rgba(255, 255, 255, .06); --seg-on: rgba(255, 255, 255, .14);
+    --sun-ink: #ffc24d;
   }
 
   * { box-sizing: border-box; }
@@ -60,159 +63,189 @@
     font: 15px/1.5 "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     font-feature-settings: "cv11", "ss01"; -webkit-font-smoothing: antialiased;
     background-image:
-      radial-gradient(900px 520px at 8% -10%, var(--bg-glow-1), transparent 60%),
-      radial-gradient(800px 600px at 100% 110%, var(--bg-glow-2), transparent 60%);
+      radial-gradient(1100px 620px at 12% -12%, var(--aura-1), transparent 62%),
+      radial-gradient(900px 700px at 105% 8%, var(--aura-2), transparent 60%),
+      radial-gradient(900px 700px at 50% 120%, var(--aura-3), transparent 60%);
+    background-attachment: fixed;
   }
   .num { font-family: "Inter Tight", "Inter", system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-  main { max-width: 1180px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px 32px; }
+  main { max-width: 1240px; margin: 0 auto; padding: max(14px, env(safe-area-inset-top)) 16px 40px; }
 
   /* kop */
-  .top { display: flex; align-items: center; gap: 12px; padding: 6px 2px 18px; }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; letter-spacing: -.01em; }
-  .brand svg { width: 28px; height: 28px; }
+  .top { display: flex; align-items: center; gap: 10px; padding: 4px 2px 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; letter-spacing: -.015em; }
+  .brand svg { width: 28px; height: 28px; filter: drop-shadow(0 4px 14px rgba(255, 150, 0, .35)); }
   .spacer { flex: 1; }
-  .live { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); padding: 6px 12px;
-          border-radius: 999px; background: var(--chip); }
-  .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 0 var(--good);
-            animation: pulse 2s infinite; }
+  .live { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); padding: 7px 13px;
+          border-radius: 999px; background: var(--card); border: 1px solid var(--card-line); backdrop-filter: blur(12px); white-space: nowrap; }
+  .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--good); animation: pulse 2.2s infinite; flex: none; }
   .live.off i { background: var(--warn); animation: none; }
   @keyframes pulse { 0% { box-shadow: 0 0 0 0 var(--good-soft); } 70% { box-shadow: 0 0 0 8px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
-  .icon-btn { width: 36px; height: 36px; border-radius: 12px; border: 1px solid var(--card-line); background: var(--card);
-              color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+  .icon-btn { width: 38px; height: 38px; border-radius: 13px; border: 1px solid var(--card-line); background: var(--card);
+              color: var(--ink); display: grid; place-items: center; cursor: pointer; backdrop-filter: blur(12px); flex: none; }
   .icon-btn svg { width: 18px; height: 18px; }
 
-  /* bento */
+  /* raster */
   .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
-  .card { position: relative; background: var(--card); border: 1px solid var(--card-line); border-radius: 22px;
-          padding: 20px; box-shadow: var(--shadow); backdrop-filter: blur(18px) saturate(140%);
-          -webkit-backdrop-filter: blur(18px) saturate(140%); min-width: 0; }
-  .c-flow { grid-column: span 8; } .c-save { grid-column: span 4; }
-  .c-dev { grid-column: span 5; } .c-today { grid-column: span 7; }
-  .c-ring { grid-column: span 4; } .c-month { grid-column: span 8; }
-  .c-price, .c-usage, .c-feed { grid-column: span 12; }
-  .advice { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin-top: 14px; }
-  .advice div { background: var(--chip); border-radius: 14px; padding: 12px 14px; }
-  .advice b { display: block; font-size: 14px; margin-bottom: 4px; }
-  .advice p { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.45; }
-  .batt { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13.5px; font-variant-numeric: tabular-nums; }
-  .batt td, .batt th { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--rule); }
-  .batt td:first-child, .batt th:first-child { text-align: left; }
-  .batt th { color: var(--ink-3); font-weight: 550; font-size: 12px; }
-  @media (max-width: 560px) { .batt .hide-m { display: none; } }
-  .btn-soft { font: inherit; font-size: 13px; font-weight: 600; border: 0; border-radius: 999px; padding: 8px 14px; background: var(--chip); color: var(--ink); cursor: pointer; }
-  .price-stats, .use-stats { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 6px 0 14px; }
-  .price-stats div, .use-stats div { display: grid; gap: 2px; }
-  .price-stats b, .use-stats b { font-family: "Inter Tight", Inter, sans-serif; font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
-  .price-stats span, .use-stats span { font-size: 12px; color: var(--ink-3); }
-  .usage-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
-  .seg.four { grid-template-columns: repeat(4, 1fr); min-width: 260px; }
-  .nav { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
-  .nav button { font: inherit; border: 0; background: var(--chip); color: var(--ink); width: 30px; height: 30px; border-radius: 10px; cursor: pointer; }
-  .nav button:disabled { opacity: .35; cursor: default; }
-  .empty { padding: 28px 8px; text-align: center; color: var(--ink-3); font-size: 13.5px; }
-  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
-  .title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-  .muted { color: var(--ink-2); }
-  .small { font-size: 13px; }
+  .card { position: relative; background: linear-gradient(180deg, var(--card-hi), var(--card)); border: 1px solid var(--card-line);
+          border-radius: 26px; padding: 22px; box-shadow: var(--shadow); backdrop-filter: blur(22px) saturate(150%);
+          -webkit-backdrop-filter: blur(22px) saturate(150%); min-width: 0; }
+  .c-hero, .c-plan, .c-usage, .c-feed { grid-column: span 12; }
+  .c-devs { grid-column: span 8; } .c-side { grid-column: span 4; display: grid; gap: 14px; align-content: start; min-width: 0; }
+  .c-today { grid-column: span 7; } .c-month { grid-column: span 5; }
+  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+  .title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  h2.sec { font: 650 20px/1.2 "Inter Tight", Inter, sans-serif; letter-spacing: -.02em; margin: 2px 0 0; }
+  .muted { color: var(--ink-2); } .small { font-size: 13px; }
+  .empty { padding: 26px 10px; text-align: center; color: var(--ink-3); font-size: 13.5px; line-height: 1.55; }
+
+  /* hero */
+  .c-hero { padding: 26px; overflow: hidden; }
+  .c-hero::before { content: ""; position: absolute; inset: -40% -10% auto auto; width: 70%; height: 140%; pointer-events: none;
+                    background: radial-gradient(closest-side, var(--hero-aura, transparent), transparent); opacity: .9; transition: background .6s; }
+  .c-hero.s-sun { --hero-aura: var(--glow-soft); } .c-hero.s-net { --hero-aura: color-mix(in srgb, var(--net) 16%, transparent); }
+  .c-hero.s-batt { --hero-aura: color-mix(in srgb, var(--batt) 18%, transparent); } .c-hero.s-warn { --hero-aura: var(--warn-soft); }
+  .hero-grid { position: relative; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 26px; align-items: center; }
+  .hero-date { font-size: 13px; color: var(--ink-3); font-weight: 550; }
+  .headline { font: 650 clamp(28px, 3.6vw, 44px)/1.08 "Inter Tight", Inter, sans-serif; letter-spacing: -.035em; margin: 8px 0 10px; text-wrap: balance; }
+  .subline { color: var(--ink-2); font-size: 15.5px; margin: 0; max-width: 46ch; text-wrap: pretty; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .pill { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; padding: 6px 11px; border-radius: 999px; background: var(--chip); color: var(--ink-2); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .pill.sun { background: var(--glow-soft); color: var(--sun-ink); }
+  .pill.net { background: color-mix(in srgb, var(--net) 14%, transparent); color: var(--net); }
+  .pill.batt { background: color-mix(in srgb, var(--batt) 15%, transparent); color: var(--batt); }
+  .kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 22px; }
+  .kpi { background: var(--chip); border-radius: 18px; padding: 13px 14px; min-width: 0; }
+  .kpi .k { font-size: 12px; color: var(--ink-3); font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kpi .v { font: 650 22px/1.15 "Inter Tight", Inter, sans-serif; letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin-top: 4px; white-space: nowrap; }
+  .kpi .v small { font-size: 13px; font-weight: 550; color: var(--ink-2); margin-left: 3px; letter-spacing: 0; }
+  .kpi .d { font-size: 12px; color: var(--ink-2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* energiestroom */
-  .flow-wrap { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(180px, 1fr); gap: 18px; align-items: center; }
   .flow svg { width: 100%; height: auto; display: block; overflow: visible; }
   .flow .line { fill: none; stroke: var(--rule); stroke-width: 2; }
   .flow .pulse { fill: none; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 2 14; animation: dash 1s linear infinite; }
-  .flow .pulse.sun { stroke: var(--glow); } .flow .pulse.net { stroke: var(--net); }
-  .flow .pulse.rev { animation-direction: reverse; }
-  .flow .pulse.idle { opacity: 0; }
+  .flow .pulse.sun { stroke: var(--glow); } .flow .pulse.net { stroke: var(--net); } .flow .pulse.batt { stroke: var(--batt); }
+  .flow .pulse.rev { animation-direction: reverse; } .flow .pulse.idle { opacity: 0; }
   @keyframes dash { to { stroke-dashoffset: -16; } }
-  .flow .node circle { fill: var(--card-solid); stroke: var(--card-line); stroke-width: 1.5; }
-  .flow .node.hot circle { stroke: var(--glow); stroke-width: 2; filter: drop-shadow(0 0 14px var(--glow-soft)); }
+  .flow .node circle { fill: var(--card-solid); stroke: var(--card-line); stroke-width: 1.5; transition: stroke .4s; }
+  .flow .node.hot circle { stroke: var(--glow); stroke-width: 2; filter: drop-shadow(0 0 16px var(--glow-soft)); }
+  .flow .node.hot-net circle { stroke: var(--net); stroke-width: 2; }
+  .flow .node.hot-batt circle { stroke: var(--batt); stroke-width: 2; }
   .flow .node .ico { stroke: var(--ink); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .flow .node .ico.sunico { stroke: var(--glow); }
   .flow text { fill: var(--ink); font-family: "Inter Tight", Inter, sans-serif; }
-  .flow .lbl { fill: var(--ink-2); font-size: 12px; font-family: Inter, sans-serif; }
+  .flow .lbl { fill: var(--ink-2); font-size: 12.5px; font-family: Inter, sans-serif; }
   .flow .val { font-size: 17px; font-weight: 650; }
   .flow .lbl, .flow .val { paint-order: stroke; stroke: var(--card-solid); stroke-width: 6px; stroke-linejoin: round; }
-  .meter { text-align: right; }
-  .meter .big { font-size: clamp(40px, 6vw, 60px); line-height: 1; font-weight: 650; }
-  .meter .unit { font-size: .45em; font-weight: 550; color: var(--ink-2); margin-left: 4px; }
-  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; padding: 5px 11px;
-           border-radius: 999px; margin-top: 10px; }
-  .badge.sun { background: var(--glow-soft); color: var(--glow); }
-  .badge.net { background: color-mix(in srgb, var(--net) 16%, transparent); color: var(--net); }
-  .badge.off { background: var(--chip); color: var(--ink-2); }
-  :root:not([data-theme="dark"]) .badge.sun { color: #9a5b00; }
-  @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) .badge.sun { color: var(--glow); } }
+  .flow .soc-bg { fill: var(--chip); } .flow .soc-fg { fill: var(--batt); }
 
-  /* besparing */
-  .save .hero { font-size: clamp(44px, 5.4vw, 58px); font-weight: 650; line-height: 1.02; margin: 6px 0 2px; }
-  .save .sub { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--rule); }
-  .save .sub .v { font-size: 22px; font-weight: 650; }
-  .spark { width: 100%; height: 44px; margin-top: 12px; display: block; }
+  /* dagplan */
+  .price-stats, .use-stats { display: flex; flex-wrap: wrap; gap: 10px 26px; margin: 4px 0 14px; }
+  .price-stats div, .use-stats div { display: grid; gap: 2px; }
+  .price-stats b, .use-stats b { font-family: "Inter Tight", Inter, sans-serif; font-size: 21px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .price-stats span, .use-stats span { font-size: 12px; color: var(--ink-3); }
+  .lanes-title { display: flex; justify-content: space-between; align-items: baseline; margin: 16px 0 2px; }
 
-  /* apparaat */
-  .dev-head { display: flex; align-items: center; gap: 14px; }
-  .dev-ico { width: 46px; height: 46px; border-radius: 15px; display: grid; place-items: center; background: var(--chip); flex: none; }
-  .dev-ico svg { width: 24px; height: 24px; stroke: var(--ink); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-  .dev.on .dev-ico { background: var(--glow-soft); box-shadow: 0 0 0 1px color-mix(in srgb, var(--glow) 35%, transparent), 0 0 28px -4px var(--glow-soft); }
+  /* apparaten */
+  .devs-head { display: flex; align-items: baseline; justify-content: space-between; margin: 2px 4px 12px; }
+  .devs { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 14px; }
+  .dev-head { display: flex; align-items: center; gap: 13px; }
+  .dev-ico { width: 46px; height: 46px; border-radius: 16px; display: grid; place-items: center; background: var(--chip); flex: none; transition: background .4s, box-shadow .4s; }
+  .dev-ico svg { width: 23px; height: 23px; stroke: var(--ink); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .dev.on .dev-ico { background: var(--glow-soft); box-shadow: 0 0 0 1px color-mix(in srgb, var(--glow) 35%, transparent), 0 0 30px -4px var(--glow-soft); }
   .dev.on .dev-ico svg { stroke: var(--glow); }
-  .dev-name { font-weight: 650; font-size: 16px; }
+  .dev-name { font-weight: 650; font-size: 16px; letter-spacing: -.01em; }
   .dev-state { font-size: 13px; color: var(--ink-2); }
   .dev-power { margin-left: auto; text-align: right; }
-  .dev-power .v { font-size: 28px; font-weight: 650; line-height: 1; }
-  .strip { position: relative; height: 34px; margin: 18px 0 6px; border-radius: 10px; background: var(--chip); overflow: hidden; }
-  .strip .best { position: absolute; top: 0; bottom: 0; background: linear-gradient(180deg, color-mix(in srgb, var(--glow) 38%, transparent), color-mix(in srgb, var(--glow) 18%, transparent)); border-radius: 8px; }
+  .dev-power .v { font-size: 26px; font-weight: 650; line-height: 1; }
+  .strip { position: relative; height: 30px; margin: 16px 0 6px; border-radius: 10px; background: var(--chip); overflow: hidden; }
+  .strip .best { position: absolute; top: 0; bottom: 0; background: linear-gradient(180deg, color-mix(in srgb, var(--glow) 40%, transparent), color-mix(in srgb, var(--glow) 18%, transparent)); border-radius: 8px; }
   .strip .ready { position: absolute; top: 4px; bottom: 4px; width: 2px; background: var(--ink); border-radius: 2px; }
   .strip .now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--net); }
   .strip-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); }
-  .facts { display: grid; gap: 8px; margin: 14px 0 16px; }
+  .facts { display: grid; gap: 7px; margin: 14px 0 16px; }
   .fact { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; color: var(--ink-2); }
   .fact b { color: var(--ink); font-weight: 600; }
   .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; }
   .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--seg); padding: 4px; border-radius: 14px; }
+  .seg.four { grid-template-columns: repeat(4, 1fr); min-width: 260px; }
   .seg button { font: inherit; font-size: 13px; font-weight: 550; padding: 9px 6px; border: 0; border-radius: 10px; background: transparent;
                 color: var(--ink-2); cursor: pointer; transition: background .2s, color .2s; }
   .seg button.active { background: var(--seg-on); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
-  .seg button:focus-visible, .icon-btn:focus-visible { outline: 2px solid var(--net); outline-offset: 2px; }
+  .seg button:focus-visible, .icon-btn:focus-visible, .btn-soft:focus-visible { outline: 2px solid var(--net); outline-offset: 2px; }
+
+  /* batterij */
+  .batt-top { display: flex; align-items: center; gap: 18px; }
+  .cell { width: 58px; height: 98px; border-radius: 14px; border: 2px solid var(--rule); position: relative; flex: none; padding: 4px; }
+  .cell::before { content: ""; position: absolute; top: -7px; left: 50%; width: 20px; height: 5px; margin-left: -10px; border-radius: 3px 3px 0 0; background: var(--rule); }
+  .cell i { position: absolute; left: 4px; right: 4px; bottom: 4px; border-radius: 9px; background: linear-gradient(180deg, color-mix(in srgb, var(--batt) 75%, #fff 25%), var(--batt)); transition: height .8s ease; }
+  .cell .minl { position: absolute; left: -4px; right: -4px; height: 0; border-top: 1.5px dashed var(--ink-3); }
+  .batt-big { font: 650 40px/1 "Inter Tight", Inter, sans-serif; letter-spacing: -.03em; }
+  .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .kv .k { font-size: 12px; color: var(--ink-3); } .kv .v { font: 650 17px/1.2 "Inter Tight", Inter, sans-serif; font-variant-numeric: tabular-nums; }
+
+  /* besparing */
+  .save .hero { font-size: clamp(38px, 4vw, 50px); font-weight: 650; line-height: 1.02; margin: 4px 0 2px; }
+  .save .sub { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .save .sub .v { font-size: 20px; font-weight: 650; }
+  .spark { width: 100%; height: 44px; margin-top: 12px; display: block; }
 
   /* grafieken */
   .chart { position: relative; }
   .chart svg { width: 100%; display: block; overflow: visible; }
   .chart .grid-l { stroke: var(--rule); stroke-width: 1; }
   .chart .axis { fill: var(--ink-3); font-size: 11px; font-family: Inter, sans-serif; }
-  .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12.5px; color: var(--ink-2); margin-top: 10px; }
+  .chart .lane-l { fill: var(--ink-2); font-size: 12px; font-weight: 600; font-family: Inter, sans-serif; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12.5px; color: var(--ink-2); margin-top: 12px; }
   .legend span { display: inline-flex; align-items: center; gap: 7px; }
-  .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
   .sw.line { height: 0; width: 14px; border-top: 2px dashed var(--ink-3); border-radius: 0; }
   .tip { position: absolute; pointer-events: none; background: var(--card-solid); border: 1px solid var(--card-line);
-         border-radius: 12px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 10px 30px -10px rgba(0,0,0,.35);
+         border-radius: 12px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 14px 34px -12px rgba(0,0,0,.4);
          white-space: nowrap; opacity: 0; transition: opacity .12s; z-index: 5; }
   .tip b { font-weight: 650; }
   .tip .row { display: flex; align-items: center; gap: 7px; color: var(--ink-2); }
   .tip .row em { font-style: normal; color: var(--ink); margin-left: auto; padding-left: 12px; font-variant-numeric: tabular-nums; }
   details.table { margin-top: 10px; font-size: 13px; color: var(--ink-2); }
+  details.table summary { cursor: pointer; }
   details.table table { width: 100%; border-collapse: collapse; margin-top: 8px; font-variant-numeric: tabular-nums; }
   details.table td, details.table th { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--rule); }
   details.table td:first-child, details.table th:first-child { text-align: left; }
+  .usage-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+  .nav { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
+  .nav button { font: inherit; border: 0; background: var(--chip); color: var(--ink); width: 30px; height: 30px; border-radius: 10px; cursor: pointer; }
+  .nav button:disabled { opacity: .35; cursor: default; }
 
-  /* ring */
-  .ring-wrap { display: flex; align-items: center; gap: 18px; }
-  .ring { width: 132px; height: 132px; flex: none; }
-  .ring .bg { stroke: var(--chip); } .ring .fg { stroke: var(--sun); transition: stroke-dashoffset .8s ease; }
-  .ring text { fill: var(--ink); font-family: "Inter Tight", Inter, sans-serif; }
+  /* teruglevering */
+  .advice { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; margin-top: 14px; }
+  .advice div { background: var(--chip); border-radius: 16px; padding: 13px 15px; }
+  .advice b { display: block; font-size: 14px; margin-bottom: 4px; }
+  .advice p { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+  .batt { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .batt td, .batt th { text-align: right; padding: 7px 8px; border-bottom: 1px solid var(--rule); }
+  .batt td:first-child, .batt th:first-child { text-align: left; }
+  .batt th { color: var(--ink-3); font-weight: 550; font-size: 12px; }
+  .btn-soft { font: inherit; font-size: 13px; font-weight: 600; border: 0; border-radius: 999px; padding: 9px 15px; background: var(--chip); color: var(--ink); cursor: pointer; }
 
-  .err { color: var(--warn); font-size: 13px; margin: 14px 2px 0; min-height: 1em; }
-  footer { color: var(--ink-3); font-size: 12px; margin: 18px 2px 0; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  footer { color: var(--ink-3); font-size: 12px; margin: 22px 4px 0; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 
-  @media (max-width: 980px) {
-    .c-flow, .c-save, .c-dev, .c-today, .c-ring, .c-month { grid-column: span 12; }
-    .c-save { order: 2; } .c-price { order: 3; } .c-dev { order: 4; } .c-today { order: 5; } .c-usage { order: 6; } .c-feed { order: 7; } .c-ring { order: 8; } .c-month { order: 9; }
+  @media (max-width: 1020px) {
+    .hero-grid { grid-template-columns: 1fr; }
+    .flow { max-width: 520px; margin: 0 auto; width: 100%; }
+    .c-devs, .c-side, .c-today, .c-month { grid-column: span 12; }
+    .c-side { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
   }
-  @media (max-width: 560px) {
-    .flow .lbl { font-size: 15px; } .flow .val { font-size: 21px; }
-    .card { padding: 16px; border-radius: 20px; }
-    .flow-wrap { grid-template-columns: 1fr; }
-    .meter { text-align: left; order: -1; }
+  @media (max-width: 640px) {
+    main { padding-left: 12px; padding-right: 12px; }
+    .card { padding: 18px; border-radius: 22px; }
+    .c-hero { padding: 20px; }
+    .kpis { grid-template-columns: 1fr 1fr; }
     .grid { gap: 12px; }
+    .flow .lbl { font-size: 15px; } .flow .val { font-size: 20px; }
+    .live .lt { display: none; }
+    @media (max-width: 560px) { .batt .hide-m { display: none; } }
   }
   @media (prefers-reduced-motion: reduce) { .flow .pulse, .live i { animation: none; } }
 </style>
@@ -229,7 +262,7 @@
       Zonnestuur
     </div>
     <div class="spacer"></div>
-    <span class="live" id="live"><i></i><span id="clock">verbinden…</span></span>
+    <span class="live" id="live" role="status"><i></i><span id="clock">verbinden…</span></span>
     <a class="icon-btn" href="instellingen" aria-label="Instellingen" title="Instellingen">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
     </a>
@@ -239,101 +272,93 @@
   </header>
 
   <div class="grid">
-    <!-- energiestroom -->
-    <section class="card c-flow" aria-labelledby="flowTitle">
-      <div class="title-row"><span class="eyebrow" id="flowTitle">Nu in huis</span><span class="small muted" id="flowNote"></span></div>
-      <div class="flow-wrap">
-        <div class="flow">
-          <svg viewBox="0 0 420 270" role="img" aria-label="Energiestroom tussen zon, net, huis en apparaten" id="flowSvg">
-            <path class="line" d="M84 58 C 150 58, 160 128, 210 128"/>
-            <path class="line" d="M84 198 C 150 198, 160 128, 210 128"/>
-            <path class="line" d="M246 128 L 330 128"/>
-            <path class="pulse sun idle" id="aSun" d="M84 58 C 150 58, 160 128, 210 128"/>
-            <path class="pulse net idle" id="aNet" d="M84 198 C 150 198, 160 128, 210 128"/>
-            <path class="pulse sun idle" id="aDev" d="M246 128 L 330 128"/>
-            <g class="node" id="nSun" transform="translate(56 58)">
-              <circle r="28"/>
-              <g class="ico sunico" transform="translate(-11 -11)"><circle cx="11" cy="11" r="4.5"/><path d="M11 1.5v2.5M11 18v2.5M1.5 11H4M18 11h2.5M4.3 4.3l1.8 1.8M15.9 15.9l1.8 1.8M4.3 17.7l1.8-1.8M15.9 6.1l1.8-1.8"/></g>
-            </g>
-            
-            <g class="node" id="nNet" transform="translate(56 198)">
-              <circle r="28"/>
-              <g class="ico" transform="translate(-11 -11)"><path d="M11 1.5 6 21M11 1.5 16 21M4.5 8h13M3.5 14h15M8 1.5h6"/></g>
-              <text class="lbl" x="0" y="48" text-anchor="middle" id="lNet">Net</text>
-              <text class="val num" x="0" y="68" text-anchor="middle" id="vNet">–</text>
-            </g>
-            <g class="node" id="nHouse" transform="translate(228 128)">
-              <circle r="36"/>
-              <g class="ico" transform="translate(-13 -13)"><path d="M2.5 12.5 13 3.5l10.5 9M5.5 10v12.5h15V10M10.5 22.5v-6.5h5v6.5"/></g>
-              <text class="lbl" x="0" y="56" text-anchor="middle">Huis</text>
-            </g>
-            <g class="node" id="nDev" transform="translate(360 128)">
-              <circle r="28"/>
-              <g class="ico" transform="translate(-11 -11)"><path d="M11 2.5c3 4 6 7 6 11a6 6 0 0 1-12 0c0-4 3-7 6-11z"/><path d="M11 17a2.5 2.5 0 0 1-2.5-2.5"/></g>
-              <text class="lbl" x="0" y="48" text-anchor="middle" id="lDev">Boiler</text>
-              <text class="val num" x="0" y="68" text-anchor="middle" id="vDev">–</text>
-            </g>
-            <text class="lbl" x="96" y="24" id="lSun">Zon, verwacht</text><text class="val num" x="96" y="44" id="vSun">–</text>
-          </svg>
+    <!-- nu -->
+    <section class="card c-hero" id="hero" aria-labelledby="headline">
+      <div class="hero-grid">
+        <div>
+          <div class="hero-date" id="heroDate">&nbsp;</div>
+          <h1 class="headline" id="headline">Even kijken…</h1>
+          <p class="subline" id="subline">&nbsp;</p>
+          <div class="pills" id="pills"></div>
+          <div class="kpis" id="kpis"></div>
         </div>
-        <div class="meter">
-          <div class="small muted">Bij de meter</div>
-          <div class="big num" id="gridBig">–</div>
-          <div class="badge off" id="gridBadge">–</div>
-        </div>
+        <div class="flow"><svg id="flowSvg" viewBox="0 0 440 300" role="img" aria-label="Energiestroom tussen zon, net, huis, batterij en apparaten"></svg></div>
       </div>
     </section>
 
-    <!-- besparing -->
-    <section class="card c-save save" aria-labelledby="saveTitle">
-      <div class="title-row"><span class="eyebrow" id="saveTitle">Bespaard deze maand</span><span class="small muted" id="valueNow"></span></div>
-      <div class="hero num" id="sMonth">–</div>
-      <div class="small muted" id="sMonthNote">met eigen zonnestroom</div>
-      <svg class="spark" id="spark" viewBox="0 0 300 44" preserveAspectRatio="none" aria-hidden="true"></svg>
-      <div class="sub">
-        <div><div class="small muted">Vandaag</div><div class="v num" id="sToday">–</div></div>
-        <div><div class="small muted">Dit jaar</div><div class="v num" id="sYear">–</div></div>
-      </div>
-    </section>
-
-    <!-- stroomprijs -->
-    <section class="card c-price" aria-labelledby="priceTitle">
-      <div class="title-row"><span class="eyebrow" id="priceTitle">Stroomprijs</span><span class="small muted" id="priceNote"></span></div>
+    <!-- dagplan -->
+    <section class="card c-plan" aria-labelledby="priceTitle">
+      <div class="title-row"><div><div class="eyebrow">Stroomprijs en planning</div><h2 class="sec" id="priceTitle">Zo plant Zonnestuur je dag</h2></div><span class="small muted" id="priceNote"></span></div>
       <div class="price-stats" id="priceStats"></div>
       <div class="chart" id="priceChart"><svg id="priceSvg" role="img" aria-label="Stroomprijs per uur vandaag en morgen, inclusief belastingen"></svg><div class="tip" id="priceTip"></div></div>
+      <div class="chart" id="laneChart"><svg id="laneSvg" role="img" aria-label="Planning per apparaat en batterij"></svg><div class="tip" id="laneTip"></div></div>
       <div class="legend" id="priceLegend">
-        <span><i class="sw" style="background:var(--cheap)"></i>Goedkoop</span>
-        <span><i class="sw" style="background:var(--mid)"></i>Normaal</span>
-        <span><i class="sw" style="background:var(--dear)"></i>Duur</span>
-        <span><i class="sw" style="background:var(--glow); height:4px"></i>Gepland voor je apparaten</span>
+        <span class="pl"><i class="sw" style="background:var(--cheap)"></i>Goedkoop</span>
+        <span class="pl"><i class="sw" style="background:var(--mid)"></i>Normaal</span>
+        <span class="pl"><i class="sw" style="background:var(--dear)"></i>Duur</span>
+        <span><i class="sw" style="background:var(--glow)"></i>Apparaat gepland</span>
+        <span class="bl" hidden><i class="sw" style="background:var(--batt)"></i>Batterij: zelf gebruiken</span>
+        <span class="bl" hidden><i class="sw" style="background:var(--net)"></i>Batterij: laden van het net</span>
+        <span class="bl" hidden><i class="sw" style="background:var(--mid)"></i>Batterij: sparen</span>
       </div>
       <details class="table" id="priceTableWrap"><summary>Toon als tabel</summary><table id="priceTable"></table></details>
     </section>
 
     <!-- apparaten -->
-    <section class="c-dev" id="devices" style="display:grid; gap:14px; min-width:0"></section>
+    <section class="c-devs" aria-labelledby="devTitle">
+      <div class="devs-head"><h2 class="sec" id="devTitle">Apparaten</h2><a class="small muted" href="instellingen">Beheren</a></div>
+      <div class="devs" id="devices"></div>
+    </section>
+
+    <div class="c-side">
+      <!-- batterij -->
+      <section class="card c-batt" id="battCard" hidden aria-labelledby="battTitle"></section>
+      <!-- besparing -->
+      <section class="card save" aria-labelledby="saveTitle">
+        <div class="title-row"><span class="eyebrow" id="saveTitle">Bespaard deze maand</span><span class="small muted" id="valueNow"></span></div>
+        <div class="hero num" id="sMonth">–</div>
+        <div class="small muted" id="sMonthNote">met eigen zonnestroom</div>
+        <svg class="spark" id="spark" viewBox="0 0 300 44" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div class="sub">
+          <div><div class="small muted">Vandaag</div><div class="v num" id="sToday">–</div></div>
+          <div><div class="small muted">Dit jaar</div><div class="v num" id="sYear">–</div></div>
+        </div>
+        <p class="small muted" id="solarShare" style="margin:12px 0 0"></p>
+      </section>
+    </div>
 
     <!-- vandaag -->
     <section class="card c-today" aria-labelledby="todayTitle">
-      <div class="title-row"><span class="eyebrow" id="todayTitle">Vandaag</span><span class="small muted" id="todayNote"></span></div>
+      <div class="title-row"><span class="eyebrow" id="todayTitle">Vandaag · gestuurde apparaten</span><span class="small muted" id="todayNote"></span></div>
       <div class="chart" id="todayChart"><svg id="todaySvg" role="img" aria-label="Verbruik van gestuurde apparaten vandaag, per vijf minuten"></svg><div class="tip" id="todayTip"></div></div>
       <div class="legend">
         <span><i class="sw" style="background:var(--sun)"></i><span class="lbl-sun">Uit eigen zon</span></span>
         <span><i class="sw" style="background:var(--net)"></i>Van het net</span>
-        <span><i class="sw line"></i>Zonvoorspelling</span>
+        <span class="fc-l"><i class="sw line"></i>Zonvoorspelling</span>
       </div>
+    </section>
+
+    <!-- 31 dagen -->
+    <section class="card c-month" aria-labelledby="monthTitle">
+      <div class="title-row"><span class="eyebrow" id="monthTitle">Laatste 31 dagen</span><span class="small muted">kWh per dag</span></div>
+      <div class="chart" id="monthChart"><svg id="monthSvg" role="img" aria-label="Verbruik van gestuurde apparaten per dag"></svg><div class="tip" id="monthTip"></div></div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--sun)"></i><span class="lbl-sun">Uit eigen zon</span></span>
+        <span><i class="sw" style="background:var(--net)"></i>Van het net</span>
+      </div>
+      <details class="table"><summary>Toon als tabel</summary><table id="monthTable"></table></details>
     </section>
 
     <!-- verbruik -->
     <section class="card c-usage" aria-labelledby="useTitle">
       <div class="usage-head">
-        <span class="eyebrow" id="useTitle">Verbruik van je hele huis</span>
+        <div><div class="eyebrow">Hele huis</div><h2 class="sec" id="useTitle">Verbruik en teruglevering</h2></div>
         <div class="seg four" role="group" aria-label="Periode" id="useSeg">
           <button data-p="day" class="active">Dag</button><button data-p="week">Week</button><button data-p="month">Maand</button><button data-p="year">Jaar</button>
         </div>
         <span class="nav"><button id="usePrev" aria-label="Vorige periode">‹</button><span id="useLabel">vandaag</span><button id="useNext" aria-label="Volgende periode">›</button></span>
       </div>
-      <div class="use-stats" id="useStats" style="margin-top:14px"></div>
+      <div class="use-stats" id="useStats" style="margin-top:16px"></div>
       <div class="chart" id="useChart"><svg id="useSvg" role="img" aria-label="Afname en teruglevering van het hele huis"></svg><div class="tip" id="useTip"></div></div>
       <div class="legend">
         <span><i class="sw" style="background:var(--net)"></i>Afgenomen van het net</span>
@@ -345,41 +370,11 @@
 
     <!-- teruglevering -->
     <section class="card c-feed" aria-labelledby="feedTitle">
-      <div class="title-row"><span class="eyebrow" id="feedTitle">Teruglevering: waar gaat je stroom heen?</span><span class="small muted" id="feedNote"></span></div>
+      <div class="title-row"><div><div class="eyebrow">Inzicht</div><h2 class="sec" id="feedTitle">Waar gaat je stroom heen?</h2></div><span class="small muted" id="feedNote"></span></div>
       <div id="feedBody"><div class="empty">Laden…</div></div>
-    </section>
-
-    <!-- zelfverbruik -->
-    <section class="card c-ring" aria-labelledby="ringTitle">
-      <div class="title-row"><span class="eyebrow" id="ringTitle">Uit eigen zon</span></div>
-      <div class="ring-wrap">
-        <svg class="ring" viewBox="0 0 132 132" role="img" aria-label="Aandeel eigen zonnestroom deze maand" id="ringSvg">
-          <circle class="bg" cx="66" cy="66" r="54" fill="none" stroke-width="12"/>
-          <circle class="fg" id="ringFg" cx="66" cy="66" r="54" fill="none" stroke-width="12" stroke-linecap="round"
-                  transform="rotate(-90 66 66)" stroke-dasharray="339.3" stroke-dashoffset="339.3"/>
-          <text x="66" y="72" text-anchor="middle" font-size="28" font-weight="650" id="ringPct">–</text>
-        </svg>
-        <div>
-          <div class="small muted">van het verbruik van je apparaten kwam deze maand uit je eigen panelen.</div>
-          <div class="small" style="margin-top:10px"><b class="num" id="ringKwh">–</b> <span class="muted">kWh zonnestroom zelf gebruikt</span></div>
-          <div class="small" style="margin-top:6px"><b class="num" id="ringToday">–</b> <span class="muted">vandaag uit zon</span></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 31 dagen -->
-    <section class="card c-month" aria-labelledby="monthTitle">
-      <div class="title-row"><span class="eyebrow" id="monthTitle">Laatste 31 dagen</span><span class="small muted">kWh per dag</span></div>
-      <div class="chart" id="monthChart"><svg id="monthSvg" role="img" aria-label="Verbruik van gestuurde apparaten per dag, uit eigen zon en van het net"></svg><div class="tip" id="monthTip"></div></div>
-      <div class="legend">
-        <span><i class="sw" style="background:var(--sun)"></i><span class="lbl-sun">Uit eigen zon</span></span>
-        <span><i class="sw" style="background:var(--net)"></i>Van het net</span>
-      </div>
-      <details class="table"><summary>Toon als tabel</summary><table id="monthTable"></table></details>
     </section>
   </div>
 
-  <p class="err" id="err"></p>
   <footer><span id="foot"></span><span>Zonnestuur · lokaal, zonder cloud</span></footer>
 </main>
 
@@ -423,73 +418,199 @@ async function api(path, opts = {}) {
 
 let STATUS = null, TODAY = null, MONTH = [], PRICES = null, USAGE = null, USE_P = "day", USE_OFF = 0, INSIGHT = null;
 
+const VERB = { boiler: "verwarmt", ev: "laadt", heatpump: "draait", generic: "draait" };
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+const pct = (v) => nl(v) + "%";
+const BACT = { auto: "zelf gebruiken", save: "sparen voor later", charge: "laden van het net", idle: "stand-by" };
+
+function nextPlanned(s) {
+  // Eerstvolgende geplande stap: uit de prijsplanning (dynamisch) of de zonnigste uren per apparaat
+  const now = Date.now() / 1000;
+  if (PRICES && PRICES.type !== "fixed" && PRICES.slots) {
+    const r = PRICES.slots.find((r) => r.end > now && r.planned && r.planned.length);
+    if (r) return { ts: r.ts, names: r.planned, price: r.all_in };
+  }
+  let best = null;
+  for (const d of s.devices) {
+    for (const h of d.best_hours || []) {
+      const t = new Date(s.now); t.setHours(Number(h.slice(0, 2)), Number(h.slice(3, 5)) || 0, 0, 0);
+      const ts = t.getTime() / 1000;
+      if (ts + 3600 > now && (!best || ts < best.ts)) best = { ts, names: [d.name] };
+      else if (best && ts === best.ts && !best.names.includes(d.name)) best.names.push(d.name);
+    }
+  }
+  return best;
+}
+const joinNames = (a) => a.length <= 1 ? (a[0] || "") : a.slice(0, -1).join(", ") + " en " + a[a.length - 1];
+
+function heroState(s) {
+  const bat = (s.batteries || [])[0];
+  const run = s.devices.filter((d) => d.on && d.power_w > 50);
+  const sunRun = run.filter((d) => /zon|overschot/.test(d.reason));
+  const cheapRun = run.filter((d) => d.reason.startsWith("goedkoop"));
+  const guarRun = run.filter((d) => d.reason.startsWith("garantie"));
+  const warn = (s.problems || []).filter((p) => p.level === "warn");
+  const g = s.grid_w;
+  const avg = PRICES && PRICES.type !== "fixed" && PRICES.slots && PRICES.slots.length
+    ? PRICES.slots.filter((r) => r.ts < PRICES.start + 86400).reduce((a, r, _, arr) => a + r.all_in / arr.length, 0) : null;
+  const priceWord = avg != null && s.price_now != null ? (s.price_now < avg ? `${nl(100 * (1 - s.price_now / avg))}% onder het daggemiddelde` : `${nl(100 * (s.price_now / avg - 1))}% boven het daggemiddelde`) : "";
+  if (s.strategy !== "price" && !s.meter_online && s.configured)
+    return ["s-warn", "Even geen meterdata", "Zonnestuur stuurt je apparaten nu op tijd en prijs, tot de meter weer antwoordt."];
+  if (sunRun.length) {
+    const d = sunRun[0], w = sunRun.reduce((a, x) => a + x.power_w, 0);
+    return ["s-sun", `${cap(d.name)} ${VERB[d.kind] || "draait"} op je eigen zon`, `${kw(w)} kW eigen stroom gaat nu je ${sunRun.length > 1 ? "apparaten" : d.name.toLowerCase()} in, in plaats van voor bijna niets het net op.`];
+  }
+  if (cheapRun.length) {
+    const d = cheapRun[0];
+    return ["s-net", `${cap(d.name)} ${VERB[d.kind] || "draait"} in een goedkoop uur`, `Stroom kost nu ${eur3(s.price_now)} per kWh${priceWord ? ", " + priceWord : ""}.`];
+  }
+  if (guarRun.length) {
+    const d = guarRun[0];
+    return ["s-net", `${cap(d.name)} ${VERB[d.kind] || "draait"} om op tijd klaar te zijn`, d.next_ready ? `Klaar om ${d.next_ready.slice(11, 16)}, zoals afgesproken. Zon of goedkope uren waren er niet genoeg.` : "Zon of goedkope uren waren er niet genoeg."];
+  }
+  if (bat && bat.online && bat.power_w != null && Math.abs(bat.power_w) > 50) {
+    if (bat.power_w > 0) return ["s-batt", bat.action === "charge" ? "Batterij laadt goedkope stroom" : "Batterij slaat je zonnestroom op",
+      bat.action === "charge" ? `Nu ${kw(bat.power_w)} kW voor ${eur3(s.price_now)}, voor de dure uren straks.` : `${kw(bat.power_w)} kW gaat de batterij in in plaats van het net op. Vanavond gebruik je het zelf.`];
+    return ["s-batt", "Batterij levert aan je huis", `Je koopt nu ${kw(bat.power_w)} kW minder in${s.price_now != null ? " tegen " + eur3(s.price_now) + " per kWh" : ""}.`];
+  }
+  if (g != null && g < -100) {
+    const idle = s.devices.filter((d) => d.online && !d.on && d.mode === "auto");
+    return ["s-sun", `Je levert ${kw(g)} kW terug`, idle.length ? "Zonnestuur zet een apparaat aan zodra het overschot een minuut stabiel is." : "Alles wat Zonnestuur kan aanzetten, draait al. Tijd voor de wasmachine of vaatwasser?"];
+  }
+  const nxt = nextPlanned(s);
+  const at = nxt ? new Date(nxt.ts * 1000) : null;
+  const when = at ? (at.getDate() !== new Date(s.now).getDate() ? "morgen " : "") + hhmm(at) : "";
+  if (s.strategy === "price") {
+    if (nxt) return ["", `Volgende slimme stap: ${when}`, `${joinNames(nxt.names)} in ${nxt.names.length > 1 ? "de goedkoopste uren" : "het goedkoopste uur"}${nxt.price != null ? " (" + eur3(nxt.price) + " per kWh)" : ""}.`];
+    return ["", "Alles staat klaar", "Er is voorlopig niets in te plannen. Zonnestuur kijkt elk uur opnieuw naar de prijzen."];
+  }
+  if (nxt) return ["", `Wacht op de zon: ${when}`, `Dan draait ${joinNames(nxt.names)} op je eigen stroom.`];
+  return ["", "Alles rustig", "Er is nu geen overschot. Zonnestuur houdt de meter in de gaten."];
+}
+
 function renderStatus(s) {
   STATUS = s;
   const now = new Date(s.now);
-  $("clock").textContent = "Live · " + hhmm(now);
-  $("live").classList.toggle("off", !s.meter_online);
+  const warn = (s.problems || []).filter((p) => p.level === "warn");
+  $("clock").innerHTML = warn.length ? `<span>Let op</span>` : `<span class="lt">Live · </span>${hhmm(now)}`;
+  $("live").classList.toggle("off", warn.length > 0);
+  $("heroDate").textContent = cap(now.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" })) + " · " + hhmm(now);
 
-  // meter
-  const badge = $("gridBadge");
-  if (s.grid_w === null) {
-    $("gridBig").innerHTML = "–"; badge.className = "badge off"; badge.textContent = "Meter niet bereikbaar";
-  } else {
-    $("gridBig").innerHTML = `${kw(s.grid_w)}<span class="unit">kW</span>`;
-    if (s.grid_w < -30) { badge.className = "badge sun"; badge.textContent = "↗ Je levert terug"; }
-    else if (s.grid_w > 30) { badge.className = "badge net"; badge.textContent = "↙ Je haalt van het net"; }
-    else { badge.className = "badge off"; badge.textContent = "In balans"; }
-  }
+  const [cls, head, sub] = heroState(s);
+  $("hero").className = "card c-hero " + cls;
+  $("headline").textContent = head;
+  $("subline").textContent = sub;
+  $("pills").innerHTML = (s.problems || []).map((p) => `<span class="pill ${p.level === "warn" ? "warn" : ""}">${p.level === "warn" ? "⚠︎ " : ""}${esc(p.text)}</span>`).join("");
 
-  // energiestroom
-  const devW = s.devices.reduce((a, d) => a + (d.power_w || 0), 0);
-  const pv = s.forecast_now_w;
-  $("vSun").textContent = pv == null ? "–" : "≈ " + kw(pv) + " kW";
-  $("flowNote").textContent = "";
-  $("lSun").textContent = pv == null ? "Zon" : "Zon, verwacht";
-  $("lNet").textContent = s.grid_w == null ? "Net" : s.grid_w < 0 ? "Naar het net" : "Van het net";
-  $("vNet").textContent = s.grid_w == null ? "–" : kw(s.grid_w) + " kW";
-  const d0 = s.devices[0];
-  $("lDev").textContent = s.devices.length === 1 ? d0.name : "Apparaten";
-  $("vDev").textContent = kw(devW) + " kW";
-  setPulse("aSun", pv != null && pv > 50, false, pv);
-  setPulse("aNet", s.grid_w != null && Math.abs(s.grid_w) > 30, s.grid_w != null && s.grid_w < 0, s.grid_w);
-  setPulse("aDev", devW > 50, false, devW);
-  $("aDev").classList.toggle("net", s.grid_w > 30 && devW > 50);
-  $("aDev").classList.toggle("sun", !(s.grid_w > 30));
-  $("nSun").classList.toggle("hot", pv != null && pv > 50);
-  $("nDev").classList.toggle("hot", devW > 50);
+  // kerncijfers
+  const bat = (s.batteries || [])[0];
+  const g = s.grid_w;
+  const cur = PRICES && PRICES.type !== "fixed" && PRICES.slots ? PRICES.slots.find((r) => Date.now() / 1000 >= r.ts && Date.now() / 1000 < r.end) : null;
+  const avgT = PRICES && PRICES.slots && PRICES.slots.length ? PRICES.slots.filter((r) => r.ts < PRICES.start + 86400).reduce((a, r, _, arr) => a + r.all_in / arr.length, 0) : null;
+  const k = [];
+  k.push(["Bij de meter", g == null ? "–" : `${kw(g)}<small>kW</small>`, g == null ? (s.strategy === "price" ? "geen meter nodig" : "geen meterdata") : g < -30 ? "↗ naar het net" : g > 30 ? "↙ van het net" : "in balans"]);
+  k.push(["Stroomprijs nu", `${eur3(s.price_now)}`, s.contract === "dynamic" ? (cur && avgT != null ? `${CLASS_WORD[priceClass(cur.all_in, avgT)]} · gem. ${nl(avgT, 3)}` : "dynamisch") : "vast tarief"]);
+  k.push(["Bespaard deze maand", eur(s.month.eur_saved), `vandaag ${eur(s.today.eur_saved)}`]);
+  if (bat) k.push(["Batterij", bat.soc == null ? "–" : `${nl(bat.soc)}<small>%</small>`, bat.online ? BACT[bat.action] || "" : "niet bereikbaar"]);
+  else if (s.has_panels) k.push(["Uit eigen zon", pct(s.month.solar_pct || 0), `${nl(s.month.kwh_solar, 1)} kWh deze maand`]);
+  else k.push(["Slim gestuurd", `${nl(s.month.kwh, 1)}<small>kWh</small>`, "deze maand in goedkope uren"]);
+  $("kpis").innerHTML = k.map(([a, b, c]) => `<div class="kpi"><div class="k">${a}</div><div class="v">${b}</div><div class="d">${c}</div></div>`).join("");
+
+  renderFlow(s);
+  renderDevices(s);
+  renderBattery(s);
 
   // besparing
   $("sMonth").textContent = eur(s.month.eur_saved);
   $("sToday").textContent = eur(s.today.eur_saved);
   $("sYear").textContent = eur(s.year.eur_saved);
-  $("valueNow").textContent = eur(s.value_own_kwh) + " per kWh";
-
-  // ring
-  const pct = s.month.solar_pct || 0;
-  $("ringPct").textContent = nl(pct) + "%";
-  $("ringFg").setAttribute("stroke-dashoffset", String(339.3 * (1 - Math.min(100, pct) / 100)));
-  $("ringKwh").textContent = nl(s.month.kwh_solar, 1);
-  $("ringToday").textContent = nl(s.today.solar_pct) + "%";
-
-  renderDevices(s);
-  $("err").textContent = s.last_error ? "Laatste melding: " + s.last_error : "";
-  if (s.strategy === "price") {
-    $("sMonthNote").textContent = "door te draaien in de goedkoopste uren";
-    $("ringTitle").textContent = "Slim ingepland";
-    document.querySelectorAll(".lbl-sun").forEach((e) => { e.textContent = "In goedkope uren"; });
-  }
+  $("valueNow").textContent = s.strategy === "price" ? "" : eur(s.value_own_kwh) + " per eigen kWh";
+  $("sMonthNote").textContent = s.strategy === "price" ? "door te draaien in de goedkoopste uren" : "met eigen zonnestroom";
+  $("solarShare").textContent = s.has_panels && s.month.kwh > 0 ? `${pct(s.month.solar_pct)} van het verbruik van je apparaten kwam deze maand uit eigen zon (${nl(s.month.kwh_solar, 1)} kWh).`
+    : s.month.kwh > 0 ? `${nl(s.month.kwh, 1)} kWh deze maand slim ingepland.` : "Zodra je apparaten stroom gebruiken, zie je hier wat het oplevert.";
+  if (s.strategy === "price") document.querySelectorAll(".lbl-sun").forEach((e) => { e.textContent = "In goedkope uren"; });
+  document.querySelectorAll(".fc-l").forEach((e) => { e.hidden = !s.has_panels; });
   $("foot").textContent = `Contract: ${s.contract === "dynamic" ? "dynamisch" : "vast"}${s.supplier ? " (" + s.supplier + ")" : ""} · ${s.strategy === "price" ? "besparing t.o.v. de gemiddelde prijs van de dag" : "besparing gerekend zonder salderen, zoals vanaf 2027"} · versie ${s.version}`;
+  drawLanes();
 }
 
-function setPulse(id, active, reverse, watts) {
-  const el = $(id);
-  el.classList.toggle("idle", !active);
-  el.classList.toggle("rev", !!reverse);
-  const w = Math.abs(watts || 0);
-  el.style.animationDuration = (w > 2500 ? 0.45 : w > 1200 ? 0.7 : 1.1) + "s";
+// ---------- energiestroom ----------
+const ICO = {
+  sun: '<g class="ico sunico" transform="translate(-11 -11)"><circle cx="11" cy="11" r="4.5"/><path d="M11 1.5v2.5M11 18v2.5M1.5 11H4M18 11h2.5M4.3 4.3l1.8 1.8M15.9 15.9l1.8 1.8M4.3 17.7l1.8-1.8M15.9 6.1l1.8-1.8"/></g>',
+  net: '<g class="ico" transform="translate(-11 -11)"><path d="M11 1.5 6 21M11 1.5 16 21M4.5 8h13M3.5 14h15M8 1.5h6"/></g>',
+  house: '<g class="ico" transform="translate(-13 -13)"><path d="M2.5 12.5 13 3.5l10.5 9M5.5 10v12.5h15V10M10.5 22.5v-6.5h5v6.5"/></g>',
+  dev: '<g class="ico" transform="translate(-11 -11)"><path d="M11 2.5c3 4 6 7 6 11a6 6 0 0 1-12 0c0-4 3-7 6-11z"/><path d="M11 17a2.5 2.5 0 0 1-2.5-2.5"/></g>',
+  batt: '<g class="ico" transform="translate(-11 -11)"><rect x="4" y="4" width="14" height="17" rx="3"/><path d="M8.5 1.5h5M11 8.5l-2.5 4h5l-2.5 4"/></g>',
+};
+let FLOW_KEY = "";
+function curve(a, b) {
+  const mx = (a[0] + b[0]) / 2;
+  return `M${a[0]} ${a[1]} C ${mx} ${a[1]}, ${mx} ${b[1]}, ${b[0]} ${b[1]}`;
+}
+function renderFlow(s) {
+  const svg = $("flowSvg"), bat = (s.batteries || [])[0];
+  const key = `${s.has_panels}|${!!bat}|${s.devices.length}`;
+  const P = { house: [220, 150], sun: [62, 60], net: s.has_panels ? [62, 240] : [62, 150], dev: bat ? [378, 60] : [378, 150], batt: [378, 240] };
+  if (key !== FLOW_KEY) {
+    FLOW_KEY = key;
+    const paths = [["Sun", P.sun, P.house, s.has_panels], ["Net", P.net, P.house, true], ["Dev", P.house, P.dev, s.devices.length > 0], ["Batt", P.house, P.batt, !!bat]];
+    let h = "";
+    for (const [id, a, b, show] of paths) if (show) h += `<path class="line" d="${curve(a, b)}"/>`;
+    for (const [id, a, b, show] of paths) if (show) h += `<path class="pulse idle" id="a${id}" d="${curve(a, b)}"/>`;
+    const node = (id, p, r, ico, show, lbl) => show ? `<g class="node" id="n${id}" transform="translate(${p[0]} ${p[1]})"><circle r="${r}"/>${ico}
+      ${lbl ? `<text class="lbl" y="${r + 20}" text-anchor="middle" id="l${id}"></text><text class="val num" y="${r + 40}" text-anchor="middle" id="v${id}"></text>` : ""}</g>` : "";
+    h += node("Sun", P.sun, 28, ICO.sun, s.has_panels, true) + node("Net", P.net, 28, ICO.net, true, true)
+      + node("House", P.house, 38, ICO.house, true, false) + node("Dev", P.dev, 28, ICO.dev, s.devices.length > 0, true) + node("Batt", P.batt, 28, ICO.batt, !!bat, true);
+    svg.innerHTML = h;
+  }
+  const set = (id, t) => { const e = $(id); if (e) e.textContent = t; };
+  const devW = s.devices.reduce((a, d) => a + (d.power_w || 0), 0);
+  const g = s.grid_w, pv = s.forecast_now_w;
+  set("lSun", "Zon, verwacht"); set("vSun", pv == null ? "–" : "≈ " + kw(pv) + " kW");
+  set("lNet", g == null ? "Net" : g < -30 ? "Naar het net" : "Van het net"); set("vNet", g == null ? "–" : kw(g) + " kW");
+  set("lDev", s.devices.length === 1 ? s.devices[0].name : "Apparaten"); set("vDev", kw(devW) + " kW");
+  if (bat) { set("lBatt", bat.soc == null ? "Batterij" : `Batterij · ${nl(bat.soc)}%`); set("vBatt", bat.power_w == null ? "–" : (bat.power_w > 30 ? "+" : bat.power_w < -30 ? "−" : "") + kw(bat.power_w) + " kW"); }
+  const pulse = (id, on, rev, kind, w) => {
+    const e = $(id); if (!e) return;
+    e.setAttribute("class", `pulse ${kind}${on ? "" : " idle"}${rev ? " rev" : ""}`);
+    const a = Math.abs(w || 0); e.style.animationDuration = (a > 2500 ? 0.45 : a > 1200 ? 0.7 : 1.1) + "s";
+  };
+  pulse("aSun", pv != null && pv > 50, false, "sun", pv);
+  pulse("aNet", g != null && Math.abs(g) > 30, g != null && g < 0, "net", g);
+  pulse("aDev", devW > 50, false, g > 30 ? "net" : "sun", devW);
+  if (bat) pulse("aBatt", bat.power_w != null && Math.abs(bat.power_w) > 30, bat.power_w < 0, "batt", bat.power_w);
+  const hot = (id, c, on) => { const e = $(id); if (e) e.classList.toggle(c, !!on); };
+  hot("nSun", "hot", pv > 50); hot("nDev", "hot", devW > 50); hot("nNet", "hot-net", g != null && Math.abs(g) > 30);
+  hot("nBatt", "hot-batt", bat && Math.abs(bat.power_w || 0) > 30);
 }
 
+// ---------- thuisbatterij ----------
+function renderBattery(s) {
+  const card = $("battCard"), b = (s.batteries || [])[0];
+  card.hidden = !b;
+  if (!b) return;
+  const pw = b.power_w || 0;
+  const now = pw > 30 ? (b.action === "charge" ? `Laadt ${kw(pw)} kW van het net` : `Laadt ${kw(pw)} kW van de zon`) : pw < -30 ? `Levert ${kw(pw)} kW aan je huis` : "Rust";
+  const t = b.today || {}, v = b.value || {};
+  const soc = b.soc == null ? 0 : Math.max(0, Math.min(100, b.soc));
+  card.innerHTML = `<div class="title-row"><span class="eyebrow" id="battTitle">Thuisbatterij</span><span class="small muted">${esc(b.name)}</span></div>
+    ${b.online ? `<div class="batt-top">
+      <div class="cell" role="img" aria-label="Laadniveau ${nl(soc)} procent"><i style="height:calc((100% - 8px) * ${soc / 100})"></i><span class="minl" style="bottom:calc(4px + (100% - 8px) * ${b.min_soc / 100})"></span></div>
+      <div><div class="batt-big num">${nl(soc)}%</div><div class="small muted">${b.kwh != null ? nl(b.kwh, 1) + " van " + nl(b.capacity_kwh, 1) + " kWh" : ""}</div>
+        <div class="pills" style="margin-top:10px"><span class="pill batt">${esc(now)}</span></div></div>
+    </div>
+    <p class="small" style="margin:14px 0 0"><b>Nu: ${esc(BACT[b.action] || b.action)}</b>${b.reason && b.reason !== BACT[b.action] ? ` <span class="muted">· ${esc(b.reason)}</span>` : ""}</p>
+    <div class="kv">
+      <div><div class="k">Geladen vandaag</div><div class="v">${nl(t.charged_kwh, 1)} kWh</div></div>
+      <div><div class="k">Waarvan van het net</div><div class="v">${nl(t.grid_kwh, 1)} kWh</div></div>
+      <div><div class="k">Geleverd vandaag</div><div class="v">${nl(t.discharged_kwh, 1)} kWh</div></div>
+      <div><div class="k">Opgeleverd vandaag</div><div class="v">${eur(t.eur)}</div></div>
+    </div>
+    ${v.vs_none_eur != null ? `<p class="small muted" style="margin:14px 0 0">Plan komende ${b.plan.length} uur: <b style="color:var(--ink)">${eur(v.vs_none_eur)}</b> goedkoper dan zonder batterij${v.export_without_kwh > 0.2 ? `, en ${nl(v.export_without_kwh - v.export_kwh, 1)} kWh minder teruglevering` : ""}.</p>` : ""}`
+    : `<div class="empty">${esc(b.name)} is niet bereikbaar${b.error ? ": " + esc(b.error) : ""}.</div>`}`;
+}
+
+// ---------- apparaten ----------
 const DEV_ICONS = {
   boiler: '<path d="M12 2.5c3 4 6.5 7.5 6.5 11.5a6.5 6.5 0 0 1-13 0c0-4 3.5-7.5 6.5-11.5z"/><path d="M12 18a2.8 2.8 0 0 1-2.8-2.8"/>',
   ev: '<path d="M5 16V11l2-5h10l2 5v5M3.5 16h17M7 16v2M17 16v2M6 11h12"/>',
@@ -502,6 +623,7 @@ const READY_WORD = { boiler: "Warm water", ev: "Auto geladen", heatpump: "Klaar"
 function renderDevices(s) {
   const wrap = $("devices");
   const now = new Date(s.now);
+  $("devices").closest("section").hidden = !s.devices.length;
   wrap.innerHTML = "";
   for (const d of s.devices) {
     const el = document.createElement("article");
@@ -511,37 +633,32 @@ function renderDevices(s) {
     const pos = (h, m) => ((h + m / 60) / 24) * 100;
     let strip = "";
     const PRICE = s.strategy === "price";
-    // Aaneengesloten blokken tekenen (bij prijsplanning kunnen de uren verspreid liggen)
     const blocks = [];
     for (const h of (d.best_hours || []).map((x) => Number(x.slice(0, 2))).sort((x, y) => x - y)) {
       const last = blocks[blocks.length - 1];
       if (last && last[1] === h) last[1] = h + 1; else blocks.push([h, h + 1]);
     }
-    for (const [a, b] of blocks) {
-      strip += `<div class="best" style="left:${pos(a, 0)}%; width:${pos(b - a, 0)}%" title="${PRICE ? "Goedkoopste uren" : "Zonnigste uren"}"></div>`;
-    }
-    for (const t of d.ready_times || []) {
-      strip += `<div class="ready" style="left:${pos(Number(t.slice(0, 2)), Number(t.slice(3, 5)))}%" title="Klaar om ${t}"></div>`;
-    }
+    for (const [a, b] of blocks) strip += `<div class="best" style="left:${pos(a, 0)}%; width:${pos(b - a, 0)}%" title="${PRICE ? "Goedkoopste uren" : "Zonnigste uren"}"></div>`;
+    for (const t of d.ready_times || []) strip += `<div class="ready" style="left:${pos(Number(t.slice(0, 2)), Number(t.slice(3, 5)))}%" title="Klaar om ${t}"></div>`;
     strip += `<div class="now" style="left:${pos(now.getHours(), now.getMinutes())}%" title="Nu"></div>`;
     const bestTxt = blocks.length ? blocks.map(([a, b]) => `${String(a).padStart(2, "0")}–${String(b).padStart(2, "0")}`).join(", ") : null;
     const readyTxt = d.next_ready ? d.next_ready.slice(11, 16) : null;
     el.innerHTML = `
       <div class="dev-head">
         <div class="dev-ico"><svg viewBox="0 0 24 24">${DEV_ICONS[d.kind] || DEV_ICONS.generic}</svg></div>
-        <div><div class="dev-name">${esc(d.name)}</div><div class="dev-state">${state} · ${esc(d.reason)}</div></div>
+        <div style="min-width:0"><div class="dev-name">${esc(d.name)}</div><div class="dev-state">${state} · ${esc(d.reason)}</div></div>
         <div class="dev-power"><div class="v num">${kw(d.power_w)}</div><div class="small muted">kW</div></div>
       </div>
       <div class="strip" role="img" aria-label="Dagplanning">${strip}</div>
       <div class="strip-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
       <div class="facts">
-        ${bestTxt ? `<div class="fact"><i class="dot" style="background:var(--glow)"></i><span>${PRICE ? "Goedkoopste uren gepland" : "Zonnigste uren vandaag"} <b>${bestTxt}</b></span></div>` : ""}
+        ${bestTxt ? `<div class="fact"><i class="dot" style="background:var(--glow)"></i><span>${PRICE ? "Goedkoopste uren gepland" : "Gepland vandaag"} <b>${bestTxt}</b></span></div>` : ""}
         ${readyTxt ? `<div class="fact"><i class="dot" style="background:${d.next_ready_ok ? "var(--good)" : "var(--ink)"}"></i><span>${
-          d.next_ready_ok ? `${READY_WORD[d.kind] || "Klaar"} voor <b>${readyTxt}</b>: gelukt` : `${READY_WORD[d.kind] || "Klaar"} voor <b>${readyTxt}</b> gegarandeerd, desnoods met netstroom`}</span></div>` : ""}
+          d.next_ready_ok ? `${READY_WORD[d.kind] || "Klaar"} voor <b>${readyTxt}</b>: gelukt` : `${READY_WORD[d.kind] || "Klaar"} voor <b>${readyTxt}</b> gegarandeerd`}</span></div>` : ""}
         ${d.modulating ? `<div class="fact"><i class="dot" style="background:var(--sun)"></i><span>${d.on && d.setpoint_w
-          ? `Laadt traploos mee met de zon: nu <b>${Math.round(d.setpoint_w / d.w_per_step)} A</b> (${kw(d.setpoint_w)} kW)`
+          ? `Laadt traploos mee: nu <b>${Math.round(d.setpoint_w / d.w_per_step)} A</b> (${kw(d.setpoint_w)} kW)`
           : `Laadt traploos tussen <b>${kw(d.min_w)}</b> en <b>${kw(d.max_w)} kW</b>`}</span></div>` : ""}
-        <div class="fact"><i class="dot" style="background:var(--sun)"></i><span>Deze maand <b>${nl(d.month.kwh_solar, 1)} kWh</b> ${PRICE ? "slim ingepland" : "zonnestroom"}, <b>${eur(d.month.eur_saved)}</b> bespaard</span></div>
+        <div class="fact"><i class="dot" style="background:var(--sun)"></i><span>Deze maand <b>${nl(d.month.kwh, 1)} kWh</b>${PRICE ? " slim ingepland" : `, waarvan <b>${nl(d.month.kwh_solar, 1)}</b> uit zon`} · <b>${eur(d.month.eur_saved)}</b> bespaard</span></div>
       </div>
       <div class="seg" role="group" aria-label="Bediening ${esc(d.name)}">
         <button data-mode="auto" class="${d.mode === "auto" ? "active" : ""}">Automatisch</button>
@@ -556,6 +673,60 @@ function renderDevices(s) {
       refresh();
     }));
     wrap.appendChild(el);
+  }
+}
+
+// ---------- planning per apparaat en batterij (zelfde tijdas als de prijsgrafiek) ----------
+let LANE_X = null;
+function drawLanes() {
+  const svg = $("laneSvg"), box = $("laneChart"), tip = $("laneTip"), s = STATUS;
+  if (!svg || !s) return;
+  const W = Math.max(300, box.clientWidth);
+  const X0 = LANE_X && Math.abs(LANE_X.W - W) < 2 ? LANE_X : (() => {
+    const d = new Date(s.now); d.setHours(0, 0, 0, 0);
+    return { W, L: 44, R: 6, n: 24, start: d.getTime() / 1000, slot: (W - 50) / 24 };
+  })();
+  const { L, R, n, start, slot } = X0;
+  const lanes = [];
+  const dyn = PRICES && PRICES.type !== "fixed" && PRICES.slots && PRICES.slots.length && LANE_X;
+  for (const d of s.devices) {
+    const hours = new Set();
+    if (dyn) PRICES.slots.forEach((r) => { if (r.planned.includes(d.name)) hours.add(Math.round((r.ts - start) / 3600)); });
+    else (d.best_hours || []).forEach((h) => hours.add(Number(h.slice(0, 2))));
+    const ready = [];
+    for (let day = 0; day * 24 < n; day++) for (const t of d.ready_times || []) ready.push(day * 24 + Number(t.slice(0, 2)) + Number(t.slice(3, 5)) / 60);
+    lanes.push({ name: d.name, kind: "dev", hours: [...hours].map((i) => ({ i, c: "var(--glow)", w: "gepland" })), ready });
+  }
+  const bat = (s.batteries || [])[0];
+  if (bat && bat.plan && bat.plan.length) {
+    const map = { auto: ["var(--batt)", "zelf gebruiken"], charge: ["var(--net)", "laden van het net"], save: ["var(--mid)", "sparen voor later"] };
+    lanes.push({ name: bat.name, kind: "batt", hours: bat.plan.map((p) => ({ i: Math.round((new Date(p.start).getTime() / 1000 - start) / 3600), c: map[p.action][0], w: map[p.action][1], soc: p.soc })), ready: [] });
+  }
+  document.querySelectorAll("#priceLegend .bl").forEach((e) => { e.hidden = !lanes.some((l) => l.kind === "batt"); });
+  if (!lanes.length) { svg.setAttribute("height", 0); svg.innerHTML = ""; return; }
+  const LH = 34, T = 8, H = T + lanes.length * LH + 4;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("height", H); svg.innerHTML = "";
+  const nowTs = Date.now() / 1000;
+  lanes.forEach((ln, k) => {
+    const y = T + k * LH;
+    el("text", { x: L, y: y + 10, class: "lane-l" }, svg).textContent = ln.name;
+    el("rect", { x: L, y: y + 16, width: n * slot, height: 12, rx: 6, fill: "var(--chip)" }, svg);
+    for (const h of ln.hours) {
+      if (h.i < 0 || h.i >= n) continue;
+      const past = start + (h.i + 1) * 3600 <= nowTs;
+      const r = el("rect", { x: L + h.i * slot + 1, y: y + 16, width: Math.max(2, slot - 2), height: 12, rx: 4, fill: h.c, opacity: past ? 0.4 : 1 }, svg);
+      const t = new Date((start + h.i * 3600) * 1000);
+      const hit = el("rect", { x: L + h.i * slot, y: y + 8, width: slot, height: 26, fill: "transparent" }, svg);
+      hit.addEventListener("pointerenter", () => showTip(tip, box, (L + h.i * slot + slot / 2) * (box.clientWidth / W),
+        `<b>${esc(ln.name)}</b><div class="row"><i class="sw" style="background:${h.c}"></i>${t.toLocaleDateString("nl-NL", { weekday: "short" })} ${hhmm(t)}<em>${esc(h.w)}${h.soc != null ? " · " + nl(h.soc) + "%" : ""}</em></div>`));
+      hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+      void r;
+    }
+    for (const rt of ln.ready) if (rt < n) el("rect", { x: L + rt * slot - 1, y: y + 13, width: 2, height: 18, rx: 1, fill: "var(--ink)" }, svg);
+  });
+  if (nowTs > start && nowTs < start + n * 3600) {
+    const x = L + ((nowTs - start) / 3600) * slot;
+    el("line", { x1: x, x2: x, y1: T + 12, y2: H - 2, stroke: "var(--ink)", "stroke-width": 1.5, "stroke-dasharray": "3 3" }, svg);
   }
 }
 
@@ -600,6 +771,12 @@ function drawToday() {
   const X = (ts) => L + ((ts - start) / day) * (W - L - R);
   const samples = TODAY.samples.filter((s) => s.ts >= start && s.ts < start + day);
   const fc = TODAY.forecast;
+  if (!samples.some((s) => (s.dev_w || 0) > 5) && !fc.length) {
+    svg.setAttribute("height", 0); $("todayNote").textContent = "";
+    box.querySelector(".empty") || box.insertAdjacentHTML("beforeend", '<div class="empty">Vandaag hebben je apparaten nog geen stroom gebruikt. Zodra ze draaien, zie je hier per 5 minuten waar de stroom vandaan kwam.</div>');
+    return;
+  }
+  box.querySelector(".empty")?.remove();
   const maxW = Math.max(1000, ...samples.map((s) => s.dev_w || 0), ...fc.map((f) => f.pv_w));
   const sc = niceScale(maxW / 1000), ymax = sc.max * 1000;
   const Y = (w) => T + (1 - w / ymax) * (H - T - B);
@@ -658,6 +835,13 @@ function drawMonth() {
     const key = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
     rows.push({ key, t, d: byDay[key] || { kwh: 0, kwh_solar: 0, eur_saved: 0 } });
   }
+  if (!rows.some((r) => r.d.kwh > 0.01)) {
+    svg.setAttribute("height", 0);
+    box.querySelector(".empty") || box.insertAdjacentHTML("beforeend", '<div class="empty">Nog geen verbruik van je apparaten gemeten. Zonnestuur telt per dag hoeveel ze gebruikten en wat dat opleverde.</div>');
+    $("monthTable").innerHTML = ""; $("spark").innerHTML = "";
+    return;
+  }
+  box.querySelector(".empty")?.remove();
   const sc = niceScale(Math.max(1, ...rows.map((r) => r.d.kwh))), ymax = sc.max;
   const Y = (v) => T + (1 - v / ymax) * (H - T - B);
   for (let v = 0; v <= ymax + 1e-9; v += sc.step) {
@@ -713,10 +897,11 @@ function drawPrices() {
       ${P.return_cost ? `<div><b>${eur3(P.return_cost)}</b><span>terugleverkosten per kWh</span></div>` : ""}
       <div><b>${eur3(P.net_feed_in)}</b><span>netto per teruggeleverde kWh</span></div>`;
     svg.innerHTML = ""; svg.setAttribute("height", 0);
-    $("priceLegend").hidden = true; $("priceTableWrap").hidden = true;
+    document.querySelectorAll("#priceLegend .pl").forEach((e) => { e.hidden = true; }); $("priceTableWrap").hidden = true;
+    LANE_X = null; drawLanes();
     return;
   }
-  $("priceLegend").hidden = false; $("priceTableWrap").hidden = false;
+  document.querySelectorAll("#priceLegend .pl").forEach((e) => { e.hidden = false; }); $("priceTableWrap").hidden = false;
   const rows = P.slots, now = Date.now() / 1000;
   if (!rows.length) { stats.innerHTML = '<div class="empty" style="padding:8px 0">Nog geen prijzen opgehaald.</div>'; svg.innerHTML = ""; return; }
   const dayEnd = P.start + 86400;
@@ -760,13 +945,14 @@ function drawPrices() {
       : `M${x},${y0} V${y1 - 3} Q${x},${y1} ${x + 3},${y1} H${x + bw - 3} Q${x + bw},${y1} ${x + bw},${y1 - 3} V${y0} Z`;
     const past = r.end <= now;
     el("path", { d, fill: `var(--${cls})`, opacity: past ? 0.4 : 1 }, svg);
-    if (r.planned.length) el("rect", { x, y: H - B + 4, width: bw, height: 4, rx: 2, fill: "var(--glow)", opacity: past ? 0.4 : 1 }, svg);
     if (cur && r.ts === cur.ts) el("rect", { x: x - 2, y: Math.min(y0, y1) - 2, width: bw + 4, height: Math.abs(y0 - y1) + 4, rx: 4, fill: "none", stroke: "var(--ink)", "stroke-width": 2 }, svg);
   }
   for (let h = 0; h <= n; h += (n > 24 ? 6 : 3) * (W < 560 ? 2 : 1)) {
     const lab = h % 24 === 0 ? "00" : String(h % 24).padStart(2, "0");
     el("text", { x: L + h * slot, y: H - 6, "text-anchor": h === 0 ? "start" : h === n ? "end" : "middle", class: "axis" }, svg).textContent = lab + ":00";
   }
+  LANE_X = { W, L, R, n, start: P.start, slot };
+  drawLanes();
   // hover per balk (vlak groter dan de balk)
   rows.forEach((r) => {
     const hit = el("rect", { x: X(r.ts), y: T, width: slot, height: H - T - B + 10, fill: "transparent" }, svg);
@@ -908,11 +1094,11 @@ async function backfill() {
   } catch (e) {}
 }
 
-function drawCharts() { drawToday(); drawMonth(); drawPrices(); drawUsage(); drawInsight(); }
+function drawCharts() { drawToday(); drawMonth(); drawPrices(); drawUsage(); drawInsight(); drawLanes(); }
 
 async function refresh() {
   try { renderStatus(await api("api/status")); }
-  catch (e) { $("err").textContent = "Geen verbinding met Zonnestuur."; $("live").classList.add("off"); }
+  catch (e) { $("clock").textContent = "Geen verbinding"; $("live").classList.add("off"); }
 }
 async function refreshCharts() {
   try {
@@ -922,6 +1108,7 @@ async function refreshCharts() {
     INSIGHT = v(4, null); $("feedBody").closest("section").hidden = !INSIGHT;
     TODAY = v(0, TODAY); MONTH = v(1, MONTH); PRICES = v(2, null); USAGE = v(3, null);
     $("priceSvg").closest("section").hidden = !PRICES;
+    if (STATUS) renderStatus(STATUS);
     $("useSvg").closest("section").hidden = !USAGE;
     drawCharts();
   } catch (e) {}
