@@ -171,6 +171,7 @@ function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add
 function setErr(msg) { $("err").textContent = msg || ""; }
 
 const ICONS = {
+  p1_serial: '<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3"/><circle cx="12" cy="10" r="2.5"/><path d="M9 17h6M12 21v2"/></svg>',
   p1: '<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3"/><circle cx="12" cy="10" r="2.5"/><path d="M9 17h6"/></svg>',
   shelly: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="9.5" cy="11" r="1.2"/><circle cx="14.5" cy="11" r="1.2"/><path d="M12 15.5v1"/></svg>',
   boiler: '<svg viewBox="0 0 24 24"><path d="M12 2.5c3 4 6.5 7.5 6.5 11.5a6.5 6.5 0 0 1-13 0c0-4 3.5-7.5 6.5-11.5z"/></svg>',
@@ -186,7 +187,7 @@ const DRIVER_LABEL = {
   sg_ready: "SG-ready (2 relais)", ocpp: "Laadpaal · OCPP",
   ha_switch: "Home Assistant · schakelaar", ha_start_button: "Home Assistant · witgoed starten", ha_setpoint: "Home Assistant · temperatuur", ha_current: "Home Assistant · laadstroom",
 };
-const METERS = [["homewizard", "HomeWizard P1-meter"], ["shelly_em", "Shelly EM / Pro 3EM"], ["youless", "YouLess (LS120)"],
+const METERS = [["p1_serial", "P1-kabel in dit kastje"], ["homewizard", "HomeWizard P1-meter"], ["shelly_em", "Shelly EM / Pro 3EM"], ["youless", "YouLess (LS120)"],
   ["dsmr_reader", "DSMR-reader"], ["esphome", "ESPHome (SlimmeLezer e.a.)"], ["ha", "Sensor in Home Assistant", "has_ha"],
   ["mqtt", "MQTT-topic", "mqtt"], ["homey", "Homey Pro", "has_homey_token"]];
 const ADD_TYPES = [["z2m", "Zigbee-stekker (Zigbee2MQTT)"], ["tasmota", "Tasmota via MQTT"], ["shellymqtt", "Shelly via MQTT"],
@@ -194,7 +195,7 @@ const ADD_TYPES = [["z2m", "Zigbee-stekker (Zigbee2MQTT)"], ["tasmota", "Tasmota
   ["sgready", "SG-ready warmtepomp (2 relais)"]];
 let SYS = { mqtt: null, homey: null, ocpp: null };
 const hasSys = (need) => need === "mqtt" ? !!((CFG.mqtt && CFG.mqtt.host) || CFG.mqtt_addon) : !!CFG[need];
-const METER_KINDS = ["p1", "shelly_em"], SWITCH_KINDS = ["shelly", "hw_socket", "tasmota"];
+const METER_KINDS = ["p1_serial", "p1", "shelly_em"], SWITCH_KINDS = ["shelly", "hw_socket", "tasmota"];
 const isHA = (drv) => String(drv || "").startsWith("ha_");
 const KINDS = [
   { id: "boiler", label: "Boiler" }, { id: "ev", label: "Elektrische auto" },
@@ -352,7 +353,8 @@ function renderFound() {
     const key = "f:" + f.host;
     const sel = asMeter ? W.meter && W.meter.host === f.host && W.meter.type !== "ha" : picked(key);
     let meta = esc(f.host);
-    if (f.ok && f.kind === "p1") meta += ` · leest nu ${nl(Math.abs(f.extra.active_power_w) / 1000, 2)} kW ${f.extra.active_power_w < 0 ? "teruglevering" : "afname"}`;
+    if (f.ok && f.kind === "p1_serial") meta = `P1-kabel in dit kastje · leest nu ${nl(Math.abs(f.extra.active_power_w) / 1000, 2)} kW ${f.extra.active_power_w < 0 ? "teruglevering" : "afname"}`;
+    else if (f.ok && f.kind === "p1") meta += ` · leest nu ${nl(Math.abs(f.extra.active_power_w) / 1000, 2)} kW ${f.extra.active_power_w < 0 ? "teruglevering" : "afname"}`;
     else if (f.ok && f.kind === "shelly_em") meta += " · meet het hele huis";
     else if (f.ok) meta += f.extra && f.extra.metering ? " · meet ook verbruik" : " · meet geen verbruik";
     return card(key, asMeter ? "meter" : "found", ICONS[f.kind] || ICONS.generic, f.name || f.model, meta, sel, f.ok, esc(f.problem_text), !asMeter && inUse.has(f.host));
@@ -421,6 +423,7 @@ function renderFound() {
 function meterSpec(m, invert) {
   if (m.type === "ha" && m.export_entity) return { meter: { driver: "ha", import_entity: m.entity, export_entity: m.export_entity, invert } };
   if (m.type === "ha") return { meter: { driver: "ha", entity: m.entity, invert } };
+  if (m.type === "p1_serial") return { host: "", meter: { driver: "p1_serial", port: m.host, invert } };
   return { host: m.host, meter: { driver: m.type === "shelly_em" ? "shelly_em" : "homewizard", host: m.host, invert } };
 }
 function meter() {
@@ -860,6 +863,7 @@ async function settings() {
       : drv === "mqtt" ? `<div class="field"><label for="m_p">Soort</label><select id="m_p"><option value="">Eigen topic</option><option value="dsmr_reader" ${v("profile") === "dsmr_reader" ? "selected" : ""}>DSMR-reader</option></select></div>`
           + f("m_a", "Topic (vermogen)", v("topic"), 'placeholder="bijv. p1/power"') + f("m_b", "JSON-veld (optioneel)", v("key"), 'placeholder="bijv. ENERGY.Power"')
           + `<div class="field" style="flex:0 1 110px"><label for="m_u">Eenheid</label><select id="m_u"><option ${v("unit") !== "kW" ? "selected" : ""}>W</option><option ${v("unit") === "kW" ? "selected" : ""}>kW</option></select></div>`
+      : drv === "p1_serial" ? f("m_a", "Poort", v("port") || "/dev/ttyUSB0")
       : drv === "homey" ? `<div class="field"><label for="m_a">Apparaat in Homey</label><select id="m_a">${(SYS.homey?.meters || []).map((x) => `<option value="${esc(x.device)}" ${x.device === v("device") ? "selected" : ""}>${esc(x.name)}</option>`).join("") || `<option value="${esc(v("device"))}">${esc(v("device") || "koppel eerst Homey hieronder")}</option>`}</select></div>`
       : f("m_a", "Adres", v("host") || (same ? CFG.p1_host : ""), 'placeholder="bijv. 192.168.1.30"');
   };
@@ -870,6 +874,7 @@ async function settings() {
     if (drv === "esphome") return { p1_host: "", meter: { driver: drv, host: g("m_a"), sensor: g("m_b"), export_sensor: g("m_c"), invert: inv } };
     if (drv === "mqtt") return { p1_host: "", meter: { driver: drv, profile: g("m_p"), topic: g("m_a"), key: g("m_b"), unit: g("m_u"), invert: inv } };
     if (drv === "homey") return { p1_host: "", meter: { driver: drv, device: g("m_a"), invert: inv } };
+    if (drv === "p1_serial") return { p1_host: "", meter: { driver: drv, port: g("m_a") || "/dev/ttyUSB0", invert: inv } };
     return { p1_host: g("m_a"), meter: { driver: drv, host: g("m_a"), invert: inv } };
   };
   $("s_md").onchange = meterFields;

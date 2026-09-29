@@ -349,6 +349,9 @@ def make_meter(cfg):
         return HAMeter(ha_client(cfg), m.get("entity", ""), m.get("import_entity", ""), m.get("export_entity", ""),
                        bool(m.get("invert")))
     from . import drivers_extra as X
+    if kind == "p1_serial":
+        from .p1serial import meter_for
+        return meter_for(m.get("port") or "/dev/ttyUSB0", int(m.get("baud") or 115200), bool(m.get("invert")))
     if kind == "youless":
         return X.YouLessMeter(m.get("host") or cfg.p1_host, bool(m.get("invert")))
     if kind == "dsmr_reader":

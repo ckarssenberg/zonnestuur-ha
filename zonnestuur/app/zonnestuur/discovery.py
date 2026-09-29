@@ -140,6 +140,7 @@ SHELLY_EM_MODELS = {"SPEM-003CEBEU": "Shelly Pro 3EM", "SPEM-002CEBEU50": "Shell
                     "SPEM-003CEBEU120": "Shelly Pro 3EM"}
 
 PROBLEMS = {
+    "p1_serial": "Er zit een P1-kabel in, maar de slimme meter stuurt nog niets. Zit de stekker goed in de P1-poort van de meter? Oudere meters (voor 2014) moeten soms eerst door de netbeheerder worden aangezet.",
     "local_api_off": "Zet in de HomeWizard Energy-app bij deze P1-meter de schakelaar 'Lokale API' aan.",
     "shelly_gen1": "Deze oudere Shelly wordt niet ondersteund.",
     "shelly_password": "Op deze Shelly staat een wachtwoord. Zet het uit in de Shelly-app (Instellingen > Authenticatie).",
@@ -317,6 +318,14 @@ class Scanner:
                         self.progress = 0.15 + 0.85 * done / len(ips)
                         if is_open and ip not in self.found:
                             self._add(self.identify(ip))
+            try:                                            # P1-kabel in dit kastje zelf
+                from .p1serial import probe
+                for p in probe(timeout=12):
+                    self._add(Found(host=p["port"], kind="p1_serial", name="Slimme meter via P1-kabel", model="P1-kabel",
+                                    ok=p["ok"], problem="" if p["ok"] else "p1_serial",
+                                    extra={"active_power_w": p["grid_w"] or 0}))
+            except Exception:
+                pass
         finally:
             self.progress = 1.0
             self.running = False
@@ -324,6 +333,6 @@ class Scanner:
     def snapshot(self) -> dict:
         with self.lock:
             items = [f.to_dict() | {"problem_text": PROBLEMS.get(f.problem, "")} for f in self.found.values()]
-        order = {"p1": 0, "shelly_em": 1, "shelly": 2, "hw_socket": 3, "tasmota": 4}
+        order = {"p1_serial": -1, "p1": 0, "shelly_em": 1, "shelly": 2, "hw_socket": 3, "tasmota": 4}
         items.sort(key=lambda x: (order.get(x["kind"], 9), x["host"]))
         return {"running": self.running, "progress": round(self.progress, 2), "found": items}

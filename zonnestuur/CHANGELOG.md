@@ -1,5 +1,8 @@
 # Wijzigingen
 
+## 0.19.0 – P1-kabel
+- Slimme meter rechtstreeks uitlezen via een P1-kabel (USB), zonder HomeWizard of andere dongel. De koppel-assistent vindt de kabel zelf.
+
 ## 0.18.0 – Overzichtelijker dashboard
 - Indeling in Nu, Planning, Apparaten en Inzicht, met een vaste navigatiebalk bovenaan.
 - Nieuwe kaart "Wat Zonnestuur je oplevert": deze maand, vandaag, dit jaar en sinds de start, inclusief de thuisbatterij, met de opbrengst per dag.
