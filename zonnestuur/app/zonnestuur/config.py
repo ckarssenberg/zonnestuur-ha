@@ -32,6 +32,7 @@ class DeviceConfig:
     # Garantie: op deze tijden moet het apparaat 'vol' zijn (boiler warm, auto geladen).
     # Is het dat niet, dan mag het in de garantieminuten ervoor van het net bijladen.
     ready_times: list[str] = field(default_factory=list)   # bijv. ["06:30", "18:30"]
+    ready_days: list[int] = field(default_factory=list)   # 0=ma … 6=zo; leeg = elke dag
     guarantee_min: int = 120       # zoveel minuten voor elke ready_time mag hij van het net bijladen
     full_lookback_h: float = 4.0   # 'vol' telt als dat binnen zoveel uur voor de ready_time gemeten is
     detect_full: bool = True       # herken 'vol': aan geschakeld maar neemt geen stroom meer op
@@ -273,6 +274,8 @@ def config_from_dict(raw: dict) -> Config:
     if (cfg.notify or {}).get("service") and not str(cfg.notify["service"]).startswith("notify."):
         raise ValueError("Meldingen: kies een dienst die met 'notify.' begint")
     for d in cfg.devices:
+        if any(not isinstance(x, int) or not 0 <= x <= 6 for x in d.ready_days):
+            raise ValueError(f"Ongeldige dagen voor {d.name}")
         for t in d.ready_times:
             hh, mm = t.split(":")
             if not (0 <= int(hh) < 24 and 0 <= int(mm) < 60):

@@ -104,14 +104,15 @@ class Controller:
     # ---- garantie --------------------------------------------------------
     @staticmethod
     def ready_datetimes(d: DeviceConfig, now: datetime) -> list[datetime]:
-        """Komende klaar-tijden binnen 24 uur, oplopend."""
+        """Komende klaar-tijden binnen 24 uur, oplopend (alleen op de gekozen weekdagen)."""
         out = []
         for t in d.ready_times:
             hh, mm = (int(x) for x in t.split(":"))
             dt = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
             if dt <= now:
                 dt += timedelta(days=1)
-            out.append(dt)
+            if not d.ready_days or dt.weekday() in d.ready_days:
+                out.append(dt)
         return sorted(out)
 
     def is_satisfied(self, d: DeviceConfig, st: DeviceState, ready: datetime) -> bool:

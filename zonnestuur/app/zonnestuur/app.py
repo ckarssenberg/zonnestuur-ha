@@ -708,7 +708,7 @@ class Engine:
                 st = self.controller.states[d.id]
                 ready = self.controller.ready_datetimes(d, now)
                 devices.append({"id": d.id, "name": d.name, "kind": d.kind, "power_nominal_w": d.power_w,
-                                "ready_times": d.ready_times, "guarantee_min": d.guarantee_min, "driver": d.driver,
+                                "ready_times": d.ready_times, "ready_days": d.ready_days, "guarantee_min": d.guarantee_min, "driver": d.driver,
                                 "modulating": d.modulating, "min_w": round(d.min_w), "max_w": round(d.max_w),
                                 "w_per_step": round(d.w_per_step),
                                 "next_ready": ready[0].isoformat(timespec="minutes") if ready else None,
@@ -736,6 +736,7 @@ class Engine:
                 "problems": self.problems(),
                 "license": self.license_state().to_dict(),
                 "has_panels": self.cfg.solar.has_panels,
+                "solar_kwp": self.cfg.solar.kwp,
                 "inverter": ({"entity": self.limiter.entity, "limited": self.limiter.active,
                               "limit_w": self._rounded(self.limiter.limit_w), "reason": self.limiter.reason}
                              if self.limiter else None),
