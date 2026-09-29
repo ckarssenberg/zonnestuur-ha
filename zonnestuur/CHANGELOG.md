@@ -1,5 +1,11 @@
 # Wijzigingen
 
+## 0.16.0 – Zonnecoach
+- Nieuw kerncijfer: hoeveel van je zonnestroom je zelf gebruikt (vandaag en deze week), plus hoeveel van je verbruik uit eigen zon komt.
+- Zonnecoach op het dashboard: je score met de laatste 14 dagen, het zonnevenster van vandaag of morgen, en persoonlijke tips met stappen en wat ze per jaar opleveren.
+- Zonder zonnepanelen: welk deel van je stroom je in goedkope uren gebruikt, met tips.
+- Ochtendmelding op zonnige dagen: "Tussen 11:00 en 15:00 ± 9 kWh over" (met meldingen aan).
+
 ## 0.15.0 – Zelflerend
 - Zonnestuur leert je huis kennen: eigen verbruik per uur (werkdag en weekend apart, zonder de gestuurde apparaten en de batterij), sluipverbruik en piekmomenten.
 - Leert per apparaat hoe lang het echt nodig heeft en plant daarmee (uit te zetten per apparaat).

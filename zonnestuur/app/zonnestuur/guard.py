@@ -83,7 +83,8 @@ class InverterLimiter:
 
 # ------------------------------------------------------------------------------------------ meldingen
 COOLDOWN = {"surplus": timedelta(hours=20), "negative_tomorrow": timedelta(hours=20),
-            "offline": timedelta(hours=12), "meter": timedelta(hours=6), "inverter": timedelta(hours=6)}
+            "offline": timedelta(hours=12), "meter": timedelta(hours=6), "inverter": timedelta(hours=6),
+            "morning": timedelta(hours=20)}
 
 
 @dataclass

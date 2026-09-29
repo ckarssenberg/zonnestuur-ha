@@ -94,7 +94,27 @@
   .card { position: relative; background: linear-gradient(180deg, var(--card-hi), var(--card)); border: 1px solid var(--card-line);
           border-radius: 26px; padding: 22px; box-shadow: var(--shadow); backdrop-filter: blur(22px) saturate(150%);
           -webkit-backdrop-filter: blur(22px) saturate(150%); min-width: 0; }
-  .c-hero, .c-plan, .c-usage, .c-feed, .c-learn { grid-column: span 12; }
+  .c-hero, .c-plan, .c-usage, .c-feed, .c-learn, .c-coach { grid-column: span 12; }
+  .coach-grid { display: grid; grid-template-columns: minmax(250px, 340px) minmax(0, 1fr); gap: 26px; align-items: start; }
+  .score { display: flex; gap: 18px; align-items: center; }
+  .score svg { width: 124px; height: 124px; flex: none; }
+  .score .pct { font: 650 30px/1 "Inter Tight", Inter, sans-serif; letter-spacing: -.03em; }
+  .score .rt { font-weight: 650; font-size: 14.5px; margin-top: 2px; }
+  .window { display: flex; gap: 14px; align-items: center; background: var(--glow-soft); border-radius: 18px; padding: 14px 16px; margin-bottom: 14px; }
+  .window .wi { width: 40px; height: 40px; border-radius: 13px; background: var(--card-solid); display: grid; place-items: center; flex: none; }
+  .window b { display: block; font-size: 15px; } .window span { font-size: 13px; color: var(--ink-2); }
+  .tip-item { border-top: 1px solid var(--rule); padding: 12px 2px; }
+  .tip-item:first-of-type { border-top: 0; padding-top: 2px; }
+  .tip-h { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  .tip-h b { font-size: 15px; letter-spacing: -.005em; }
+  .tip-h .gain { font-size: 12.5px; font-weight: 650; white-space: nowrap; color: var(--good); background: var(--good-soft); padding: 3px 9px; border-radius: 999px; }
+  .tip-item p { margin: 4px 0 6px; font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+  .tip-item details summary { font-size: 13px; font-weight: 600; cursor: pointer; color: var(--ink); }
+  .tip-item ol { margin: 8px 0 2px; padding-left: 20px; font-size: 13.5px; color: var(--ink-2); line-height: 1.55; }
+  .tip-item ol li { margin: 3px 0; }
+  .explain { margin-top: 14px; font-size: 13px; color: var(--ink-2); }
+  .explain summary { cursor: pointer; font-weight: 600; color: var(--ink); }
+  @media (max-width: 860px) { .coach-grid { grid-template-columns: 1fr; } }
   .c-devs { grid-column: span 8; } .c-side { grid-column: span 4; display: grid; gap: 14px; align-content: start; min-width: 0; }
   .c-today { grid-column: span 7; } .c-month { grid-column: span 5; }
   @media (min-width: 1021px) {
@@ -295,6 +315,12 @@
       </div>
     </section>
 
+    <!-- zonnecoach -->
+    <section class="card c-coach" aria-labelledby="coachTitle">
+      <div class="title-row"><div><div class="eyebrow">Zonnecoach</div><h2 class="sec" id="coachTitle">Gebruik je genoeg van je eigen zon?</h2></div><span class="small muted" id="coachNote"></span></div>
+      <div id="coachBody"><div class="empty">Laden…</div></div>
+    </section>
+
     <!-- dagplan -->
     <section class="card c-plan" aria-labelledby="priceTitle">
       <div class="title-row"><div><div class="eyebrow">Stroomprijs en planning</div><h2 class="sec" id="priceTitle">Zo plant Zonnestuur je dag</h2></div><span class="small muted" id="priceNote"></span></div>
@@ -431,6 +457,7 @@ async function api(path, opts = {}) {
   return r.json();
 }
 
+let COACH = null;
 let STATUS = null, TODAY = null, MONTH = [], PRICES = null, USAGE = null, USE_P = "day", USE_OFF = 0, INSIGHT = null;
 
 const VERB = { boiler: "verwarmt", ev: "laadt", heatpump: "draait", generic: "draait" };
@@ -529,7 +556,12 @@ function renderStatus(s) {
   k.push(["Bij de meter", g == null ? "–" : `${kw(g)}<small>kW</small>`, g == null ? (s.strategy === "price" ? "geen meter nodig" : "geen meterdata") : g < -30 ? "↗ naar het net" : g > 30 ? "↙ van het net" : "in balans"]);
   k.push(["Stroomprijs nu", `${eur3(s.price_now)}`, s.contract === "dynamic" ? (cur && avgT != null ? `${CLASS_WORD[priceClass(cur.all_in, avgT)]} · gem. ${nl(avgT, 3)}` : "dynamisch") : "vast tarief"]);
   k.push(["Bespaard deze maand", eur(s.month.eur_saved), `vandaag ${eur(s.today.eur_saved)}`]);
-  if (bat) k.push(["Batterij", bat.soc == null ? "–" : `${nl(bat.soc)}<small>%</small>`, bat.online ? BACT[bat.action] || "" : "niet bereikbaar"]);
+  const sc = COACH && COACH.scores;
+  if (s.has_panels && sc && (sc.today.self_use_pct != null || sc.week.self_use_pct != null)) {
+    const td = sc.today.self_use_pct, wk = sc.week.self_use_pct;
+    k.push(["Zonnestroom zelf gebruikt", td != null ? `${nl(td)}<small>%</small>` : `${nl(wk)}<small>%</small>`, td != null ? `vandaag · deze week ${wk != null ? nl(wk) + "%" : "–"}` : "deze week"]);
+  } else if (!s.has_panels && sc && sc.cheap_pct_week != null) k.push(["In goedkope uren", `${nl(sc.cheap_pct_week)}<small>%</small>`, "van je stroom, deze week"]);
+  else if (bat) k.push(["Batterij", bat.soc == null ? "–" : `${nl(bat.soc)}<small>%</small>`, bat.online ? BACT[bat.action] || "" : "niet bereikbaar"]);
   else if (s.has_panels) k.push(["Uit eigen zon", pct(s.month.solar_pct || 0), `${nl(s.month.kwh_solar, 1)} kWh deze maand`]);
   else k.push(["Slim gestuurd", `${nl(s.month.kwh, 1)}<small>kWh</small>`, "deze maand in goedkope uren"]);
   $("kpis").innerHTML = k.map(([a, b, c]) => `<div class="kpi"><div class="k">${a}</div><div class="v">${b}</div><div class="d">${c}</div></div>`).join("");
@@ -1181,7 +1213,72 @@ function drawLearned() {
   hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; cross.setAttribute("opacity", 0); dots.forEach((d) => d.setAttribute("opacity", 0)); });
 }
 let LEARN_KEY = "";
-function drawCharts() { drawToday(); drawMonth(); drawPrices(); drawUsage(); drawInsight(); drawLanes(); drawLearned(); }
+
+// ---------- zonnecoach ----------
+function drawCoach() {
+  const C = COACH, body = $("coachBody"); if (!C) return;
+  const sc = C.scores, panels = C.has_panels;
+  $("coachTitle").textContent = panels ? "Gebruik je genoeg van je eigen zon?" : "Gebruik je stroom op de goedkoopste momenten?";
+  const main = panels ? sc.week.self_use_pct : sc.cheap_pct_week;
+  $("coachNote").textContent = panels && sc.week.pv_kwh ? `deze week ${nl(sc.week.pv_kwh, 1)} kWh opgewekt${sc.week.measured ? "" : " (geschat uit de zonvoorspelling)"}` : "";
+  const ring = (v, col) => {
+    const f = Math.max(0, Math.min(100, v || 0)) / 100, c = 2 * Math.PI * 52;
+    return `<svg viewBox="0 0 124 124" role="img" aria-label="${v == null ? "nog geen gegevens" : nl(v) + " procent"}"><circle cx="62" cy="62" r="52" fill="none" stroke="var(--chip)" stroke-width="12"/>
+      <circle cx="62" cy="62" r="52" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 62 62)"/>
+      <text x="62" y="70" text-anchor="middle" font-size="26" font-weight="650" fill="var(--ink)" font-family="Inter Tight, Inter, sans-serif">${v == null ? "–" : nl(v) + "%"}</text></svg>`;
+  };
+  let left;
+  if (panels) {
+    left = main == null ? `<div class="empty" style="text-align:left;padding:6px 0">Na een dag meten zie je hier hoeveel van je zonnestroom je zelf gebruikt.${""}</div>`
+      : `<div class="score">${ring(main, "var(--sun)")}<div>
+          <div class="small muted">van je zonnestroom gebruik je zelf</div>
+          <div class="rt">${esc(sc.rating_text)}</div>
+          <div class="small muted" style="margin-top:8px"><b style="color:var(--ink)">${sc.week.self_supply_pct != null ? nl(sc.week.self_supply_pct) + "%" : "–"}</b> van je verbruik kwam uit eigen zon</div>
+          ${sc.today.self_use_pct != null ? `<div class="small muted"><b style="color:var(--ink)">${nl(sc.today.self_use_pct)}%</b> zelf gebruikt vandaag</div>` : ""}</div></div>
+        <div class="chart" id="coachChart" style="margin-top:16px"><svg id="coachSvg" role="img" aria-label="Zelf gebruikt per dag, laatste 14 dagen"></svg><div class="tip" id="coachTip"></div></div>
+        <div class="small muted" style="margin-top:4px">Zelf gebruikt per dag, laatste 14 dagen</div>`;
+  } else {
+    left = main == null ? `<div class="empty" style="text-align:left;padding:6px 0">Na een paar dagen meten zie je hier hoeveel van je stroom je in goedkope uren gebruikt.</div>`
+      : `<div class="score">${ring(main, "var(--cheap)")}<div><div class="small muted">van je stroom gebruikte je deze week in uren onder het daggemiddelde</div>
+          <div class="rt">${main >= 60 ? "Slim bezig" : main >= 45 ? "Goed op weg" : "Hier valt nog te winnen"}</div></div></div>`;
+  }
+  const w = (C.windows || [])[0];
+  const win = panels ? (w ? `<div class="window"><div class="wi"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--sun)" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg></div>
+        <div><b>${w.tomorrow ? "Morgen" : "Vandaag"} zon over: ${w.from}–${w.to}</b><span>± ${nl(w.kwh, 1)} kWh meer dan je huis zelf gebruikt (tot ${nl(w.peak_kw, 1)} kW). Plan hier de was, vaatwasser of de auto.</span></div></div>`
+      : `<div class="window" style="background:var(--chip)"><div><b>Vandaag geen groot zonnevenster verwacht</b><span>Zonnestuur vult aan in de goedkoopste uren waar nodig.</span></div></div>`) : "";
+  const tips = C.tips || [];
+  const tipHtml = (t) => `<div class="tip-item"><div class="tip-h"><b>${esc(t.title)}</b>${t.eur_year > 0 ? `<span class="gain">± € ${nl(t.eur_year)} per jaar</span>` : ""}</div>
+      <p>${esc(t.text)}</p><details><summary>Zo doe je het</summary><ol>${t.how.map((h) => `<li>${esc(h)}</li>`).join("")}</ol></details></div>`;
+  body.innerHTML = `<div class="coach-grid"><div>${left}</div><div>${win}
+      <div class="eyebrow" style="margin:4px 0 8px">Tips voor jouw huis</div>
+      ${tips.length ? tips.slice(0, 4).map(tipHtml).join("") : `<p class="small muted">Geen tips: je haalt al het meeste uit je zon.</p>`}
+      ${tips.length > 4 ? `<details class="explain"><summary>Nog ${tips.length - 4} tips</summary>${tips.slice(4).map(tipHtml).join("")}</details>` : ""}
+      <details class="explain"><summary>Hoe rekent Zonnestuur dit uit?</summary><p style="margin:8px 0 0;line-height:1.55">
+        <b>Zelf gebruikt</b> = opgewekte zonnestroom min wat je teruglevert, gedeeld door wat je opwekt. Hoe hoger, hoe minder zonnestroom je voor bijna niets weggeeft.<br>
+        <b>Uit eigen zon</b> = hetzelfde, maar gedeeld door je totale verbruik: hoeveel van je stroom je niet hoeft te kopen.<br>
+        ${panels ? (sc.week.measured ? "Je opwek komt van je opwek-sensor." : "Zonder opwek-sensor schat Zonnestuur je opwek uit de zonvoorspelling; koppel onder Instellingen → Zonnepanelen een opwek-sensor voor exacte cijfers.") : "Goedkope uren zijn uren onder de gemiddelde prijs van die dag."}
+        De opbrengst per tip is een schatting op je eigen meterdata van de laatste twee weken.</p></details>
+    </div></div>`;
+  if (panels && main != null) {
+    const svg = $("coachSvg"), box = $("coachChart"), tip = $("coachTip");
+    const W = Math.max(220, box.clientWidth), H = 90, L = 26, R = 2, T = 6, B = 16, n = sc.days.length;
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("height", H);
+    const Y = (v) => T + (1 - v / 100) * (H - T - B), slot = (W - L - R) / n, bw = Math.max(3, slot - 3);
+    [0, 50, 100].forEach((v) => { el("line", { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: "grid-l" }, svg);
+      el("text", { x: L - 4, y: Y(v) + 4, "text-anchor": "end", class: "axis" }, svg).textContent = v; });
+    sc.days.forEach((d, i) => {
+      const x = L + i * slot + (slot - bw) / 2, v = d.self_use_pct;
+      if (v != null && v > 0) el("path", { d: roundedTop(x, Y(v), bw, Y(0) - Y(v), 3), fill: "var(--sun)" }, svg);
+      const dt = new Date(d.day);
+      if (i === 0 || i === n - 1) el("text", { x: x + bw / 2, y: H - 3, "text-anchor": i === 0 ? "start" : "end", class: "axis" }, svg).textContent = dt.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
+      const hit = el("rect", { x: L + i * slot, y: T, width: slot, height: H - T - B, fill: "transparent" }, svg);
+      hit.addEventListener("pointerenter", () => showTip(tip, box, (L + i * slot + slot / 2) * (box.clientWidth / W), `<b>${dt.toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" })}</b>
+        <div class="row">Zelf gebruikt<em>${v == null ? "–" : nl(v) + "%"}</em></div><div class="row">Opgewekt<em>${nl(d.pv_kwh, 1)} kWh</em></div><div class="row">Teruggeleverd<em>${nl(d.export_kwh, 1)} kWh</em></div>`));
+      hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+    });
+  }
+}
+function drawCharts() { drawCoach(); drawToday(); drawMonth(); drawPrices(); drawUsage(); drawInsight(); drawLanes(); drawLearned(); }
 
 async function refresh() {
   try { renderStatus(await api("api/status")); }
@@ -1190,8 +1287,9 @@ async function refresh() {
 async function refreshCharts() {
   try {
     const r = await Promise.allSettled([api("api/today"), api("api/history?days=31"), api("api/prices"),
-      api(`api/usage?period=${USE_P}&offset=${USE_OFF}`), api("api/insight")]);
+      api(`api/usage?period=${USE_P}&offset=${USE_OFF}`), api("api/insight"), api("api/coach")]);
     const v = (i, d) => (r[i].status === "fulfilled" ? r[i].value : d);
+    COACH = v(5, COACH);
     INSIGHT = v(4, null); $("feedBody").closest("section").hidden = !INSIGHT;
     TODAY = v(0, TODAY); MONTH = v(1, MONTH); PRICES = v(2, null); USAGE = v(3, null);
     $("priceSvg").closest("section").hidden = !PRICES;

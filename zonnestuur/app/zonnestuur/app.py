@@ -437,6 +437,17 @@ class Engine:
         items = self.notifier.evaluate(now, mono, grid_w=self.grid_w, meter_online=self.meter_online or not self.cfg.has_meter,
                                        has_panels=self.cfg.solar.has_panels, devices=self.cfg.devices,
                                        states=self.controller.states, tomorrow_negative=neg)
+        if self.notifier.tips and self.cfg.solar.has_panels and 8 <= now.hour < 10:
+            key = f"zon:{now:%Y-%m-%d}"
+            if self.notifier._may(key, "morning", now):
+                from .coach import morning_message
+                try:
+                    wins = self.coach_view().get("windows") or []
+                except Exception:
+                    wins = []
+                msg = morning_message(wins[0] if wins else None)
+                if msg:
+                    items.append((key, "morning", msg[0], msg[1]))
         self.notifier.send(lambda: ha_client(self.cfg), now, items)
 
     def notify_test(self, service: str) -> dict:
@@ -889,6 +900,45 @@ class Engine:
         log.info("Historie uit Home Assistant: %d uren toegevoegd", added)
         return {"ok": True, "hours": len(rows), "added": added, "from": datetime.fromtimestamp(min(hours), self.tz).date().isoformat()}
 
+    def coach_view(self) -> dict:
+        """Zonnecoach: zelf gebruikt %, zonnevenster en persoonlijke tips (gecachet: 5 minuten)."""
+        from . import coach
+        from .insight import compute
+        now = datetime.now(self.tz)
+        cached = getattr(self, "_coach_cache", None)
+        if cached and (now - cached[0]).total_seconds() < 300:
+            return cached[1]
+        with self.lock:
+            rows = self.ledger.house_hours(int((now - timedelta(days=30)).timestamp()), int(now.timestamp()) + 3600)
+            has_panels = self.cfg.solar.has_panels
+            sc = coach.scores(rows, self.tz, now, has_panels)
+            windows = coach.solar_windows(now, self.forecast.production_w, lambda t: self.model.base_w(t.astimezone(self.tz))) \
+                if has_panels and self.forecast.hours else []
+            ins = compute(rows[-14 * 24:], self.tz, has_panels, self.cfg.devices, bool((self.cfg.inverter or {}).get("entity"))) if rows else {"ok": False}
+            devs = []
+            for d in self.cfg.devices:
+                P = d.params or {}
+                bd = (float(P["boost_temp"]) - float(P["normal_temp"])) if d.driver == "ha_setpoint" and "boost_temp" in P and "normal_temp" in P else None
+                devs.append({"id": d.id, "name": d.name, "kind": d.kind, "driver": d.driver, "modulating": d.modulating,
+                             "min_w": d.min_w if d.modulating else d.power_w, "power_w": d.power_w, "start_surplus_w": d.start_surplus_w,
+                             "boost_delta": bd})
+            evening = 0.0
+            if rows:
+                ev = [r["import_kwh"] for r in rows[-14 * 24:] if datetime.fromtimestamp(r["ts"], self.tz).hour >= 17]
+                evening = sum(ev) / max(1, len({datetime.fromtimestamp(r["ts"], self.tz).date() for r in rows[-14 * 24:]}))
+            batts = ins.get("batteries") if ins.get("ok") else None
+            ctx = {"has_panels": has_panels, "export_per_day": ins.get("export_per_day", 0.0) if ins.get("ok") else 0.0,
+                   "import_evening_per_day": evening, "peak_hours": ins.get("peak_hours") if ins.get("ok") else [],
+                   "value_kwh": (ins.get("avg_import_price", 0.25) - ins.get("avg_export_value", 0.05)) if ins.get("ok") else 0.2,
+                   "devices": devs, "batteries": bool(self.batteries), "inverter": bool(self.limiter),
+                   "negative_feed": any(sl.market < 0 for sl in self.prices.slots),
+                   "night_w": self.model.night_w, "window": windows[0] if windows else None,
+                   "best_battery": min((b for b in batts if b.get("payback_years")), key=lambda b: b["payback_years"], default=None) if batts else None}
+            out = {"has_panels": has_panels, "scores": sc, "windows": windows, "tips": coach.tips(ctx),
+                   "export_per_day": round(ctx["export_per_day"], 1)}
+        self._coach_cache = (now, out)
+        return out
+
     def insight_view(self, days: int = 365) -> dict:
         from .insight import compute
         now = datetime.now(self.tz)
@@ -1092,6 +1142,8 @@ def make_handler(engine: Engine):
                 return self._json(200, _simulate(engine.cfg, q))
             if url.path == "/api/license":
                 return self._json(200, engine.license_state(force=True).to_dict())
+            if url.path == "/api/coach":
+                return self._json(200, engine.coach_view())
             if url.path == "/api/learned":
                 with engine.lock:
                     return self._json(200, engine.learned_view())
