@@ -1,5 +1,14 @@
 # Wijzigingen
 
+## 0.15.0 – Zelflerend
+- Zonnestuur leert je huis kennen: eigen verbruik per uur (werkdag en weekend apart, zonder de gestuurde apparaten en de batterij), sluipverbruik en piekmomenten.
+- Leert per apparaat hoe lang het echt nodig heeft en plant daarmee (uit te zetten per apparaat).
+- Met een opwek-sensor stelt Zonnestuur de zonvoorspelling bij voor jouw dak.
+- Zon-, prijs- en batterijplanning rekenen met het geleerde huis in plaats van vaste aannames.
+- Nieuwe kaart "Wat Zonnestuur over je huis weet".
+- Alles per apparaat in te stellen: meerdere klaar-tijden, weekdagen, garantie, looptijd, drempels en tijden.
+- Mooier op grote schermen.
+
 ## 0.14.1
 - Dashboard terug naar het vertrouwde ontwerp van 0.13.
 - Klaar-tijden kunnen nu per weekdag gelden (bijvoorbeeld alleen op werkdagen).

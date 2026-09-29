@@ -53,9 +53,13 @@ class Ledger:
         self.conn = sqlite3.connect(path, check_same_thread=False)
         self.conn.executescript(SCHEMA)
         cols = {r[1] for r in self.conn.execute("PRAGMA table_info(house_hour)")}
-        if "batt_kwh" not in cols:                # netto geladen door de thuisbatterij (+ laden, − ontladen)
-            self.conn.execute("ALTER TABLE house_hour ADD COLUMN batt_kwh REAL NOT NULL DEFAULT 0")
-            self.conn.commit()
+        for col, ddl in (("batt_kwh", "REAL NOT NULL DEFAULT 0"),    # netto geladen door de thuisbatterij
+                         ("pv_kwh", "REAL NOT NULL DEFAULT 0"),      # zonne-opwek (gemeten of geschat)
+                         ("pv_src", "INTEGER NOT NULL DEFAULT 0"),   # 2 gemeten, 1 geschat, 0 onbekend
+                         ("fc_kwh", "REAL")):                         # voorspelde opwek (voor het bijstellen)
+            if col not in cols:
+                self.conn.execute(f"ALTER TABLE house_hour ADD COLUMN {col} {ddl}")
+        self.conn.commit()
         self._batt: dict[tuple[str, str], list[float]] = {}
         self.lock = threading.Lock()
         self._pending: dict[tuple[str, str], list[float]] = {}
@@ -84,7 +88,8 @@ class Ledger:
             acc[2] += kwh_solar * value_per_kwh
 
     def record_house(self, now: datetime, dt: float, grid_w: float, import_price: float, feed_price: float,
-                     dev_w: float = 0.0, batt_w: float = 0.0) -> None:
+                     dev_w: float = 0.0, batt_w: float = 0.0, pv_w: Optional[float] = None,
+                     pv_src: int = 0, fc_w: Optional[float] = None) -> None:
         """Hele huis per uur: afname, teruglevering en wat dat kostte/opleverde (voor het verbruiksoverzicht)."""
         if dt <= 0 or dt > 600:
             return
@@ -92,7 +97,7 @@ class Ledger:
         if self._hour is not None and self._hour[0] != ts:
             self._write_hour()
         if self._hour is None:
-            self._hour = [ts, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            self._hour = [ts, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, None]
         kwh = grid_w * dt / 3_600_000
         h = self._hour
         if kwh >= 0:
@@ -104,6 +109,11 @@ class Ledger:
             h[4] += -kwh * feed_price
         h[6] += max(0.0, dev_w) * dt / 3_600_000
         h[7] += batt_w * dt / 3_600_000
+        if pv_w is not None and pv_src:
+            h[8] += max(0.0, pv_w) * dt / 3_600_000
+            h[9] = max(h[9], pv_src)
+        if fc_w is not None:
+            h[10] = (h[10] or 0.0) + max(0.0, fc_w) * dt / 3_600_000
 
     def record_battery(self, now: datetime, dt: float, battery_id: str, power_w: float, grid_w: Optional[float],
                        import_price: float, feed_price: float) -> None:
@@ -131,15 +141,17 @@ class Ledger:
                        "eur": round(r[4], 2)} for r in rows}
 
     def _write_hour(self, keep: bool = False) -> None:
-        ts, imp, exp, cost, rev, mx, dev, batt = self._hour
-        self._hour = [ts, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] if keep else None
+        ts, imp, exp, cost, rev, mx, dev, batt, pv, src, fc = self._hour
+        self._hour = [ts, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, src, None] if keep else None
         with self.lock:
             self.conn.execute(
-                "INSERT INTO house_hour(ts, import_kwh, export_kwh, cost_eur, revenue_eur, market_x_kwh, dev_kwh, batt_kwh) "
-                "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(ts) DO UPDATE SET import_kwh=import_kwh+excluded.import_kwh, "
+                "INSERT INTO house_hour(ts, import_kwh, export_kwh, cost_eur, revenue_eur, market_x_kwh, dev_kwh, batt_kwh, pv_kwh, pv_src, fc_kwh) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(ts) DO UPDATE SET import_kwh=import_kwh+excluded.import_kwh, "
                 "export_kwh=export_kwh+excluded.export_kwh, cost_eur=cost_eur+excluded.cost_eur, "
                 "revenue_eur=revenue_eur+excluded.revenue_eur, market_x_kwh=market_x_kwh+excluded.market_x_kwh, "
-                "dev_kwh=dev_kwh+excluded.dev_kwh, batt_kwh=batt_kwh+excluded.batt_kwh", (ts, imp, exp, cost, rev, mx, dev, batt))
+                "dev_kwh=dev_kwh+excluded.dev_kwh, batt_kwh=batt_kwh+excluded.batt_kwh, pv_kwh=pv_kwh+excluded.pv_kwh, "
+                "pv_src=MAX(pv_src, excluded.pv_src), fc_kwh=CASE WHEN excluded.fc_kwh IS NULL THEN fc_kwh "
+                "ELSE COALESCE(fc_kwh, 0) + excluded.fc_kwh END", (ts, imp, exp, cost, rev, mx, dev, batt, pv, src, fc))
             self.conn.execute("DELETE FROM house_hour WHERE ts < ?", (ts - 800 * 86400,))
             self.conn.commit()
 
@@ -147,8 +159,9 @@ class Ledger:
         """Historie invoegen (uit Home Assistant); bestaande uren blijven staan."""
         with self.lock:
             cur = self.conn.executemany(
-                "INSERT OR IGNORE INTO house_hour(ts, import_kwh, export_kwh, cost_eur, revenue_eur, market_x_kwh, dev_kwh) "
-                "VALUES (?,?,?,?,?,0,0)", [(r["ts"], r["import_kwh"], r["export_kwh"], r["cost"], r["revenue"]) for r in rows])
+                "INSERT OR IGNORE INTO house_hour(ts, import_kwh, export_kwh, cost_eur, revenue_eur, market_x_kwh, dev_kwh, pv_kwh, pv_src) "
+                "VALUES (?,?,?,?,?,0,0,?,?)", [(r["ts"], r["import_kwh"], r["export_kwh"], r["cost"], r["revenue"],
+                                               r.get("pv_kwh", 0.0), r.get("pv_src", 0)) for r in rows])
             self.conn.commit()
             return cur.rowcount
 
@@ -159,21 +172,36 @@ class Ledger:
     def house_hours(self, start_ts: int, end_ts: int) -> list[dict]:
         with self.lock:
             rows = self.conn.execute(
-                "SELECT ts, import_kwh, export_kwh, cost_eur, revenue_eur, dev_kwh, batt_kwh FROM house_hour "
+                "SELECT ts, import_kwh, export_kwh, cost_eur, revenue_eur, dev_kwh, batt_kwh, pv_kwh, pv_src, fc_kwh FROM house_hour "
                 "WHERE ts >= ? AND ts < ? ORDER BY ts", (start_ts, end_ts)).fetchall()
         out = [{"ts": r[0], "import_kwh": r[1], "export_kwh": r[2], "cost": r[3], "revenue": r[4], "dev_kwh": r[5],
-                "batt_kwh": r[6]} for r in rows]
+                "batt_kwh": r[6], "pv_kwh": r[7], "pv_src": r[8], "fc_kwh": r[9]} for r in rows]
         h = self._hour
         if h is not None and start_ts <= h[0] < end_ts:
             prev = next((o for o in out if o["ts"] == h[0]), None)
             add = {"ts": h[0], "import_kwh": h[1], "export_kwh": h[2], "cost": h[3], "revenue": h[4], "dev_kwh": h[6],
-                   "batt_kwh": h[7]}
+                   "batt_kwh": h[7], "pv_kwh": h[8], "pv_src": h[9], "fc_kwh": h[10]}
             if prev:
-                for k in ("import_kwh", "export_kwh", "cost", "revenue", "dev_kwh", "batt_kwh"):
+                for k in ("import_kwh", "export_kwh", "cost", "revenue", "dev_kwh", "batt_kwh", "pv_kwh"):
                     prev[k] += add[k]
+                prev["pv_src"] = max(prev["pv_src"] or 0, add["pv_src"] or 0)
+                if add["fc_kwh"] is not None:
+                    prev["fc_kwh"] = (prev["fc_kwh"] or 0.0) + add["fc_kwh"]
             else:
                 out.append(add)
         return out
+
+    def device_daily(self, since: date) -> dict[str, list[float]]:
+        """kWh per dag per gestuurd apparaat, oud naar nieuw (dagen zonder verbruik tellen als 0)."""
+        self.flush()
+        with self.lock:
+            rows = self.conn.execute("SELECT day, device_id, kwh FROM device_day WHERE day >= ? ORDER BY day",
+                                     (since.isoformat(),)).fetchall()
+        days = sorted({r[0] for r in rows})
+        out: dict[str, dict] = {}
+        for day, dev, kwh in rows:
+            out.setdefault(dev, {})[day] = kwh
+        return {dev: [v.get(d, 0.0) for d in days] for dev, v in out.items()}
 
     def _add_sample(self, now: datetime, grid_w: Optional[float], dev_w: float, solar_w: float) -> None:
         ts = int(now.timestamp()) // BUCKET_S * BUCKET_S

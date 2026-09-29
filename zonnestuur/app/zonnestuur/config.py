@@ -37,6 +37,7 @@ class DeviceConfig:
     full_lookback_h: float = 4.0   # 'vol' telt als dat binnen zoveel uur voor de ready_time gemeten is
     detect_full: bool = True       # herken 'vol': aan geschakeld maar neemt geen stroom meer op
     expected_run_min: int = 150    # zoveel minuten draait hij gemiddeld per dag (voor het kiezen van de beste zonuren)
+    learn_run: bool = True         # looptijd per dag zelf leren uit wat het apparaat echt gebruikt
 
     @property
     def one_shot(self) -> bool:
@@ -95,6 +96,7 @@ class SolarConfig:
     azimuth: float = 0.0        # 0 = zuid, -90 = oost, 90 = west
     base_load_w: float = 350.0  # gemiddeld sluipverbruik van het huis overdag
     has_panels: bool = True     # False = geen zonnepanelen: sturen op de goedkoopste uren
+    pv_entity: str = ""         # optioneel: sensor met de echte opwek (W of kW) in Home Assistant
     forecast_url: str = "https://api.open-meteo.com/v1/forecast"
 
 

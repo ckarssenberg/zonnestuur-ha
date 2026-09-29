@@ -25,6 +25,7 @@ from .config import Config, load_config, merge_public, public_dict, save_config,
 from .discovery import PROBLEMS, Scanner, identify
 from . import license as lic
 from .guard import InverterLimiter, Notifier, negative_window
+from .learn import HouseModel, learn as learn_house
 from .battery import BatteryConfig, BatteryRuntime, HourIn, hourly_profile, import_profile, plan as plan_battery, plan_value
 from .drivers import HomeAssistant, ha_candidates, make_meter, make_switch, ha_client
 from .controller import Context, Controller, plan_cheapest_hours, plan_sunny_hours, plan_cheapest_block, plan_day, Need
@@ -71,6 +72,11 @@ class Engine:
         self.notifier = Notifier.from_config(cfg.notify)
         self.batteries = {b["id"]: BatteryRuntime(BatteryConfig.from_dict(b)) for b in cfg.batteries}
         self._lic_cache: Optional[tuple] = None
+        self.model = HouseModel(fallback_w=cfg.solar.base_load_w)
+        self._model_key = ""
+        self.pv_w: Optional[float] = None
+        self._pv_read = -1e9
+        self._wire_model()
         self._restore_state()
 
     # Laatste fout, met tijdstip: het dashboard toont alleen wat nu nog speelt.
@@ -103,6 +109,50 @@ class Engine:
                 msg = msg.replace(k, v)
             out.append({"level": "info", "text": msg})
         return out
+
+    # ---- leren -------------------------------------------------------------
+    def _wire_model(self) -> None:
+        """De planning rekent met het geleerde huis in plaats van met vaste aannames."""
+        self.forecast.base_load = lambda when: self.model.base_w(when.astimezone(self.tz))
+        self.forecast.calibration = lambda when: self.model.pv_calibration(when.astimezone(self.tz))
+
+    def relearn(self, now: datetime, force: bool = False) -> None:
+        key = f"{now:%Y%m%d%H}"
+        if key == self._model_key and not force:
+            return
+        self._model_key = key
+        from .learn import LEARN_DAYS, RUN_DAYS
+        rows = self.ledger.house_hours(int((now - timedelta(days=LEARN_DAYS)).timestamp()), int(now.timestamp()) + 3600)
+        power = {d.id: (d.max_w if d.modulating else d.power_w) for d in self.cfg.devices}
+        self.model = learn_house(rows, self.tz, self.cfg.solar.has_panels, self.cfg.solar.base_load_w,
+                                 self.ledger.device_daily((now - timedelta(days=RUN_DAYS)).date()), power)
+
+    def run_min(self, d) -> float:
+        """Hoe lang dit apparaat per dag nodig heeft: geleerd als dat kan, anders de instelling."""
+        learned = self.model.run_min(d.id) if d.learn_run else None
+        if learned:
+            return max(15.0, min(12 * 60.0, learned))
+        return float(d.expected_run_min)
+
+    def _read_pv(self, mono: float) -> tuple[Optional[float], int]:
+        """Zonne-opwek nu: gemeten (sensor) of geschat uit de bijgestelde voorspelling."""
+        ent = self.cfg.solar.pv_entity
+        if ent and mono - self._pv_read >= 30:
+            self._pv_read = mono
+            try:
+                st = ha_client(self.cfg).state(ent)
+                v = float(st.get("state"))
+                if str((st.get("attributes") or {}).get("unit_of_measurement", "W")).lower() == "kw":
+                    v *= 1000
+                self.pv_w = max(0.0, v)
+            except (DeviceError, ValueError, TypeError, OSError):
+                self.pv_w = None
+        if ent and self.pv_w is not None:
+            return self.pv_w, 2
+        if self.cfg.solar.has_panels:
+            est = self.forecast.production_w(datetime.now(self.tz))
+            return est, (1 if est is not None else 0)
+        return 0.0, 2
 
     # ---- licentie ----------------------------------------------------------
     def license_state(self, force: bool = False) -> "lic.LicenseState":
@@ -186,7 +236,8 @@ class Engine:
             # 2b. thuisbatterijen uitlezen
             self._read_batteries()
 
-            # 3. prijzen en zonvoorspelling bijwerken, garantie-planning maken
+            # 3. leren, prijzen en zonvoorspelling bijwerken, garantie-planning maken
+            self.relearn(now)
             self.prices.refresh(now)
             self._read_live_price(now, mono)
             self.forecast.refresh()
@@ -243,8 +294,10 @@ class Engine:
             # 5. boekhouding
             if self.grid_w is not None:
                 batt_w = sum(b.power_w or 0.0 for b in self.batteries.values() if b.online)
+                pv, pv_src = self._read_pv(mono)
                 self.ledger.record_house(now, dt, self.grid_w, self.prices.import_price(now),
-                                         self.prices.feed_in_price(now), sum(max(0.0, p) for p in powers.values()), batt_w)
+                                         self.prices.feed_in_price(now), sum(max(0.0, p) for p in powers.values()), batt_w,
+                                         pv, pv_src, self.forecast.raw_production_w(now) if self.cfg.solar.has_panels else None)
             for b in self.batteries.values():
                 if b.online and b.power_w is not None:
                     self.ledger.record_battery(now, dt, b.cfg.id, b.power_w, self.grid_w, self.prices.import_price(now),
@@ -308,14 +361,18 @@ class Engine:
         else:
             times = [start + timedelta(hours=i) for i in range(24)]
             price = {t: self.prices.import_price(t, live=False) for t in times}
+        learned = self.model.days >= 3
         hours = []
         for t in times:
             h = t.hour
             n = net[h]
+            load = self.model.base_w(t) / 1000 if learned else max(imp[h], base)   # geleerd eigen verbruik van dit uur
             if self.cfg.solar.has_panels:
                 fc = self.forecast.production_w(t)
-                if fc is not None:                   # zonvoorspelling vervangt het zon-deel van het profiel
-                    n = max(imp[h], base) - fc / 1000
+                if fc is not None:                   # zonvoorspelling (bijgesteld) vervangt het zon-deel
+                    n = load - fc / 1000
+            elif learned:
+                n = load
             hours.append(HourIn(t, price[t], self.prices.feed_in_price(t), n))
         return hours
 
@@ -414,12 +471,12 @@ class Engine:
                     continue
                 start = end - timedelta(hours=d.full_lookback_h)
                 need_s = d.guarantee_min * 60
-            elif d.expected_run_min > 0 or d.one_shot:
+            elif self.run_min(d) > 0 or d.one_shot:
                 end = now.replace(hour=23, minute=0, second=0, microsecond=0)
                 if end <= now:
                     continue
                 start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                need_s = (d.expected_run_min or 120) * 60 - (0 if d.one_shot else st.run_seconds_today)
+                need_s = (self.run_min(d) or 120) * 60 - (0 if d.one_shot else st.run_seconds_today)
             else:
                 continue
             old = plans.get(d.id)
@@ -475,7 +532,7 @@ class Engine:
             if old and old["end"] == end.isoformat() and (old["key"] == key or any(h <= hour for h in old["hours"])):
                 out[d.id] = old["hours"]
                 continue
-            run_s = max(d.expected_run_min, d.guarantee_min if d.ready_times else 0) * 60 or 3600
+            run_s = max(self.run_min(d), d.guarantee_min if d.ready_times else 0) * 60 or 3600
             candidates = self.prices.upcoming(hour.astimezone(timezone.utc), end.astimezone(timezone.utc))
             if d.one_shot:
                 start = plan_cheapest_block(run_s, candidates)
@@ -504,16 +561,16 @@ class Engine:
             while t < end_day:
                 prod = self.forecast.production_w(t + timedelta(minutes=30))
                 if prod is not None:
-                    surplus.append((t, prod - self.cfg.solar.base_load_w))
+                    surplus.append((t, prod - self.model.base_w(t.astimezone(self.tz))))
                 t += timedelta(hours=1)
             needs = []
             for d in sorted(self.cfg.devices, key=lambda x: x.priority):
                 st = self.controller.states[d.id]
-                if d.expected_run_min <= 0 and not d.one_shot:
+                if self.run_min(d) <= 0 and not d.one_shot:
                     continue
                 if d.ready_times and self.controller.next_unsatisfied(d, st, now) is None:
                     continue                                  # al vol / klaar
-                left_h = max(0.0, (d.expected_run_min or 120) / 60 - (0 if d.one_shot else st.run_seconds_today / 3600))
+                left_h = max(0.0, (self.run_min(d) or 120) / 60 - (0 if d.one_shot else st.run_seconds_today / 3600))
                 ready = self.controller.ready_datetimes(d, now)
                 deadline = ready[0] - timedelta(minutes=d.guarantee_min) if ready and ready[0].date() == now.date() else None
                 needs.append(Need(d.id, d.max_w, left_h, d.min_w if d.modulating else 0.0, d.modulating, d.one_shot, deadline))
@@ -531,6 +588,9 @@ class Engine:
             self.switches = self._make_switches(new)
             self.prices = PriceProvider(new.contract, enabled=new.use_prices)
             self.forecast = SolarForecast(new.solar, enabled=new.use_forecast)
+            self.model.fallback_w = new.solar.base_load_w
+            self._wire_model()
+            self._model_key = ""                     # opnieuw leren met de nieuwe instellingen
             self.controller = Controller(new)
             for dev_id, st in old_states.items():
                 if dev_id in self.controller.states:
@@ -742,7 +802,18 @@ class Engine:
                              if self.limiter else None),
                 "notifications": self.notifier.history[:5] if self.notifier else [],
                 "batteries": self._batteries_view(today),
+                "learned": self.learned_view(),
             }
+
+    def learned_view(self) -> dict:
+        out = self.model.to_dict()
+        out["devices"] = [{"id": d.id, "name": d.name, "learned_min": (out["device_run_min"].get(d.id) or {}).get("min"),
+                           "kwh": (out["device_run_min"].get(d.id) or {}).get("kwh"), "days": (out["device_run_min"].get(d.id) or {}).get("days"),
+                           "setting_min": d.expected_run_min, "learn": d.learn_run, "used_min": round(self.run_min(d))}
+                          for d in self.cfg.devices]
+        out["pv_sensor"] = bool(self.cfg.solar.pv_entity)
+        out["fallback_w"] = round(self.cfg.solar.base_load_w)
+        return out
 
     def _batteries_view(self, today) -> list:
         if not self.batteries:
@@ -765,6 +836,9 @@ class Engine:
         if m.get("driver") != "ha" or not ha.get("token"):
             return {"ok": False, "error": "alleen mogelijk met een meter-sensor uit Home Assistant"}
         ids = [x for x in (m.get("entity"), m.get("import_entity"), m.get("export_entity")) if x]
+        pv_ent = self.cfg.solar.pv_entity if self.cfg.solar.has_panels else ""
+        if pv_ent:
+            ids.append(pv_ent)
         now = datetime.now(self.tz)
         start = (now - timedelta(days=days)).replace(minute=0, second=0, microsecond=0)
         try:
@@ -798,6 +872,7 @@ class Engine:
                                   (now + timedelta(days=1)).date().isoformat())
             for k, v in hist.get("hours", []):
                 market[int(datetime.fromisoformat(k.replace("Z", "+00:00")).timestamp())] = v
+        pv_h = {ts: max(0.0, v * factor[pv_ent]) / 1000 for ts, v in data.get(pv_ent, [])} if pv_ent else {}
         rows = []
         for ts, (imp, exp) in sorted(hours.items()):
             when = datetime.fromtimestamp(ts, self.tz)
@@ -806,9 +881,11 @@ class Engine:
                 fp = market[ts] / 1.21 + self.prices._feed_in_adjust()
             else:
                 ip, fp = c.import_price, c.feed_in_price - (c.return_cost if c.type == "fixed" else 0)
-            rows.append({"ts": ts, "import_kwh": imp, "export_kwh": exp, "cost": imp * ip, "revenue": exp * fp})
+            rows.append({"ts": ts, "import_kwh": imp, "export_kwh": exp, "cost": imp * ip, "revenue": exp * fp,
+                         "pv_kwh": pv_h.get(ts, 0.0), "pv_src": 2 if ts in pv_h else (0 if self.cfg.solar.has_panels else 2)})
         added = self.ledger.insert_house_hours(rows)
         self.ledger.save_state("backfill", {"done": now.isoformat(), "hours": len(rows)})
+        self._model_key = ""                         # meteen opnieuw leren met de historie
         log.info("Historie uit Home Assistant: %d uren toegevoegd", added)
         return {"ok": True, "hours": len(rows), "added": added, "from": datetime.fromtimestamp(min(hours), self.tz).date().isoformat()}
 
@@ -1015,6 +1092,9 @@ def make_handler(engine: Engine):
                 return self._json(200, _simulate(engine.cfg, q))
             if url.path == "/api/license":
                 return self._json(200, engine.license_state(force=True).to_dict())
+            if url.path == "/api/learned":
+                with engine.lock:
+                    return self._json(200, engine.learned_view())
             if url.path == "/api/insight":
                 return self._json(200, engine.insight_view())
             if url.path == "/api/prices":

@@ -69,6 +69,10 @@
     background-attachment: fixed;
   }
   .num { font-family: "Inter Tight", "Inter", system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  @media (min-width: 1600px) { main { max-width: 1520px !important; } body { font-size: 15.5px; } }
+  @media (min-width: 2200px) { main { max-width: 1840px !important; } body { font-size: 16px; } .card { padding: 26px; }
+    .headline { font-size: 52px !important; } .kpi .v { font-size: 25px; } }
+  .hero-grid .flow { max-width: 560px; width: 100%; justify-self: center; }
   main { max-width: 1240px; margin: 0 auto; padding: max(14px, env(safe-area-inset-top)) 16px 40px; }
 
   /* kop */
@@ -90,9 +94,14 @@
   .card { position: relative; background: linear-gradient(180deg, var(--card-hi), var(--card)); border: 1px solid var(--card-line);
           border-radius: 26px; padding: 22px; box-shadow: var(--shadow); backdrop-filter: blur(22px) saturate(150%);
           -webkit-backdrop-filter: blur(22px) saturate(150%); min-width: 0; }
-  .c-hero, .c-plan, .c-usage, .c-feed { grid-column: span 12; }
+  .c-hero, .c-plan, .c-usage, .c-feed, .c-learn { grid-column: span 12; }
   .c-devs { grid-column: span 8; } .c-side { grid-column: span 4; display: grid; gap: 14px; align-content: start; min-width: 0; }
   .c-today { grid-column: span 7; } .c-month { grid-column: span 5; }
+  @media (min-width: 1021px) {
+    /* zijkolom (batterij + besparing) loopt door naast 'vandaag': geen gat onder de apparaten */
+    .c-side { grid-row: span 2; }
+    .c-today { grid-column: span 8; } .c-month { grid-column: span 12; }
+  }
   .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
   .title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
   h2.sec { font: 650 20px/1.2 "Inter Tight", Inter, sans-serif; letter-spacing: -.02em; margin: 2px 0 0; }
@@ -368,6 +377,12 @@
       <details class="table"><summary>Toon als tabel</summary><table id="useTable"></table></details>
     </section>
 
+    <!-- geleerd -->
+    <section class="card c-learn" aria-labelledby="learnTitle">
+      <div class="title-row"><div><div class="eyebrow">Zelflerend</div><h2 class="sec" id="learnTitle">Wat Zonnestuur over je huis weet</h2></div><span class="small muted" id="learnNote"></span></div>
+      <div id="learnBody"><div class="empty">Laden…</div></div>
+    </section>
+
     <!-- teruglevering -->
     <section class="card c-feed" aria-labelledby="feedTitle">
       <div class="title-row"><div><div class="eyebrow">Inzicht</div><h2 class="sec" id="feedTitle">Waar gaat je stroom heen?</h2></div><span class="small muted" id="feedNote"></span></div>
@@ -535,6 +550,8 @@ function renderStatus(s) {
   document.querySelectorAll(".fc-l").forEach((e) => { e.hidden = !s.has_panels; });
   $("foot").textContent = `Contract: ${s.contract === "dynamic" ? "dynamisch" : "vast"}${s.supplier ? " (" + s.supplier + ")" : ""} · ${s.strategy === "price" ? "besparing t.o.v. de gemiddelde prijs van de dag" : "besparing gerekend zonder salderen, zoals vanaf 2027"} · ${Lc.plan === "pro" ? "Pro" : Lc.plan === "trial" ? "proef" : "Basis"} · versie ${s.version}`;
   drawLanes();
+  const lk = JSON.stringify(s.learned || {});
+  if (lk !== LEARN_KEY) { LEARN_KEY = lk; drawLearned(); }
 }
 
 // ---------- energiestroom ----------
@@ -1097,7 +1114,74 @@ async function backfill() {
   } catch (e) {}
 }
 
-function drawCharts() { drawToday(); drawMonth(); drawPrices(); drawUsage(); drawInsight(); drawLanes(); }
+
+// ---------- geleerd: het huis leren kennen ----------
+const hm = (min) => { const h = Math.floor(min / 60), m = Math.round(min % 60); return h ? `${h} u${m ? " " + m + " min" : ""}` : `${m} min`; };
+function drawLearned() {
+  const s = STATUS, body = $("learnBody"); if (!s || !s.learned) return;
+  const Lr = s.learned;
+  $("learnNote").textContent = Lr.days ? `geleerd uit ${Lr.days} ${Lr.days === 1 ? "dag" : "dagen"} meterdata` : "";
+  if (Lr.days < 3) {
+    body.innerHTML = `<div class="empty">Zonnestuur is je huis aan het leren kennen (${Lr.days} van minstens 3 dagen).<br>Hij leert je verbruik per uur, apart voor werkdagen en het weekend, en hoe lang je apparaten echt nodig hebben. Tot die tijd rekent hij met de instellingen.</div>`;
+    return;
+  }
+  const wd = Lr.profile.werkdag || [], we = Lr.profile.weekend || [];
+  const pvTxt = Lr.pv_factor_all != null ? `<div><b>${nl(Lr.pv_factor_all * 100)}%</b><span>van de voorspelde zon leveren je panelen echt${Lr.pv_factor_all < 0.95 ? " (voorspelling bijgesteld)" : ""}</span></div>`
+    : s.has_panels ? `<div><b>–</b><span>${Lr.pv_sensor ? "voorspelling bijstellen: na 5 zonnige dagen" : "koppel een opwek-sensor om de zonvoorspelling bij te stellen"}</span></div>` : "";
+  body.innerHTML = `<div class="use-stats">
+      <div><b>${Lr.night_w != null ? nl(Lr.night_w) + " W" : "–"}</b><span>sluipverbruik, altijd aan</span></div>
+      ${Lr.day_kwh.werkdag != null ? `<div><b>${nl(Lr.day_kwh.werkdag, 1)} kWh</b><span>eigen verbruik op een werkdag</span></div>` : ""}
+      ${Lr.day_kwh.weekend != null ? `<div><b>${nl(Lr.day_kwh.weekend, 1)} kWh</b><span>op een weekenddag</span></div>` : ""}
+      ${Lr.peak ? `<div><b>${String(Lr.peak.hour).padStart(2, "0")}:00</b><span>hier piekt je verbruik meestal (${nl(Lr.peak.w)} W)</span></div>` : ""}
+      ${pvTxt}
+    </div>
+    <div class="chart" id="learnChart"><svg id="learnSvg" role="img" aria-label="Geleerd eigen verbruik per uur, werkdag en weekend"></svg><div class="tip" id="learnTip"></div></div>
+    <div class="legend"><span><i class="sw" style="background:var(--net)"></i>Werkdag</span><span><i class="sw" style="background:var(--batt)"></i>Weekend</span><span class="muted">eigen verbruik in W, zonder de apparaten die Zonnestuur stuurt</span></div>
+    ${Lr.devices.length ? `<div class="advice">${Lr.devices.map((d) => `<div><b>${esc(d.name)}</b><p>${
+      !d.learn ? `Vaste instelling: ${hm(d.setting_min)} per dag.`
+      : d.learned_min != null ? `Heeft gemiddeld <b style="display:inline;color:var(--ink)">${hm(d.learned_min)}</b> per dag nodig (${nl(d.kwh, 1)} kWh, geleerd uit ${d.days} dagen). Zonnestuur plant daarmee.`
+      : `Nog aan het leren; tot die tijd ${hm(d.setting_min)} per dag.`}</p></div>`).join("")}</div>` : ""}
+    <p class="small muted" style="margin-top:12px">Zonnestuur gebruikt dit elk uur voor de planning: hoeveel zon er over is voor je apparaten, wanneer de batterij moet leveren, en hoe lang elk apparaat moet draaien. Hoe langer hij draait, hoe beter het klopt.</p>`;
+  const svg = $("learnSvg"), box = $("learnChart"), tip = $("learnTip");
+  const W = Math.max(300, box.clientWidth), H = 200, L = 44, R = 60, T = 12, B = 26;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("height", H);
+  const all = [...wd, ...we].filter((v) => v != null);
+  const sc = niceScale(Math.max(500, ...all)), ymax = sc.max;
+  const X = (h) => L + (h / 23) * (W - L - R), Y = (v) => T + (1 - v / ymax) * (H - T - B);
+  for (let v = 0; v <= ymax + 1e-9; v += sc.step) {
+    el("line", { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: "grid-l" }, svg);
+    el("text", { x: L - 6, y: Y(v) + 4, "text-anchor": "end", class: "axis" }, svg).textContent = nl(v);
+  }
+  for (let h = 0; h < 24; h += (W < 560 ? 6 : 3)) el("text", { x: X(h), y: H - 6, "text-anchor": "middle", class: "axis" }, svg).textContent = String(h).padStart(2, "0") + ":00";
+  const lastY = (arr) => { for (let h = 23; h >= 0; h--) if (arr[h] != null) return Y(arr[h]); return null; };
+  let yWd = lastY(wd), yWe = lastY(we);
+  if (yWd != null && yWe != null && Math.abs(yWd - yWe) < 14) { const m = (yWd + yWe) / 2; yWd = m - 7; yWe = m + 7; }   // labels niet over elkaar
+  const line = (arr, col, label, ly) => {
+    const pts = arr.map((v, h) => v == null ? null : [X(h), Y(v)]).filter(Boolean);
+    if (pts.length < 2) return;
+    el("polyline", { points: pts.map((p) => p.join(",")).join(" "), fill: "none", stroke: col, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    const last = pts[pts.length - 1];
+    el("text", { x: last[0] + 8, y: (ly ?? last[1]) + 4, class: "axis", fill: "var(--ink-2)", "font-weight": 600 }, svg).textContent = label;
+  };
+  line(we, "var(--batt)", "Weekend", yWe);
+  line(wd, "var(--net)", "Werkdag", yWd);
+  const cross = el("line", { y1: T, y2: H - B, stroke: "var(--ink-3)", "stroke-width": 1, opacity: 0 }, svg);
+  const dots = [el("circle", { r: 4, fill: "var(--net)", stroke: "var(--card-solid)", "stroke-width": 2, opacity: 0 }, svg),
+                el("circle", { r: 4, fill: "var(--batt)", stroke: "var(--card-solid)", "stroke-width": 2, opacity: 0 }, svg)];
+  const hit = el("rect", { x: L, y: T, width: W - L - R, height: H - T - B, fill: "transparent" }, svg);
+  hit.addEventListener("pointermove", (e) => {
+    const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * (W / r.width);
+    const h = Math.max(0, Math.min(23, Math.round(((px - L) / (W - L - R)) * 23)));
+    cross.setAttribute("x1", X(h)); cross.setAttribute("x2", X(h)); cross.setAttribute("opacity", 1);
+    [[wd, 0], [we, 1]].forEach(([a, i]) => { if (a[h] != null) { dots[i].setAttribute("cx", X(h)); dots[i].setAttribute("cy", Y(a[h])); dots[i].setAttribute("opacity", 1); } else dots[i].setAttribute("opacity", 0); });
+    showTip(tip, box, X(h) * (box.clientWidth / W), `<b>${String(h).padStart(2, "0")}:00–${String(h + 1).padStart(2, "0")}:00</b>
+      <div class="row"><i class="sw" style="background:var(--net)"></i>Werkdag<em>${wd[h] != null ? nl(wd[h]) + " W" : "–"}</em></div>
+      <div class="row"><i class="sw" style="background:var(--batt)"></i>Weekend<em>${we[h] != null ? nl(we[h]) + " W" : "–"}</em></div>`);
+  });
+  hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; cross.setAttribute("opacity", 0); dots.forEach((d) => d.setAttribute("opacity", 0)); });
+}
+let LEARN_KEY = "";
+function drawCharts() { drawToday(); drawMonth(); drawPrices(); drawUsage(); drawInsight(); drawLanes(); drawLearned(); }
 
 async function refresh() {
   try { renderStatus(await api("api/status")); }

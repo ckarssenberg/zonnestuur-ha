@@ -27,6 +27,9 @@ class SolarForecast:
         self.fetcher = fetcher or http_get_json
         self.hours: dict[datetime, float] = {}   # uur (UTC) -> geschatte opwek in W
         self._last_fetch = 0.0
+        # Wat Zonnestuur over het huis geleerd heeft (zie learn.py); standaard de vaste aannames.
+        self.base_load: Callable[[datetime], float] = lambda when: self.solar.base_load_w
+        self.calibration: Callable[[datetime], float] = lambda when: 1.0
 
     def refresh(self, force: bool = False) -> None:
         if not self.enabled:
@@ -52,9 +55,15 @@ class SolarForecast:
             log.warning("Zonvoorspelling ophalen mislukt: %s", exc)
             self._last_fetch = time.time() - 3 * 3600 + 900
 
-    def production_w(self, when: datetime) -> Optional[float]:
+    def raw_production_w(self, when: datetime) -> Optional[float]:
+        """Voorspelling zoals Open-Meteo hem geeft (nog niet bijgesteld)."""
         hour = when.astimezone(timezone.utc).replace(minute=0, second=0, microsecond=0)
         return self.hours.get(hour)
+
+    def production_w(self, when: datetime) -> Optional[float]:
+        """Verwachte opwek, bijgesteld met wat je panelen in de praktijk leveren."""
+        raw = self.raw_production_w(when)
+        return None if raw is None else raw * self.calibration(when)
 
     def expected_surplus_seconds(self, start: datetime, end: datetime, needed_w: float) -> Optional[float]:
         """Hoeveel seconden tussen start en end er naar verwachting genoeg overschot is voor een apparaat.
@@ -70,7 +79,7 @@ class SolarForecast:
             prod = self.production_w(t)
             if prod is None:
                 return None if total == 0 else total
-            surplus = prod - self.solar.base_load_w
+            surplus = prod - self.base_load(t)
             if surplus >= needed_w:
                 total += (nxt - t).total_seconds()
             elif surplus > needed_w * 0.6:
