@@ -1,5 +1,9 @@
 # Wijzigingen
 
+## 0.13.0 – Zonnestuur Pro
+- 30 dagen alles proberen; daarna Zonnestuur Basis (gratis) of Pro (€ 49 per jaar). Zie PRO.md.
+- Licentiesleutel activeren onder Instellingen → Zonnestuur Pro. Controle gebeurt lokaal, zonder account of internet.
+
 ## 0.12.0 – Thuisbatterij en nieuw dashboard
 - **Thuisbatterij sturen**: HomeWizard Plug-In Battery, Zendure, Marstek, Sessy, Victron en andere batterijen in Home Assistant. Zonnestuur plant elk uur wanneer de batterij zelf gebruikt, spaart voor de dure uren of goedkoop laadt, op basis van je eigen verbruik, de zonvoorspelling en de uurprijzen. Zon-overschot gaat eerst naar je apparaten.
 - **Nieuw dashboard**: in één zin wat er nu gebeurt, live energiestroom met batterij, en een dagplanning per apparaat en batterij onder de prijsgrafiek.

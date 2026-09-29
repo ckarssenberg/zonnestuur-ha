@@ -23,6 +23,7 @@ from . import __version__
 from .adapters import DeviceError, HomeWizardP1, ShellySwitch, NotReady, http_get_json
 from .config import Config, load_config, merge_public, public_dict, save_config, effective_ha
 from .discovery import PROBLEMS, Scanner, identify
+from . import license as lic
 from .guard import InverterLimiter, Notifier, negative_window
 from .battery import BatteryConfig, BatteryRuntime, HourIn, hourly_profile, import_profile, plan as plan_battery, plan_value
 from .drivers import HomeAssistant, ha_candidates, make_meter, make_switch, ha_client
@@ -69,6 +70,7 @@ class Engine:
         self.limiter = InverterLimiter.from_config(cfg.inverter)
         self.notifier = Notifier.from_config(cfg.notify)
         self.batteries = {b["id"]: BatteryRuntime(BatteryConfig.from_dict(b)) for b in cfg.batteries}
+        self._lic_cache: Optional[tuple] = None
         self._restore_state()
 
     # Laatste fout, met tijdstip: het dashboard toont alleen wat nu nog speelt.
@@ -101,6 +103,36 @@ class Engine:
                 msg = msg.replace(k, v)
             out.append({"level": "info", "text": msg})
         return out
+
+    # ---- licentie ----------------------------------------------------------
+    def license_state(self, force: bool = False) -> "lic.LicenseState":
+        today = datetime.now(self.tz).date()
+        if force or not self._lic_cache or self._lic_cache[0] != today:
+            stored = self.ledger.load_state("license")
+            state, st = lic.evaluate(stored, today)
+            if st != stored:
+                self.ledger.save_state("license", st)
+            self._lic_cache = (today, state)
+        return self._lic_cache[1]
+
+    def set_license(self, key: str) -> dict:
+        key = (key or "").strip()
+        if key and lic.verify(key) is None:
+            return {"ok": False, "error": "Deze sleutel klopt niet. Kopieer hem in zijn geheel, beginnend met ZS1."}
+        st = dict(self.ledger.load_state("license") or {})
+        if key:
+            st["key"] = key
+        else:
+            st.pop("key", None)
+        self.ledger.save_state("license", st)
+        state = self.license_state(force=True)
+        if state.plan != "pro" and key:
+            return {"ok": False, "error": state.error or "Deze sleutel is niet (meer) geldig", **state.to_dict()}
+        return {"ok": True, **state.to_dict()}
+
+    def _basic_device(self) -> Optional[str]:
+        """Zonnestuur Basis stuurt één apparaat automatisch: dat met de hoogste prioriteit."""
+        return min(self.cfg.devices, key=lambda d: d.priority).id if self.cfg.devices else None
 
     # ---- regelronde ------------------------------------------------------
     def tick(self, now: Optional[datetime] = None, mono: Optional[float] = None) -> None:
@@ -164,9 +196,18 @@ class Engine:
             # 4. beslissen en schakelen
             price_hours = self._plan_price(now)
             price_now = self.prices.import_price(now) if self.cfg.contract.type == "dynamic" and self.prices.slots else None
+            pro = self.license_state().pro
+            if not pro:                     # Basis: alleen zon-overschot en de klaar-tijd-garantie
+                cheapest, sunny, price_hours, price_now = {}, {}, {}, None
+            basic_id = None if pro else self._basic_device()
             ctx = Context(now=now, mono=mono, grid_w=self._grid_for_controller(now), dt=dt, cheapest_hours=cheapest, sunny_hours=sunny,
                           price_hours=price_hours, price_now=price_now)
             for dec in self.controller.step(ctx):
+                if (basic_id and dec.on and dec.device_id != basic_id
+                        and not dec.reason.startswith(("handmatig", "garantie"))):
+                    self.controller.states[dec.device_id].on = False
+                    self.controller.states[dec.device_id].reason = "automatisch sturen: met Zonnestuur Pro"
+                    continue
                 try:
                     sw = self.switches[dec.device_id]
                     if dec.on != self._last_on.get(dec.device_id):
@@ -181,12 +222,23 @@ class Engine:
                     log.warning(self.last_error)
                     self.controller.states[dec.device_id].on = not dec.on
 
-            # 4a. thuisbatterijen: plan per uur, nu uitvoeren (na de apparaten: die gaan voor)
-            self._run_batteries(now, mono)
+            if basic_id:
+                for d in self.cfg.devices:
+                    st = self.controller.states[d.id]
+                    if d.id != basic_id and st.mode == "auto" and not st.on:
+                        st.reason = "automatisch sturen: met Zonnestuur Pro"
 
+            # 4a. thuisbatterijen: plan per uur, nu uitvoeren (na de apparaten: die gaan voor)
             # 4b. omvormer begrenzen als terugleveren geld kost, en meldingen
-            self._limit_inverter(now, mono)
-            self._notify(now, mono)
+            if pro:
+                self._run_batteries(now, mono)
+                self._limit_inverter(now, mono)
+                self._notify(now, mono)
+            else:
+                for b in self.batteries.values():
+                    b.reason = "batterij regelt zichzelf; slim plannen met Zonnestuur Pro"
+                if self.limiter and self.limiter.active:
+                    self._limit_inverter_release(mono)
 
             # 5. boekhouding
             if self.grid_w is not None:
@@ -293,6 +345,15 @@ class Engine:
             except (DeviceError, ValueError, OSError) as exc:
                 self.last_error = f"{b.cfg.name}: {exc}"
                 log.warning(self.last_error)
+
+    def _limit_inverter_release(self, mono: float) -> None:
+        self.limiter._last = -1e9
+        value = self.limiter.decide(mono, self.grid_w, 1.0)             # 'terugleveren loont': vol vermogen
+        if value is not None:
+            try:
+                self.limiter.apply(ha_client(self.cfg), value)
+            except (DeviceError, ValueError, OSError) as exc:
+                log.warning("omvormer terugzetten mislukt: %s", exc)
 
     def _limit_inverter(self, now: datetime, mono: float) -> None:
         if not self.limiter:
@@ -673,6 +734,7 @@ class Engine:
                 "year": self.ledger.totals(year_start),
                 "last_error": self.last_error,
                 "problems": self.problems(),
+                "license": self.license_state().to_dict(),
                 "has_panels": self.cfg.solar.has_panels,
                 "inverter": ({"entity": self.limiter.entity, "limited": self.limiter.active,
                               "limit_w": self._rounded(self.limiter.limit_w), "reason": self.limiter.reason}
@@ -950,6 +1012,8 @@ def make_handler(engine: Engine):
                 return self._json(200, _solar_history(engine.cfg, q.get("start", [""])[0], q.get("end", [""])[0]))
             if url.path == "/api/simulate":
                 return self._json(200, _simulate(engine.cfg, q))
+            if url.path == "/api/license":
+                return self._json(200, engine.license_state(force=True).to_dict())
             if url.path == "/api/insight":
                 return self._json(200, engine.insight_view())
             if url.path == "/api/prices":
@@ -998,6 +1062,8 @@ def make_handler(engine: Engine):
                     return self._json(400, {"error": str(exc)})
                 engine.apply_config(new)
                 return self._json(200, public_dict(engine.cfg))
+            if url.path == "/api/license":
+                return self._json(200, engine.set_license(str(body.get("key", ""))))
             if url.path == "/api/notify/test":
                 return self._json(200, engine.notify_test(str(body.get("service", ""))))
             if url.path == "/api/setup/scan":

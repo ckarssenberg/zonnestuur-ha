@@ -110,7 +110,7 @@
   .headline { font: 650 clamp(28px, 3.6vw, 44px)/1.08 "Inter Tight", Inter, sans-serif; letter-spacing: -.035em; margin: 8px 0 10px; text-wrap: balance; }
   .subline { color: var(--ink-2); font-size: 15.5px; margin: 0; max-width: 46ch; text-wrap: pretty; }
   .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-  .pill { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; padding: 6px 11px; border-radius: 999px; background: var(--chip); color: var(--ink-2); }
+  .pill { text-decoration: none; display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; padding: 6px 11px; border-radius: 999px; background: var(--chip); color: var(--ink-2); }
   .pill.warn { background: var(--warn-soft); color: var(--warn); }
   .pill.sun { background: var(--glow-soft); color: var(--sun-ink); }
   .pill.net { background: color-mix(in srgb, var(--net) 14%, transparent); color: var(--net); }
@@ -500,7 +500,10 @@ function renderStatus(s) {
   $("hero").className = "card c-hero " + cls;
   $("headline").textContent = head;
   $("subline").textContent = sub;
-  $("pills").innerHTML = (s.problems || []).map((p) => `<span class="pill ${p.level === "warn" ? "warn" : ""}">${p.level === "warn" ? "⚠︎ " : ""}${esc(p.text)}</span>`).join("");
+  const Lc = s.license || {};
+  const licPill = Lc.plan === "trial" && Lc.days_left <= 10 ? `<a class="pill sun" href="instellingen">Proef: nog ${Lc.days_left} ${Lc.days_left === 1 ? "dag" : "dagen"} alles · Pro ${esc(Lc.price)}</a>`
+    : Lc.plan === "basic" ? `<a class="pill" href="instellingen">Zonnestuur Basis · alles slim sturen met Pro →</a>` : "";
+  $("pills").innerHTML = licPill + (s.problems || []).map((p) => `<span class="pill ${p.level === "warn" ? "warn" : ""}">${p.level === "warn" ? "⚠︎ " : ""}${esc(p.text)}</span>`).join("");
 
   // kerncijfers
   const bat = (s.batteries || [])[0];
@@ -530,7 +533,7 @@ function renderStatus(s) {
     : s.month.kwh > 0 ? `${nl(s.month.kwh, 1)} kWh deze maand slim ingepland.` : "Zodra je apparaten stroom gebruiken, zie je hier wat het oplevert.";
   if (s.strategy === "price") document.querySelectorAll(".lbl-sun").forEach((e) => { e.textContent = "In goedkope uren"; });
   document.querySelectorAll(".fc-l").forEach((e) => { e.hidden = !s.has_panels; });
-  $("foot").textContent = `Contract: ${s.contract === "dynamic" ? "dynamisch" : "vast"}${s.supplier ? " (" + s.supplier + ")" : ""} · ${s.strategy === "price" ? "besparing t.o.v. de gemiddelde prijs van de dag" : "besparing gerekend zonder salderen, zoals vanaf 2027"} · versie ${s.version}`;
+  $("foot").textContent = `Contract: ${s.contract === "dynamic" ? "dynamisch" : "vast"}${s.supplier ? " (" + s.supplier + ")" : ""} · ${s.strategy === "price" ? "besparing t.o.v. de gemiddelde prijs van de dag" : "besparing gerekend zonder salderen, zoals vanaf 2027"} · ${Lc.plan === "pro" ? "Pro" : Lc.plan === "trial" ? "proef" : "Basis"} · versie ${s.version}`;
   drawLanes();
 }
 

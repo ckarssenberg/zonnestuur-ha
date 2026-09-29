@@ -663,6 +663,28 @@ function klaar() {
 }
 
 // ---------- instellingen ----------
+const PRO_FEATURES = ["Alle apparaten automatisch (Basis: één)", "Slimme dagplanning op zon én uurprijzen",
+  "Sturen op de goedkoopste uren, ook zonder zonnepanelen", "Thuisbatterij slim laden en ontladen",
+  "Omvormer begrenzen bij negatieve prijzen", "Meldingen op je telefoon"];
+async function licenseCard() {
+  const box = $("licCard"); if (!box) return;
+  let L; try { L = await api("api/license"); } catch (e) { return; }
+  const head = L.plan === "pro" ? `<b>Pro</b> is actief${L.expires ? " tot " + new Date(L.expires).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" }) : ""}${L.email ? " · " + esc(L.email) : ""}.`
+    : L.plan === "trial" ? `Je probeert alles gratis: nog <b>${L.days_left} ${L.days_left === 1 ? "dag" : "dagen"}</b>. Daarna gaat Zonnestuur verder als Basis.`
+    : `Je gebruikt <b>Zonnestuur Basis</b>: inzicht, één apparaat op zon-overschot en de klaar-tijd-garantie.`;
+  box.innerHTML = `<h2 class="t">Zonnestuur Pro</h2>
+    <p class="small" style="margin-top:-4px">${head}</p>
+    ${L.error ? `<p class="small" style="color:var(--warn)">${esc(L.error)}</p>` : ""}
+    ${L.plan !== "pro" ? `<ul class="small muted" style="margin:10px 0 12px; padding-left:18px; line-height:1.7">${PRO_FEATURES.map((f) => `<li>${f}</li>`).join("")}</ul>
+      <a class="btn" href="${esc(L.buy_url)}" target="_blank" rel="noopener">Pro kopen · ${esc(L.price)}</a>` : ""}
+    <div class="row" style="margin-top:14px"><div class="field"><label for="licKey">Licentiesleutel</label><input id="licKey" placeholder="ZS1.…" autocomplete="off" spellcheck="false"></div>
+      <div class="field" style="flex:0 0 auto"><button class="btn ghost" id="licBtn">${L.plan === "pro" ? "Vervangen" : "Activeren"}</button></div></div>
+    <p class="small muted" id="licRes" role="status">Installatie-ID: <b>${esc(L.install_id)}</b></p>`;
+  $("licBtn").onclick = async () => {
+    const r = await api("api/license", { method: "POST", body: JSON.stringify({ key: $("licKey").value }) });
+    if (r.ok) { toast("Zonnestuur Pro is actief"); licenseCard(); } else $("licRes").textContent = r.error;
+  };
+}
 function batteryHtml(b) {
   const f = (id, label, val, type = "text", extra = "") => `<div class="field" ${extra}><label for="${id}">${label}</label><input id="${id}" type="${type}" ${type === "number" ? 'step="any"' : ""} value="${esc(val ?? "")}"></div>`;
   const m = b.mode_map || {};
@@ -706,6 +728,7 @@ async function settings() {
   const md = (CFG.meter && CFG.meter.driver) || "homewizard";
   $("app").innerHTML = `<div class="settings">
     <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:6px"><h1 class="t" style="margin:0">Instellingen</h1><a class="btn ghost small" href="./">← Dashboard</a></div>
+    <section class="card" id="licCard"><h2 class="t">Zonnestuur Pro</h2><p class="small muted">Laden…</p></section>
     <section class="card"><h2 class="t">Apparaten</h2>
       <div>${CFG.devices.map((d, i) => `<div class="dev-row"><div class="ico" style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--chip)">${ICONS[d.kind].replace("<svg", '<svg width="20" height="20" stroke="currentColor" fill="none" stroke-width="1.8"')}</div>
         <div style="flex:1;min-width:0"><b>${esc(d.name)}</b><div class="small muted">${esc(DRIVER_LABEL[d.driver] || d.driver)} · ${esc(d.host || d.params.entity || d.params.current_entity || d.params.button_entity || "")} · ${d.driver === "ha_current" ? "traploos" : nl(d.power_w) + " W"} · prioriteit ${d.priority}</div></div>
@@ -804,6 +827,7 @@ async function settings() {
       CFG = await api("api/config"); settings(); toast(`Gekoppeld: ${r.devices.length} apparaten beschikbaar`);
     } catch (e) { $("s_hares").textContent = e.message; }
   };
+  licenseCard();
   const bindBattery = () => { if ($("b_on")) $("b_on").onchange = () => { $("b_form").hidden = !$("b_on").checked; }; };
   bindBattery();
   if (CFG.has_ha) {
