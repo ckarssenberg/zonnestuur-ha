@@ -26,6 +26,7 @@ from .discovery import PROBLEMS, Scanner, identify
 from . import license as lic
 from . import netsetup
 from . import failsafe
+from .events import EventTracker, Health, price_rank, sun_hours_ahead
 from .guard import InverterLimiter, Notifier, negative_window
 from .learn import HouseModel, learn as learn_house
 from .battery import BatteryConfig, BatteryRuntime, HourIn, hourly_profile, import_profile, plan as plan_battery, plan_value
@@ -45,7 +46,8 @@ STATIC = {
     "/icon-192.png": ("icon-192.png", "image/png"),
     "/icon-512.png": ("icon-512.png", "image/png"),
 }
-PAGES = {"/": "index.html", "/index.html": "index.html", "/setup": "setup.html", "/instellingen": "setup.html"}
+PAGES = {"/": "index.html", "/index.html": "index.html", "/setup": "setup.html", "/instellingen": "setup.html",
+         "/rapport": "rapport.html", "/kiosk": "kiosk.html"}
 
 
 class Engine:
@@ -76,6 +78,8 @@ class Engine:
         self._last_on: dict[str, Optional[bool]] = {}
         self.limiter = InverterLimiter.from_config(cfg.inverter)
         self.notifier = Notifier.from_config(cfg.notify)
+        self.events = EventTracker(self.ledger)
+        self.health = Health()
         self.batteries = {b["id"]: BatteryRuntime(BatteryConfig.from_dict(b)) for b in cfg.batteries}
         self._lic_cache: Optional[tuple] = None
         self.model = HouseModel(fallback_w=cfg.solar.base_load_w)
@@ -254,6 +258,330 @@ class Engine:
         """Zonnestuur Basis stuurt één apparaat automatisch: dat met de hoogste prioriteit."""
         return min(self.cfg.devices, key=lambda d: d.priority).id if self.cfg.devices else None
 
+    def _device(self, device_id: str):
+        return next((d for d in self.cfg.devices if d.id == device_id), None)
+
+    # ---- betrouwbaarheid en logboek -----------------------------------------
+    def _confirm_switch(self, now: datetime, mono: float, d, actual_on: bool) -> None:
+        res = self.health.check(now, mono, d, actual_on)
+        day = now.date().isoformat()
+        if res == "retry":
+            want = not actual_on
+            try:
+                self.switches[d.id].set(want)
+                log.info("%s: stand klopte niet, opnieuw %s", d.name, "AAN" if want else "UIT")
+            except DeviceError as exc:
+                log.warning("%s: opnieuw schakelen mislukt: %s", d.name, exc)
+        elif res == "failed":
+            self.ledger.inc(day, "switch_failed")
+            self.events.note(now, d.id, d.name, "MISLUKT",
+                             f"Schakelen lukte niet: {d.name} bleef {'aan' if actual_on else 'uit'}, ook na een tweede poging. "
+                             "Staat hij aan en in het netwerk?")
+            if self.notifier:
+                self.notifier.queue_alert(f"fail:{d.id}", f"{d.name} schakelt niet",
+                                          f"Zonnestuur probeerde {d.name} {'uit' if actual_on else 'aan'} te zetten, maar de stand veranderde niet. "
+                                          "Kijk of het apparaat aan staat en verbinding heeft.")
+        if res is None and d.id not in self.health.pending and self._confirmed_count.get(day, 0) != self.health.ok:
+            self._confirmed_count = {day: self.health.ok}
+            self.ledger.set_stat(day, "switch_ok", self.health.ok)
+
+    _confirmed_count: dict = {}
+
+    def _event_inputs(self, now: datetime, d, ctx) -> dict:
+        price = self.prices.import_price(now)
+        rank = None
+        if self.cfg.contract.type == "dynamic" and self.prices.slots:
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            day = [p for _, _, p in self.prices.upcoming(start.astimezone(timezone.utc), (start + timedelta(days=1)).astimezone(timezone.utc))]
+            rank = price_rank(price, day)
+        st = self.controller.states.get(d.id)
+        inp = {"surplus_w": None if ctx.grid_w is None else -ctx.grid_w, "price_now": price, "price_rank": rank,
+               "until": st.override_until.strftime("%H:%M") if st and st.override_until else None,
+               "not_before": (d.params or {}).get("not_before") or None}
+        if self.cfg.solar.has_panels and self.forecast.hours:
+            try:
+                inp["sun_hours"] = sun_hours_ahead(now, self.forecast.production_w, lambda t: self.model.base_w(t.astimezone(self.tz)),
+                                                   d.start_threshold_w)
+            except Exception:
+                pass
+        return inp
+
+    def events_view(self, days: int = 2) -> dict:
+        now = datetime.now(self.tz)
+        since = int((now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days - 1)).timestamp())
+        with self.lock:
+            return {"events": self.events.view(since, 150), "health": self.health.view(now, time.monotonic())}
+
+    # ---- doel, weekrapport, moment, contractcheck, uitleg --------------------
+    def goal_view(self, now: Optional[datetime] = None) -> dict:
+        from .report import goal
+        now = now or datetime.now(self.tz)
+        m0 = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        rows = self.ledger.house_hours(int(m0.timestamp()), int(now.timestamp()) + 3600)
+        tot = self.ledger.totals(m0.date())
+        bat = sum(v["eur"] for v in self.ledger.battery_totals(m0.date()).values())
+        return goal(self.cfg.goal, rows, tot["kwh_solar"], tot["eur_saved"] + bat, self.cfg.solar.has_panels, now.date())
+
+    def report_view(self, offset: int = 0) -> dict:
+        from .report import self_use, week_report
+        now = datetime.now(self.tz)
+        monday = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(weeks=offset)
+        end = monday + timedelta(days=7)
+        prev = monday - timedelta(days=7)
+
+        def eur_between(a: datetime, b: datetime) -> tuple[float, dict]:
+            per: dict[str, dict] = {}
+            total = 0.0
+            for r in self.ledger.device_days(a.date()):
+                if r["day"] >= b.date().isoformat():
+                    continue
+                p = per.setdefault(r["device"], {"eur": 0.0, "kwh": 0.0, "kwh_solar": 0.0})
+                p["eur"] += r["eur"]
+                p["kwh"] += r["kwh"]
+                p["kwh_solar"] += r["kwh_solar"]
+                total += r["eur"]
+            with self.ledger.lock:
+                b_eur = self.ledger.conn.execute("SELECT COALESCE(SUM(eur),0) FROM battery_day WHERE day >= ? AND day < ?",
+                                                 (a.date().isoformat(), b.date().isoformat())).fetchone()[0]
+            return total + b_eur, per
+
+        e_week, per = eur_between(monday, end)
+        e_prev, _ = eur_between(prev, monday)
+        rows = self.ledger.house_hours(int(monday.timestamp()), int(end.timestamp()))
+        stats = self.ledger.stats(monday.date().isoformat())
+        in_week = {d: v for d, v in stats.items() if d < end.date().isoformat()}
+        overrides = int(sum(v.get("override", 0) for v in in_week.values()))
+        failed = int(sum(v.get("switch_failed", 0) for v in in_week.values()))
+        meetdagen = sum(1 for v in in_week.values() for k in v if k.startswith("meetdag:"))
+        outlook = ""
+        if offset == 0:
+            try:
+                wins = self.coach_view().get("windows") or []
+                tw = [w for w in wins if w.get("tomorrow")]
+                if self.cfg.solar.has_panels and tw:
+                    outlook = f"Morgen zon over tussen {tw[0]['from']} en {tw[0]['to']}, ± {round(tw[0]['kwh'])} kWh."
+                elif self.cfg.solar.has_panels and self.forecast.hours:
+                    outlook = "Morgen weinig zon verwacht: Zonnestuur vult aan in de goedkoopste uren."
+            except Exception:
+                pass
+        tips = []
+        try:
+            tips = self.coach_view().get("tips") or []
+        except Exception:
+            pass
+        r = week_report(week_start=monday.date(), eur_week=e_week, eur_prev=e_prev, su_week=self_use(rows),
+                        goal_v=self.goal_view(now), per_device=per, names={d.id: d.name for d in self.cfg.devices},
+                        solar_to_devices=sum(p["kwh_solar"] for p in per.values()), outlook=outlook,
+                        action=tips[0] if tips else None, overrides=overrides, failed=failed, meetdagen=meetdagen,
+                        motivation=self.cfg.motivation)
+        r["days"] = []
+        for i in range(7):
+            d = (monday + timedelta(days=i)).date()
+            if d > now.date():
+                break
+            dr = [x for x in rows if datetime.fromtimestamp(x["ts"], self.tz).date() == d]
+            su = self_use(dr)
+            r["days"].append({"day": d.isoformat(), "self_use_pct": None if su["pct"] is None else round(su["pct"]),
+                              "pv_kwh": round(su["pv"], 1), "eur": round(sum(x["eur"] for x in self.ledger.device_days(d) if x["day"] == d.isoformat()), 2)})
+        r["offset"] = offset
+        return r
+
+    def moment_view(self) -> dict:
+        from .report import moment
+        now = datetime.now(self.tz)
+        with self.lock:
+            nxt = None
+            if self.cfg.solar.has_panels and self.forecast.hours:
+                try:
+                    wins = self.coach_view().get("windows") or []
+                    w = next((w for w in wins if not w.get("tomorrow")), None)
+                    if w and w["from"] > now.strftime("%H:%M"):
+                        nxt = w["from"]
+                except Exception:
+                    pass
+            surplus_next = None
+            if self.cfg.solar.has_panels:
+                p = self.forecast.production_w(now + timedelta(hours=1))
+                if p is not None:
+                    surplus_next = p - self.model.base_w(now + timedelta(hours=1))
+            price = self.prices.import_price(now)
+            rank = None
+            if self.cfg.contract.type == "dynamic" and self.prices.slots:
+                start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                day = [p for _, _, p in self.prices.upcoming(start.astimezone(timezone.utc), (start + timedelta(days=1)).astimezone(timezone.utc))]
+                rank = price_rank(price, day)
+                if nxt is None:
+                    future = [(s, p) for s, _, p in self.prices.upcoming(now.astimezone(timezone.utc), (start + timedelta(days=1)).astimezone(timezone.utc))]
+                    if future:
+                        cheapest = min(future, key=lambda x: x[1])
+                        if cheapest[1] < price - 0.03:
+                            nxt = cheapest[0].astimezone(self.tz).strftime("%H:%M")
+            m = moment(now, self.grid_w, surplus_next, price if self.cfg.contract.type == "dynamic" else None, rank, nxt,
+                       self.cfg.solar.has_panels)
+            m.update(at=now.isoformat(timespec="minutes"), price_now=round(price, 4), grid_w=None if self.grid_w is None else round(self.grid_w))
+            return m
+
+    def compare_view(self) -> dict:
+        from .report import compare
+        from .suppliers import DYNAMIC, FIXED, CHECKED_ON, energy_tax_for
+        now = datetime.now(self.tz)
+        cache = self.ledger.load_state("compare")
+        if cache and cache.get("day") == now.date().isoformat():
+            return cache["data"]
+        rows = self.ledger.house_hours(int((now - timedelta(days=365)).timestamp()), int(now.timestamp()))
+        rows = [r for r in rows if r["import_kwh"] or r["export_kwh"]]
+        if len(rows) < 24 * 7:
+            return {"ok": False, "error": "Na een week meten kan Zonnestuur uitrekenen welk contract het goedkoopst is voor jouw huis."}
+        market: dict[int, float] = {}
+        try:
+            hist = _price_history(datetime.fromtimestamp(rows[0]["ts"], self.tz).date().isoformat(), now.date().isoformat())
+            for k, v in hist.get("hours", []):
+                market[int(datetime.fromisoformat(k.replace("Z", "+00:00")).timestamp())] = v
+        except Exception as exc:
+            log.warning("prijshistorie voor vergelijking niet op te halen: %s", exc)
+        c = self.cfg.contract
+        own_imp = c.import_price if c.type != "dynamic" else (sum(r["cost"] for r in rows) / max(0.1, sum(r["import_kwh"] for r in rows)))
+        data = compare(rows, market, lambda ts: energy_tax_for(2027), DYNAMIC, FIXED, own_imp,
+                       {"fixed_monthly": c.fixed_monthly})
+        if data.get("ok"):
+            data["checked_on"] = CHECKED_ON
+            data["own_import_price"] = round(own_imp, 4)
+            data["current"] = _supplier_name(c)
+        self.ledger.save_state("compare", {"day": now.date().isoformat(), "data": data})
+        return data
+
+    def howcalc_view(self) -> dict:
+        """'Zo rekenen we': alle bedragen waarmee Zonnestuur rekent, in gewone taal."""
+        from .report import tax_credit_for
+        now = datetime.now(self.tz)
+        c = self.cfg.contract
+        imp, feed = self.prices.import_price(now), self.prices.feed_in_price(now)
+        base = self.baseline_price(now)
+        credit = c.tax_credit_year if c.tax_credit_year is not None else tax_credit_for(now.year)
+        kinds = {d.kind for d in self.cfg.devices}
+        lines = []
+        if c.type == "dynamic":
+            lines.append(f"Stroom kopen kost nu € {imp:.3f} per kWh: marktprijs + energiebelasting (€ {self.prices.energy_tax(now):.4f}) + opslag leverancier (€ {c.supplier_markup:.4f}).")
+            lines.append(f"Terugleveren levert nu € {feed:.3f} per kWh op (kale marktprijs zonder btw, plus of min wat je leverancier doet).")
+            lines.append(f"Zonder Zonnestuur draait een apparaat op een willekeurig moment. Daarom rekenen we met de gemiddelde prijs van vandaag: € {base:.3f} per kWh.")
+        else:
+            lines.append(f"Stroom kopen kost € {c.import_price:.3f} per kWh (je vaste of variabele tarief, inclusief belastingen).")
+            lines.append(f"Terugleveren levert € {c.feed_in_price:.3f} per kWh op, min € {c.return_cost:.3f} terugleverkosten: netto € {feed:.3f}.")
+        lines.append(f"Elke kWh eigen zonnestroom die een apparaat gebruikt in plaats van terug te leveren, scheelt dus ± € {base - feed:.2f}.")
+        if c.type == "dynamic":
+            lines.append("Stroom van het net op een goedkoop uur telt als besparing (t.o.v. het daggemiddelde); op een duur uur, bijvoorbeeld voor de klaar-tijd, als extra kosten.")
+        per = []
+        if "boiler" in kinds:
+            per.append("Boiler: zonder Zonnestuur verwarmt hij als zijn eigen thermostaat dat wil. Extra warmteverlies door een warmer vat rekenen we niet mee; dat is een paar procent.")
+        if "ev" in kinds:
+            per.append("Auto: zonder Zonnestuur laadt hij meteen bij aansluiten, met vol vermogen.")
+        if "heatpump" in kinds:
+            per.append("Warmtepomp: zonder Zonnestuur geen extra opwarmen bij zon of goedkope stroom.")
+        if self.batteries:
+            per.append("Thuisbatterij: vergeleken met de batterij die alleen op 'nul op de meter' staat.")
+        if self.limiter:
+            per.append("Omvormer begrenzen: de teruglevering bij een negatieve prijs die je niet hoeft te betalen.")
+        fixed_year = 12 * (c.fixed_monthly + c.grid_monthly)
+        bill = [f"Vaste kosten: € {c.fixed_monthly:.2f} leveringskosten + € {c.grid_monthly:.2f} netbeheer per maand"
+                + ("" if fixed_year else " (nog niet ingevuld)") + f"; vermindering energiebelasting € {credit:.2f} per jaar"
+                + (" (automatisch, Belastingplan 2027)" if c.tax_credit_year is None else "") + "."]
+        return {"lines": lines, "per_device": per, "bill": bill,
+                "note": "Alle bedragen zijn schattingen. Leveranciers passen hun tarieven een paar keer per jaar aan: controleer ze bij Instellingen → Energiecontract.",
+                "baseline_price": round(base, 4), "value_own_kwh": round(base - feed, 4)}
+
+    def _publish_ha(self) -> None:
+        """Sensoren in Home Assistant: goed moment nu, zelf gebruikt, besparing deze maand."""
+        try:
+            ha = ha_client(self.cfg)
+            m = self.moment_view()
+            ha.set_state("sensor.zonnestuur_moment", m["state"], {"friendly_name": "Zonnestuur: goed moment", "icon":
+                         {"groen": "mdi:white-balance-sunny", "oranje": "mdi:weather-partly-cloudy", "rood": "mdi:timer-sand"}[m["state"]],
+                         "advies": m["word"], "uitleg": m["text"]})
+            now = datetime.now(self.tz)
+            month = now.replace(day=1).date()
+            tot = self.ledger.totals(month)
+            bat = sum(v["eur"] for v in self.ledger.battery_totals(month).values())
+            ha.set_state("sensor.zonnestuur_besparing_maand", round(tot["eur_saved"] + bat, 2),
+                         {"friendly_name": "Zonnestuur: opgeleverd deze maand", "unit_of_measurement": "EUR",
+                          "device_class": "monetary", "icon": "mdi:piggy-bank-outline"})
+            g = self.goal_view(now)
+            if g.get("now") is not None and g.get("type") == "pct":
+                ha.set_state("sensor.zonnestuur_zelf_gebruikt", g["now"],
+                             {"friendly_name": "Zonnestuur: zon zelf gebruikt (maand)", "unit_of_measurement": "%",
+                              "icon": "mdi:solar-power", "doel": g.get("target"), "status": g.get("status")})
+        except Exception as exc:                     # Home Assistant even weg: volgende keer opnieuw
+            log.debug("sensoren naar Home Assistant: %s", exc)
+
+    def export_csv(self, days: int = 60) -> str:
+        """Meetdata voor de proef, per dag (anoniem: geen namen of adressen, alleen apparaat-id's)."""
+        import csv
+        import io
+        from .report import self_use
+        now = datetime.now(self.tz)
+        start = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        rows = self.ledger.house_hours(int(start.timestamp()), int(now.timestamp()) + 3600)
+        by_day: dict[str, list] = {}
+        for r in rows:
+            by_day.setdefault(datetime.fromtimestamp(r["ts"], self.tz).date().isoformat(), []).append(r)
+        dev = {}
+        for r in self.ledger.device_days(start.date()):
+            dev.setdefault(r["day"], {})[r["device"]] = r
+        stats = self.ledger.stats(start.date().isoformat())
+        ids = [d.id for d in self.cfg.devices]
+        keys = sorted({k for v in stats.values() for k in v if not k.startswith(("meetdag:", "override:"))})
+        out = io.StringIO()
+        w = csv.writer(out, delimiter=";")
+        w.writerow(["dag", "opwek_kwh", "opwek_gemeten", "afname_kwh", "teruglevering_kwh", "zelf_gebruikt_pct", "kosten_eur", "opbrengst_eur"]
+                   + [f"{i}_{x}" for i in ids for x in ("kwh", "kwh_zon", "eur", "meetdag", "ingrepen")] + keys)
+        d = start.date()
+        while d <= now.date():
+            k = d.isoformat()
+            hr = by_day.get(k, [])
+            su = self_use(hr)
+            st = stats.get(k, {})
+            row = [k, round(su["pv"], 3), int(su["measured"]), round(sum(r["import_kwh"] for r in hr), 3), round(su["export"], 3),
+                   "" if su["pct"] is None else round(su["pct"], 1), round(sum(r["cost"] for r in hr), 3), round(sum(r["revenue"] for r in hr), 3)]
+            for i in ids:
+                x = dev.get(k, {}).get(i, {})
+                row += [round(x.get("kwh", 0), 3), round(x.get("kwh_solar", 0), 3), round(x.get("eur", 0), 3),
+                        int(st.get(f"meetdag:{i}", 0)), int(st.get(f"override:{i}", 0))]
+            row += [st.get(kk, 0) for kk in keys]
+            w.writerow([str(v).replace(".", ",") if isinstance(v, float) else v for v in row])
+            d += timedelta(days=1)
+        return out.getvalue()
+
+    # ---- eerlijke besparing en meetdagen ------------------------------------
+    def baseline_price(self, now: datetime) -> float:
+        """Wat een kWh zonder Zonnestuur had gekost: vast contract = je tarief; dynamisch = gemiddelde prijs van de dag
+        (zonder sturing draait een apparaat gemiddeld op een willekeurig moment)."""
+        if self.cfg.contract.type == "dynamic" and self.prices.slots:
+            avg = self._avg_price_today(now)
+            if avg is not None:
+                return avg
+        return self.prices.import_price(now, live=False) if self.cfg.contract.type != "dynamic" else self.prices.import_price(now)
+
+    def baseline_ids(self, now: datetime) -> set:
+        """Meetdagen: op willekeurige dagen (gemiddeld 1 op de 7) een apparaat een dag niet sturen."""
+        t = self.cfg.trial or {}
+        if not t.get("enabled"):
+            return set()
+        every = max(2, int(t.get("every", 7) or 7))
+        only = set(t.get("devices") or [])
+        out = set()
+        import hashlib
+        for d in self.cfg.devices:
+            if only and d.id not in only:
+                continue
+            h = int(hashlib.sha256(f"{now.date().isoformat()}:{d.id}".encode()).hexdigest(), 16)
+            if h % every == 0:
+                out.add(d.id)
+        day = now.date().isoformat()
+        if out and getattr(self, "_baseline_logged", "") != day:
+            self._baseline_logged = day
+            for i in out:
+                self.ledger.set_stat(day, f"meetdag:{i}", 1)
+        return out
+
     # ---- regelronde ------------------------------------------------------
     def tick(self, now: Optional[datetime] = None, mono: Optional[float] = None) -> None:
         now = now or datetime.now(self.tz)
@@ -276,6 +604,7 @@ class Engine:
                 self.grid_w = reading.grid_w
                 self.meter_online = True
                 self.meter_fail_since = None
+                self.health.meter_ok_mono = mono
             except _NoMeter:
                 self.grid_w, self.meter_online = None, False
             except DeviceError as exc:
@@ -298,6 +627,7 @@ class Engine:
                     self._last_on[d.id] = s.on
                     self.controller.update_measurements(d.id, s.on, s.power_w, s.energy_wh, True)
                     powers[d.id] = s.power_w
+                    self._confirm_switch(now, mono, d, s.on)
                 except NotReady as exc:
                     self.controller.update_measurements(d.id, False, 0.0, None, online=False, offline_reason=str(exc))
                 except (DeviceError, KeyError, ValueError) as exc:
@@ -324,18 +654,22 @@ class Engine:
                 cheapest, sunny, price_hours, price_now = {}, {}, {}, None
             basic_id = None if pro else self._basic_device()
             ctx = Context(now=now, mono=mono, grid_w=self._grid_for_controller(now), dt=dt, cheapest_hours=cheapest, sunny_hours=sunny,
-                          price_hours=price_hours, price_now=price_now)
+                          price_hours=price_hours, price_now=price_now, baseline=self.baseline_ids(now))
             for dec in self.controller.step(ctx):
                 if (basic_id and dec.on and dec.device_id != basic_id
                         and not dec.reason.startswith(("handmatig", "garantie"))):
                     self.controller.states[dec.device_id].on = False
                     self.controller.states[dec.device_id].reason = "automatisch sturen: met Zonnestuur Pro"
                     continue
+                dev = self._device(dec.device_id)
                 try:
                     sw = self.switches[dec.device_id]
                     if dec.on != self._last_on.get(dec.device_id):
                         sw.set(dec.on)
                         log.info("%s -> %s (%s)", dec.device_id, "AAN" if dec.on else "UIT", dec.reason)
+                        if dev:
+                            self.health.sent(now, mono, dev, dec.on)
+                            self.events.switched(now, dev, dec.on, dec.reason, self._event_inputs(now, dev, ctx))
                     if dec.on and dec.power_w is not None and hasattr(sw, "set_power"):
                         sw.set_power(dec.power_w)
                         log.info("%s -> %d W", dec.device_id, dec.power_w)
@@ -344,6 +678,9 @@ class Engine:
                     self.last_error = f"schakelen {dec.device_id}: {exc}"
                     log.warning(self.last_error)
                     self.controller.states[dec.device_id].on = not dec.on
+                    if dev and dec.on != self._last_on.get(dec.device_id):
+                        self.health.send_failed(now, dev, str(exc))
+                        self.ledger.inc(now.date().isoformat(), "switch_failed")
 
             if basic_id:
                 for d in self.cfg.devices:
@@ -378,11 +715,18 @@ class Engine:
                 # Besparing zonder panelen: wat je betaalt tegenover de gemiddelde prijs van vandaag
                 avg = self._avg_price_today(now)
                 saving = (avg - price_now) if (avg is not None and price_now is not None) else 0.0
-                self.ledger.record(now, dt, None, powers, saving, all_counts=True)
+                self.events.energy(self.ledger.record(now, dt, None, powers, saving, all_counts=True))
             else:
-                self.ledger.record(now, dt, self.grid_w, powers, self.prices.value_of_own_kwh(now))
+                base = self.baseline_price(now)
+                per = self.ledger.record(now, dt, self.grid_w, powers, base - self.prices.feed_in_price(now),
+                                         grid_value=base - self.prices.import_price(now))
+                self.events.energy(per)
             if reading is not None:
                 self.ledger.record_meter(now, reading.import_kwh, reading.export_kwh)
+            if mono - getattr(self, "_ha_pub", -1e9) > 60 and (self.cfg.kiosk or {}).get("ha_sensors", True) \
+                    and effective_ha(self.cfg).get("token") and self.switches is not None and not getattr(self, "_testing", False):
+                self._ha_pub = mono
+                threading.Thread(target=self._publish_ha, daemon=True, name="ha-sensoren").start()
             if mono - self._last_save > 60:
                 self.ledger.flush()
                 self._save_state()
@@ -466,7 +810,12 @@ class Engine:
                 b.plan = plan_battery(b.cfg, b.soc, hours)
                 b.value = plan_value(b.cfg, b.soc, hours, b.plan)
                 b.plan_key = key
+            prev = b.action
             b.decide_action(now, cheap_devices)
+            if b.action != prev and prev is not None:
+                word = {"auto": "levert aan het huis en laadt met overschot", "save": "spaart voor later (laadt alleen met zon)",
+                        "charge": "laadt van het net", "idle": "staat stil"}.get(b.action, b.action)
+                self.events.note(now, f"batterij:{b.cfg.id}", b.cfg.name, "BATTERIJ", f"{b.cfg.name} {word} vanaf {now:%H:%M}: {b.reason}.")
             try:
                 msg = b.apply(ha, mono, self.grid_w)
                 if msg:
@@ -487,12 +836,19 @@ class Engine:
     def _limit_inverter(self, now: datetime, mono: float) -> None:
         if not self.limiter:
             return
+        was = self.limiter.active
         value = self.limiter.decide(mono, self.grid_w, self.prices.feed_in_price(now))
         if value is None:
             return
         try:
             self.limiter.apply(ha_client(self.cfg), value)
             log.info("omvormer %s -> %s %s (%s)", self.limiter.entity, value, self.limiter.unit, self.limiter.reason)
+            if self.limiter.active != was:
+                fp = self.prices.feed_in_price(now)
+                self.events.note(now, "omvormer", "Omvormer", "OMVORMER_AF" if self.limiter.active else "OMVORMER_VOL",
+                                 f"Panelen begrensd om {now:%H:%M}: terugleveren kost nu geld ({'−' if fp < 0 else ''}€ {abs(fp):.3f} per kWh). "
+                                 "Je panelen leveren precies wat je huis gebruikt." if self.limiter.active
+                                 else f"Panelen om {now:%H:%M} weer op vol vermogen: terugleveren kost geen geld meer.")
         except (DeviceError, ValueError, OSError) as exc:
             self.last_error = f"omvormer: {exc}"
             log.warning(self.last_error)
@@ -500,16 +856,40 @@ class Engine:
     def _notify(self, now: datetime, mono: float) -> None:
         if not self.notifier:
             return
-        neg = None
+        neg = expensive = None
         if self.cfg.contract.type == "dynamic" and self.prices.slots:
             tomorrow = (now + timedelta(days=1)).date()
             start = datetime.combine(tomorrow, datetime.min.time(), self.tz)
             neg = negative_window([(s.astimezone(self.tz), e.astimezone(self.tz), p)
                                    for s, e, p in self.prices.upcoming(start, start + timedelta(days=1))], tomorrow)
+            ev0 = now.replace(hour=18, minute=0, second=0, microsecond=0)
+            evening = [(s.astimezone(self.tz), e.astimezone(self.tz), p) for s, e, p in self.prices.upcoming(ev0, ev0 + timedelta(hours=3))]
+            dear = [x for x in evening if x[2] > 0.50]
+            if dear:
+                expensive = (dear[0][0], dear[-1][1], max(p for _, _, p in dear))
+        sunny = None
+        if self.cfg.solar.has_panels and now.hour >= 19:
+            try:
+                w = next((w for w in self.coach_view().get("windows") or [] if w.get("tomorrow")), None)
+                if w and w["peak_kw"] >= 2 and w["kwh"] >= 4:
+                    sunny = dict(w, day=(now + timedelta(days=1)).date().isoformat())
+            except Exception:
+                sunny = None
+        risk = []
+        for d in self.cfg.devices:
+            st = self.controller.states.get(d.id)
+            if not st or st.online or st.offline_reason or not d.ready_times:
+                continue
+            nxt = self.controller.next_unsatisfied(d, st, now)
+            if nxt and (nxt - now) <= timedelta(minutes=max(60, d.guarantee_min)):
+                risk.append((d, nxt))
         items = self.notifier.evaluate(now, mono, grid_w=self.grid_w, meter_online=self.meter_online or not self.cfg.has_meter,
                                        has_panels=self.cfg.solar.has_panels, devices=self.cfg.devices,
-                                       states=self.controller.states, tomorrow_negative=neg)
-        if self.notifier.tips and self.cfg.solar.has_panels and 8 <= now.hour < 10:
+                                       states=self.controller.states, tomorrow_negative=neg, tomorrow_sunny=sunny,
+                                       evening_expensive=expensive, guarantee_risk=risk,
+                                       value_kwh=max(0.05, self.baseline_price(now) - self.prices.feed_in_price(now)))
+        if self.notifier.morning and self.notifier.tip_allowed(now) and self.cfg.solar.has_panels and 8 <= now.hour < 10 and not any(
+                i[1] in ("surplus", "negative_tomorrow", "sunny_tomorrow", "expensive_evening") for i in items):
             key = f"zon:{now:%Y-%m-%d}"
             if self.notifier._may(key, "morning", now):
                 from .coach import morning_message
@@ -520,17 +900,41 @@ class Engine:
                 msg = morning_message(wins[0] if wins else None)
                 if msg:
                     items.append((key, "morning", msg[0], msg[1]))
-        self.notifier.send(lambda: ha_client(self.cfg), now, items)
+        # weekrapport: zondag vanaf 19:00
+        if self.notifier.reports and now.weekday() == 6 and 19 <= now.hour < 22:
+            key = f"week:{now:%G-%V}"
+            if self.notifier._may(key, "week", now):
+                try:
+                    r = self.report_view(0)
+                    items.append((key, "week", r["title"], r["message"]))
+                except Exception as exc:
+                    log.warning("weekrapport maken mislukt: %s", exc)
+        self.notifier.send(self._ha_or_none(), now, items, click=self._public_url("rapport"))
+        for k, kind, *_ in items:
+            self.ledger.inc(now.date().isoformat(), f"melding_{kind}")
 
-    def notify_test(self, service: str) -> dict:
-        if not service.startswith("notify."):
-            return {"ok": False, "error": "Kies een melddienst"}
-        try:
-            ha_client(self.cfg).call("notify", service.split(".", 1)[1],
-                                     {"title": "Zonnestuur", "message": "Zo ziet een melding van Zonnestuur eruit. Je krijgt er alleen een als je zelf iets kunt doen."})
-            return {"ok": True}
-        except (DeviceError, ValueError, OSError) as exc:
-            return {"ok": False, "error": f"Versturen mislukt: {exc}"}
+    def _ha_or_none(self):
+        return (lambda: ha_client(self.cfg)) if effective_ha(self.cfg).get("token") else None
+
+    def _public_url(self, page: str) -> str:
+        base = str((self.cfg.notify or {}).get("link") or "")
+        if not base and not effective_ha(self.cfg).get("addon"):
+            base = "http://zonnestuur.local/"
+        return (base.rstrip("/") + "/" + page) if base else ""
+
+    def notify_test(self, conf: dict) -> dict:
+        from .notify import channels_of, merge, send_all
+        conf = merge(self.cfg.notify or {}, conf or {})
+        if not channels_of(conf):
+            return {"ok": False, "error": "Kies eerst hoe je meldingen wilt krijgen"}
+        res = send_all(conf, self._ha_or_none(), "Zonnestuur",
+                       "Zo ziet een melding van Zonnestuur eruit. Je krijgt er alleen een als er iets misgaat, "
+                       "als er een kans is om geld te besparen (hoogstens één per dag) en op zondag je weekrapport.")
+        bad = {k: v for k, v in res.items() if v != "ok"}
+        names = {"ha": "Home Assistant-app", "ntfy": "ntfy", "telegram": "Telegram", "email": "e-mail"}
+        if bad:
+            return {"ok": False, "results": res, "error": "; ".join(f"{names[k]}: {v}" for k, v in bad.items())}
+        return {"ok": True, "results": res, "sent": [names[k] for k in res]}
 
     def _plan_guarantee(self, now: datetime) -> dict[str, set]:
         """Zon + goedkope stroom (dynamisch contract, met zonnepanelen).
@@ -699,6 +1103,7 @@ class Engine:
             old_n, self.notifier = self.notifier, Notifier.from_config(new.notify)
             if old_n and self.notifier:
                 self.notifier.sent, self.notifier.history = old_n.sent, old_n.history
+                self.notifier.active, self.notifier.tip_day = old_n.active, old_n.tip_day
             if self.config_path:
                 save_config(new, self.config_path)
             self._save_state()
@@ -873,6 +1278,7 @@ class Engine:
                                 "next_ready_ok": (self.controller.is_satisfied(d, self.controller.states[d.id], ready[0])
                                                   if ready else None),
                                 "best_hours": self._best_hours(d.id, now),
+                                "last_event": next(iter(self.events.view_device(d.id, int((now - timedelta(days=2)).timestamp()))), None),
                                 **st.to_dict(), "month": per_dev.get(d.id, {"kwh": 0, "kwh_solar": 0, "eur_saved": 0})})
             return {
                 "version": __version__,
@@ -902,6 +1308,11 @@ class Engine:
                 "notifications": self.notifier.history[:5] if self.notifier else [],
                 "batteries": self._batteries_view(today),
                 "learned": self.learned_view(),
+                "health": self.health.view(now, time.monotonic()),
+                "last_events": self.events.view(int((now - timedelta(hours=36)).timestamp()), 4),
+                "baseline_today": sorted(self.baseline_ids(now)),
+                "motivation": self.cfg.motivation,
+                "goal": self.goal_view(now),
             }
 
     def _value_view(self, today, month_start, year_start) -> dict:
@@ -1125,6 +1536,14 @@ class Engine:
         out = [{k: (round(v, 3) if isinstance(v, float) else v) for k, v in b.items()} for b in buckets.values()]
         tot = {k: round(sum(b[k] for b in out), 3) for k in ("import_kwh", "export_kwh", "cost", "revenue", "dev_kwh")}
         tot["net"] = round(tot["cost"] - tot["revenue"], 2)
+        c = self.cfg.contract
+        from .report import tax_credit_for
+        days = (end - start).total_seconds() / 86400
+        credit = c.tax_credit_year if c.tax_credit_year is not None else tax_credit_for(start.year)
+        fixed = (12 * (c.fixed_monthly + c.grid_monthly) - credit) * days / 365.0
+        tot["fixed"] = round(fixed, 2)
+        tot["fixed_known"] = bool(c.fixed_monthly or c.grid_monthly)
+        tot["bill"] = round(tot["net"] + fixed, 2) if tot["fixed_known"] else None
         tot["avg_paid"] = round(tot["cost"] / tot["import_kwh"], 4) if tot["import_kwh"] > 0.05 else None
         return {"period": period, "offset": offset, "title": title, "buckets": out, "totals": tot,
                 "has_data": bool(rows), "has_meter": self.cfg.has_meter}
@@ -1148,9 +1567,13 @@ class Engine:
         return None if v is None else round(v)
 
     def set_mode(self, device_id: str, mode: str, hours: Optional[float]) -> None:
+        now = datetime.now(self.tz)
         with self.lock:
-            self.controller.set_mode(device_id, mode, datetime.now(self.tz), hours)
+            self.controller.set_mode(device_id, mode, now, hours)
             self._save_state()
+            if mode != "auto":
+                self.ledger.inc(now.date().isoformat(), "override")
+                self.ledger.inc(now.date().isoformat(), f"override:{device_id}")
 
 
 # ---- webserver --------------------------------------------------------------
@@ -1220,6 +1643,11 @@ def make_handler(engine: Engine):
                     self.send_header("Location", "setup")
                     self.end_headers()
                     return
+                if page in ("index.html", "rapport.html", "kiosk.html"):
+                    try:
+                        engine.ledger.inc(datetime.now(engine.tz).date().isoformat(), "open_" + page.split(".")[0])
+                    except Exception:
+                        pass
                 return self._send(200, (WEB_DIR / page).read_bytes(), "text/html; charset=utf-8")
             if url.path in STATIC:
                 f, ctype = STATIC[url.path]
@@ -1255,6 +1683,25 @@ def make_handler(engine: Engine):
                 return self._json(200, engine.license_state(force=True).to_dict())
             if url.path == "/api/ocpp":
                 return self._json(200, engine.ocpp_view())
+            if url.path == "/api/report":
+                return self._json(200, engine.report_view(max(0, min(52, int(q.get("offset", ["0"])[0] or 0)))))
+            if url.path == "/api/moment":
+                return self._json(200, engine.moment_view())
+            if url.path == "/api/compare":
+                return self._json(200, engine.compare_view())
+            if url.path == "/api/howcalc":
+                return self._json(200, engine.howcalc_view())
+            if url.path == "/api/export.csv":
+                body = engine.export_csv(min(400, max(1, int(q.get("days", ["60"])[0] or 60)))).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/csv; charset=utf-8")
+                self.send_header("Content-Disposition", 'attachment; filename="zonnestuur-meetdata.csv"')
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            if url.path == "/api/events":
+                return self._json(200, engine.events_view(min(14, max(1, int(q.get("days", ["2"])[0])))))
             if url.path == "/api/coach":
                 return self._json(200, engine.coach_view())
             if url.path == "/api/learned":
@@ -1328,7 +1775,7 @@ def make_handler(engine: Engine):
                 tok = str(body.get("token", "")) or (engine.cfg.homey or {}).get("token", "")
                 return self._json(200, engine.homey_test(str(body.get("url", "")), tok))
             if url.path == "/api/notify/test":
-                return self._json(200, engine.notify_test(str(body.get("service", ""))))
+                return self._json(200, engine.notify_test(body.get("notify") or body))
             if url.path == "/api/setup/scan":
                 engine.scanner.start()
                 return self._json(200, engine.scanner.snapshot())

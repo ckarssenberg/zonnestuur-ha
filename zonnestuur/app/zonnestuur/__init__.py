@@ -1,2 +1,2 @@
 """Zonnestuur: laat apparaten automatisch draaien op eigen zonnestroom."""
-__version__ = "0.20.1"
+__version__ = "0.21.0"

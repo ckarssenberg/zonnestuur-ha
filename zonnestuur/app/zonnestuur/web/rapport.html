@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Weekrapport · Zonnestuur</title>
+<style>
+  @font-face { font-family: "Inter"; src: url("fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Inter Tight"; src: url("fonts/inter-tight.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  :root {
+    color-scheme: light;
+    --bg: #f4f3ee; --card: #ffffff; --line: rgba(14, 17, 22, .08); --ink: #0d1015; --ink-2: #555d69; --ink-3: #868d98;
+    --sun: #b86e00; --sun-ink: #8f5500; --glow-soft: rgba(255, 178, 36, .18); --chip: rgba(14, 17, 22, .045);
+    --good: #1f8a4c; --warn: #b54708;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --bg: #05070a; --card: #10141a; --line: rgba(255, 255, 255, .08); --ink: #f3f5f8; --ink-2: #a2abb7; --ink-3: #6c7582;
+      --sun: #c98500; --sun-ink: #ffc24d; --glow-soft: rgba(255, 178, 36, .14); --chip: rgba(255, 255, 255, .055);
+      --good: #4ade80; --warn: #fdb022;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #05070a; --card: #10141a; --line: rgba(255, 255, 255, .08); --ink: #f3f5f8; --ink-2: #a2abb7; --ink-3: #6c7582;
+    --sun: #c98500; --sun-ink: #ffc24d; --glow-soft: rgba(255, 178, 36, .14); --chip: rgba(255, 255, 255, .055);
+    --good: #4ade80; --warn: #fdb022;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  main { max-width: 640px; margin: 0 auto; padding: max(20px, env(safe-area-inset-top)) 16px 48px; display: grid; gap: 16px; }
+  .top { display: flex; align-items: center; gap: 10px; }
+  .top a { color: var(--ink-2); text-decoration: none; font-size: 14px; font-weight: 600; }
+  .spacer { flex: 1; }
+  .nav { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--ink-2); }
+  .nav button { font: inherit; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+  .nav button:disabled { opacity: .35; cursor: default; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 22px; }
+  .eyebrow { font-size: 12px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--sun-ink); }
+  h1 { font: 650 clamp(26px, 6vw, 34px)/1.15 "Inter Tight", "Inter", sans-serif; letter-spacing: -.02em; margin: 6px 0 0; text-wrap: balance; }
+  .big { font: 650 clamp(44px, 12vw, 64px)/1 "Inter Tight", "Inter", sans-serif; letter-spacing: -.03em; margin-top: 14px; font-variant-numeric: tabular-nums; }
+  .sub { color: var(--ink-2); font-size: 14px; margin-top: 6px; }
+  ul.lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  ul.lines li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; }
+  ul.lines li i { width: 26px; height: 26px; border-radius: 8px; background: var(--glow-soft); color: var(--sun-ink); display: grid; place-items: center; font-style: normal; font-size: 13px; font-weight: 700; }
+  .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; height: 120px; margin-top: 14px; }
+  .day { display: grid; grid-template-rows: 1fr auto auto; gap: 4px; height: 100%; text-align: center; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .day .col { display: flex; align-items: flex-end; justify-content: center; }
+  .day .col span { width: 70%; max-width: 34px; border-radius: 6px 6px 2px 2px; background: var(--sun); min-height: 2px; }
+  .day b { color: var(--ink); font-weight: 650; }
+  .extra { display: flex; flex-wrap: wrap; gap: 8px; }
+  .extra span { font-size: 13px; background: var(--chip); color: var(--ink-2); padding: 5px 10px; border-radius: 999px; }
+  .muted { color: var(--ink-3); font-size: 13px; }
+  .empty { color: var(--ink-2); text-align: center; padding: 30px 0; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><a href="./">← Dashboard</a><span class="spacer"></span>
+    <span class="nav"><button id="prev" aria-label="Vorige week">‹</button><span id="wk">deze week</span><button id="next" aria-label="Volgende week" disabled>›</button></span></div>
+  <section class="card">
+    <div class="eyebrow">Weekrapport</div>
+    <h1 id="title">Laden…</h1>
+    <div class="big" id="eur">–</div>
+    <div class="sub" id="eurSub">&nbsp;</div>
+  </section>
+  <section class="card"><ul class="lines" id="lines"></ul></section>
+  <section class="card"><div class="eyebrow">Zelf gebruikt per dag</div><div class="days" id="days"></div><p class="muted" id="daysNote" style="margin:10px 0 0"></p></section>
+  <div class="extra" id="extra"></div>
+  <p class="muted">Bedragen zijn schattingen: wat je eigen zonnestroom en de goedkope uren opleverden tegenover wat je apparaten zonder Zonnestuur zouden kosten. Zie op het dashboard "Zo rekenen we".</p>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const nl = (v, d = 0) => (v ?? 0).toLocaleString("nl-NL", { minimumFractionDigits: d, maximumFractionDigits: d });
+const eur = (v) => (v < 0 ? "−" : "") + "€ " + nl(Math.abs(v), 2);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let token = ""; try { token = localStorage.getItem("zs_token") || ""; } catch (e) {}
+try { const t = localStorage.getItem("zs_theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+let OFF = 0;
+async function load() {
+  const r = await fetch(`api/report?offset=${OFF}`, { headers: token ? { "X-Token": token } : {} });
+  const R = await r.json();
+  const d0 = new Date(R.from), d1 = new Date(R.to);
+  const fmt = (d) => d.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
+  $("wk").textContent = OFF === 0 ? "deze week" : `${fmt(d0)} – ${fmt(d1)}`;
+  $("next").disabled = OFF === 0;
+  $("title").textContent = OFF === 0 ? "Je week met Zonnestuur tot nu toe" : `Je week van ${fmt(d0)} tot ${fmt(d1)}`;
+  $("eur").textContent = eur(R.eur);
+  $("eurSub").textContent = Math.abs(R.eur_prev) > 0.009 ? `opgeleverd · vorige week ${eur(R.eur_prev)}` : "opgeleverd (geschat)";
+  const icon = (l) => l.startsWith("Zelf gebruikt") ? "%" : l.startsWith("Beste") ? "★" : l.includes("CO₂") ? "♻" : l.startsWith("Morgen") ? "☀" : l.startsWith("Eén ding") ? "→" : "•";
+  $("lines").innerHTML = R.lines.slice(1).map((l) => `<li><i aria-hidden="true">${icon(l)}</i><span>${esc(l)}</span></li>`).join("") || `<li><i>•</i><span>Nog weinig te melden deze week.</span></li>`;
+  const max = 100;
+  $("days").innerHTML = R.days.map((d) => `<div class="day"><div class="col"><span style="height:${d.self_use_pct == null ? 2 : Math.max(2, d.self_use_pct / max * 100)}%"></span></div>
+    <b>${d.self_use_pct == null ? "–" : d.self_use_pct + "%"}</b><span>${new Date(d.day).toLocaleDateString("nl-NL", { weekday: "short" })}</span></div>`).join("")
+    + Array.from({ length: 7 - R.days.length }, () => `<div class="day"><div class="col"></div><b>&nbsp;</b><span>&nbsp;</span></div>`).join("");
+  $("daysNote").textContent = R.days.some((d) => d.self_use_pct != null) ? "Hoeveel van je eigen zonnestroom je zelf gebruikte, per dag." : "Zonder zonnepanelen of opwekdata is er geen percentage per dag.";
+  $("extra").innerHTML = (R.extra || []).map((x) => `<span>${esc(x)}</span>`).join("");
+}
+$("prev").onclick = () => { OFF++; load(); };
+$("next").onclick = () => { OFF = Math.max(0, OFF - 1); load(); };
+load().catch(() => { $("title").textContent = "Het rapport kon niet geladen worden."; });
+</script>
+</body>
+</html>

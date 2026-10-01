@@ -1,5 +1,21 @@
 # Wijzigingen
 
+## 0.21.0 – Laten zien wat het doet en oplevert
+- Logboek: bij elke schakeling waarom, en achteraf wat het gebruikte, hoeveel uit eigen zon en wat het opleverde. Ook op elke apparaatkaart.
+- Betrouwbaarheid: controle of schakelen echt lukte (met één nieuwe poging), live/lokaal-status en een melding als het misgaat.
+- Tarieven 2027: vaste kosten, netbeheer en belastingvermindering, voor een geschatte rekening die klopt met je factuur. Terugleverkosten 2027 bijgewerkt.
+- Eerlijkere besparing: bij een dynamisch contract vergeleken met de gemiddelde prijs van de dag. Uitleg onder "Zo rekenen we".
+- Meldingen ook zonder Home Assistant (ntfy, Telegram, e-mail), met vaste regels: storingen direct, kansen hoogstens één per dag, rust 's nachts.
+- Weekrapport op zondag, ook als pagina.
+- Eigen doel in de Zonnecoach, gerekend als "beter dan zonder Zonnestuur", en een korte kennismaking.
+- Ingrijpen met één tik: nu aan of vandaag overslaan, zichtbaar in de planning. Per apparaat "nooit vóór" een tijd.
+- Meetdagen zonder sturing, met export van de meetgegevens.
+- Traploze vermogensregelaar via Home Assistant (boiler volgt precies het overschot).
+- Wandscherm met stoplicht "goed moment nu", en sensoren in Home Assistant.
+- Zonnecoach: eerst tips om iets te koppelen, de thuisbatterij pas als de goedkopere stappen gezet zijn.
+- Contractcheck 2027: welk contract met jouw verbruik het goedkoopst is.
+- Plan naast werkelijk in de grafiek van vandaag.
+
 ## 0.20.1
 - Welkomstscherm van de koppel-assistent noemt ook de P1-kabel van de Zonnestuur Box.
 

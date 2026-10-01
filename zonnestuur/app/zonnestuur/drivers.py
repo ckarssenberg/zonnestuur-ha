@@ -159,6 +159,11 @@ class HomeAssistant:
     def call(self, domain: str, service: str, data: dict) -> None:
         _request(f"{self.url}/api/services/{domain}/{service}", "POST", data, headers=self._h(), timeout=self.timeout)
 
+    def set_state(self, entity_id: str, state, attributes: dict) -> None:
+        """Eigen sensor in Home Assistant zetten (verdwijnt bij een herstart van HA; Zonnestuur zet hem opnieuw)."""
+        _request(f"{self.url}/api/states/{entity_id}", "POST", {"state": state, "attributes": attributes},
+                 headers=self._h(), timeout=self.timeout)
+
     def notify_services(self) -> list[str]:
         """Alle notify-diensten, bijvoorbeeld notify.mobile_app_telefoon (voor meldingen op je telefoon)."""
         data = _request(f"{self.url}/api/services", headers=self._h(), timeout=self.timeout)
@@ -421,7 +426,57 @@ def make_switch(cfg, d):
         return HACurrentControl(ha, p["current_entity"], p.get("switch_entity", ""), p.get("power_entity", ""),
                                 int(p.get("phases", 1)), float(p.get("volts", 230)), float(p.get("min_a", 6)),
                                 float(p.get("max_a", 16)), p.get("plug_entity", ""))
+    if drv == "ha_power":
+        return HAPowerControl(ha, p["entity"], p.get("unit", "W"), float(d.power_w), float(p.get("min_w", 100)),
+                              p.get("switch_entity", ""), p.get("power_entity", ""))
     raise ValueError(f"Onbekende koppeling: {drv}")
+
+
+class HAPowerControl:
+    """Traploze vermogensregelaar via Home Assistant (bijv. een boiler-regelaar met 0–10 V of een ESPHome-dimmer):
+    het vermogen volgt precies het zonne-overschot, ook als dat kleiner is dan het element.
+
+    entity: number.* of input_number.* in watt of procent. Optioneel een schakelaar en een vermogensmeting.
+    Gebruik voor 230 V alleen een gecertificeerde regelaar, geplaatst door een installateur."""
+
+    modulating = True
+
+    def __init__(self, ha: HomeAssistant, entity: str, unit: str, max_w: float, min_w: float = 100.0,
+                 switch_entity: str = "", power_entity: str = ""):
+        self.ha, self.entity, self.unit = ha, entity, (unit or "W")
+        self.max_w, self.min_w, self.sw, self.power_entity = max_w, min_w, switch_entity, power_entity
+        self.step_w = 50.0
+        self._set: float = 0.0
+
+    def _value(self, w: float) -> float:
+        w = max(0.0, min(self.max_w, w))
+        return round(100.0 * w / self.max_w, 1) if self.unit == "%" else round(w)
+
+    def _write(self, w: float) -> None:
+        domain = self.entity.split(".", 1)[0]
+        self.ha.call(domain, "set_value", {"entity_id": self.entity, "value": self._value(w)})
+        self._set = w
+
+    def status(self) -> SwitchStatus:
+        on = True
+        if self.sw:
+            on = self.ha.state(self.sw).get("state") == "on"
+        val = self.ha.number(self.entity) or 0.0
+        setw = val * self.max_w / 100.0 if self.unit == "%" else val
+        on = on and setw > 0
+        power = self.ha.number(self.power_entity) if self.power_entity else setw
+        return SwitchStatus(on, float(power or 0.0), None)
+
+    def set(self, on: bool) -> None:
+        if self.sw:
+            self.ha.call(self.sw.split(".", 1)[0], "turn_on" if on else "turn_off", {"entity_id": self.sw})
+        if not on:
+            self._write(0.0)
+        elif self._set <= 0:
+            self._write(self.min_w)
+
+    def set_power(self, w: float) -> None:
+        self._write(max(self.min_w, w))
 
 
 def ha_client(cfg) -> HomeAssistant:

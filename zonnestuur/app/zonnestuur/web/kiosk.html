@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Wandscherm · Zonnestuur</title>
+<style>
+  @font-face { font-family: "Inter"; src: url("fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Inter Tight"; src: url("fonts/inter-tight.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  /* Wandscherm: leesbaar op 3 meter. Overdag licht, 's avonds automatisch donker. */
+  :root {
+    color-scheme: light;
+    --bg: #f4f3ee; --card: #ffffff; --line: rgba(14, 17, 22, .08); --ink: #0d1015; --ink-2: #555d69; --ink-3: #868d98;
+    --sun: #b86e00; --net: #2f5bdb; --chip: rgba(14, 17, 22, .05);
+    --groen: #1f8a4c; --groen-bg: rgba(31, 138, 76, .12); --oranje: #b86e00; --oranje-bg: rgba(255, 178, 36, .18);
+    --rood: #c43c3b; --rood-bg: rgba(227, 73, 72, .12);
+  }
+  :root[data-night="1"] {
+    color-scheme: dark;
+    --bg: #05070a; --card: #10141a; --line: rgba(255, 255, 255, .08); --ink: #f3f5f8; --ink-2: #a2abb7; --ink-3: #6c7582;
+    --sun: #c98500; --net: #5b8cff; --chip: rgba(255, 255, 255, .06);
+    --groen: #4ade80; --groen-bg: rgba(74, 222, 128, .12); --oranje: #ffc24d; --oranje-bg: rgba(255, 178, 36, .14);
+    --rood: #ff8a8a; --rood-bg: rgba(230, 103, 103, .14);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 18px/1.4 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  main { height: 100%; display: grid; grid-template-rows: auto 1fr auto; gap: 16px; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); max-width: 1400px; margin: 0 auto; }
+  .top { display: flex; align-items: center; gap: 12px; color: var(--ink-2); font-size: 16px; }
+  .top b { color: var(--ink); font-weight: 650; }
+  .top .spacer { flex: 1; }
+  .top a { color: var(--ink-3); font-size: 14px; }
+  .grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; min-height: 0; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 26px; padding: 26px; min-width: 0; }
+  .moment { display: grid; align-content: center; gap: 14px; border-width: 2px; }
+  .moment.groen { background: var(--groen-bg); border-color: var(--groen); }
+  .moment.oranje { background: var(--oranje-bg); border-color: var(--oranje); }
+  .moment.rood { background: var(--rood-bg); border-color: var(--rood); }
+  .light { display: flex; align-items: center; gap: 18px; }
+  .dot { width: clamp(64px, 9vw, 110px); height: clamp(64px, 9vw, 110px); border-radius: 50%; display: grid; place-items: center; flex: none; color: #fff; }
+  .groen .dot { background: var(--groen); } .oranje .dot { background: var(--oranje); } .rood .dot { background: var(--rood); }
+  .dot svg { width: 56%; height: 56%; }
+  .word { font: 700 clamp(40px, 6.5vw, 84px)/1.02 "Inter Tight", "Inter", sans-serif; letter-spacing: -.03em; text-wrap: balance; }
+  .why { font-size: clamp(20px, 2.2vw, 28px); color: var(--ink-2); max-width: 32ch; }
+  .side { display: grid; gap: 16px; grid-template-rows: auto auto 1fr; min-width: 0; }
+  .nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .num .k { font-size: 15px; color: var(--ink-2); }
+  .num .v { font: 650 clamp(32px, 3.6vw, 48px)/1.1 "Inter Tight", "Inter", sans-serif; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .num .v small { font-size: .45em; color: var(--ink-2); margin-left: 3px; }
+  .eyebrow { font-size: 14px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 10px; }
+  .timeline { position: relative; height: 48px; border-radius: 12px; background: var(--chip); overflow: hidden; }
+  .timeline .w { position: absolute; top: 0; bottom: 0; background: var(--groen); opacity: .85; border-radius: 8px; }
+  .timeline .now { position: absolute; top: -2px; bottom: -2px; width: 3px; background: var(--ink); border-radius: 2px; }
+  .axis { display: flex; justify-content: space-between; font-size: 15px; color: var(--ink-3); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .money { font: 650 clamp(48px, 6vw, 80px)/1 "Inter Tight", "Inter", sans-serif; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .foot { color: var(--ink-3); font-size: 14px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><b>Zonnestuur</b><span id="clock"></span><span class="spacer"></span><a href="./">Dashboard</a></div>
+  <div class="grid">
+    <section class="card moment oranje" id="moment" aria-live="polite">
+      <div class="light"><div class="dot" id="dot" aria-hidden="true"></div><div class="word" id="word">Even kijken…</div></div>
+      <div class="why" id="why">&nbsp;</div>
+    </section>
+    <div class="side">
+      <section class="card">
+        <div class="nums">
+          <div class="num"><div class="k">Zon</div><div class="v" id="pv">–</div></div>
+          <div class="num"><div class="k" id="gridK">Net</div><div class="v" id="grid">–</div></div>
+          <div class="num"><div class="k">Apparaten</div><div class="v" id="dev">–</div></div>
+        </div>
+      </section>
+      <section class="card">
+        <div class="eyebrow">Vandaag zon over</div>
+        <div class="timeline" id="tl"></div>
+        <div class="axis"><span>06</span><span>09</span><span>12</span><span>15</span><span>18</span><span>21</span></div>
+      </section>
+      <section class="card">
+        <div class="eyebrow">Opgeleverd deze maand</div>
+        <div class="money" id="money">–</div>
+        <div style="color:var(--ink-2);margin-top:8px" id="moneyNote">&nbsp;</div>
+      </section>
+    </div>
+  </div>
+  <div class="foot"><span>Groen: zet nu de was, droger of vaatwasser aan. Rood: liever wachten.</span><span id="upd"></span></div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const nl = (v, d = 0) => (v ?? 0).toLocaleString("nl-NL", { minimumFractionDigits: d, maximumFractionDigits: d });
+let token = ""; try { token = localStorage.getItem("zs_token") || ""; } catch (e) {}
+const api = (p) => fetch(p, { headers: token ? { "X-Token": token } : {} }).then((r) => r.json());
+const ICON = {
+  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>',
+  wait: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9"/></svg>',
+  later: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+};
+async function moment() {
+  try {
+    const m = await api("api/moment");
+    $("moment").className = "card moment " + m.state;
+    $("dot").innerHTML = ICON[m.icon] || ICON.ok;
+    $("word").textContent = m.word;
+    $("why").textContent = m.text;
+    $("upd").textContent = "bijgewerkt " + new Date().toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+  } catch (e) { $("word").textContent = "Geen verbinding"; $("why").textContent = "Het wandscherm probeert het zo opnieuw."; }
+}
+async function status() {
+  try {
+    const s = await api("api/status");
+    const now = new Date(s.now), h = now.getHours();
+    document.documentElement.dataset.night = h >= 21 || h < 7 ? "1" : "";
+    $("clock").textContent = now.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" }) + " · " + now.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+    const dev = s.devices.reduce((a, d) => a + (d.power_w || 0), 0);
+    const g = s.grid_w;
+    $("grid").innerHTML = g == null ? "–" : `${nl(Math.abs(g) / 1000, 1)}<small>kW</small>`;
+    $("gridK").textContent = g == null ? "Net" : g < -30 ? "Naar het net" : "Van het net";
+    $("dev").innerHTML = `${nl(dev / 1000, 1)}<small>kW</small>`;
+    $("pv").innerHTML = s.forecast_now_w == null ? "–" : `${nl(s.forecast_now_w / 1000, 1)}<small>kW</small>`;
+    const V = s.value || { month: { eur: s.month.eur_saved } };
+    $("money").textContent = "€ " + nl(V.month.eur, 2);
+    $("moneyNote").textContent = s.has_panels ? `${nl(s.month.kwh_solar, 1)} kWh eigen zon naar je apparaten` : "door te draaien in de goedkoopste uren";
+  } catch (e) {}
+}
+async function windows() {
+  try {
+    const c = await api("api/coach");
+    const tl = $("tl"); const pos = (hhmm) => { const [a, b] = hhmm.split(":").map(Number); return Math.max(0, Math.min(100, ((a + b / 60) - 6) / 15 * 100)); };
+    tl.innerHTML = (c.windows || []).filter((w) => !w.tomorrow).map((w) => `<div class="w" style="left:${pos(w.from)}%;width:${pos(w.to) - pos(w.from)}%"></div>`).join("");
+    const n = new Date(), p = ((n.getHours() + n.getMinutes() / 60) - 6) / 15 * 100;
+    if (p >= 0 && p <= 100) tl.insertAdjacentHTML("beforeend", `<div class="now" style="left:${p}%"></div>`);
+  } catch (e) {}
+}
+moment(); status(); windows();
+setInterval(moment, 30000); setInterval(status, 10000); setInterval(windows, 300000);
+(async () => { try { await navigator.wakeLock.request("screen"); } catch (e) {} })();
+document.addEventListener("visibilitychange", async () => { if (document.visibilityState === "visible") { try { await navigator.wakeLock.request("screen"); } catch (e) {} } });
+</script>
+</body>
+</html>

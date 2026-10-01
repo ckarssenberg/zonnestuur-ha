@@ -16,7 +16,7 @@ vergelijkingssites en is het een indicatie.
 """
 from __future__ import annotations
 
-CHECKED_ON = "2026-09-27"
+CHECKED_ON = "2026-10-01"
 
 # Energiebelasting elektriciteit, eerste schijf, incl. 21% btw. 2027 is het voorstel uit het Belastingplan 2027.
 ENERGY_TAX = {2026: 0.1108, 2027: 0.10648}
@@ -72,21 +72,24 @@ DYNAMIC = {
 # Vaste en variabele contracten, tarieven 2027 (nieuw 1-jarig contract). Afnameprijs verschilt per contract:
 # die vult de gebruiker zelf in.
 FIXED = {
-    "eneco": {"name": "Eneco", "feed_in_2027": 0.0835, "return_cost_2027": 0.0422},
-    "vattenfall": {"name": "Vattenfall", "feed_in_2027": 0.0828, "return_cost_2027": 0.0484},
-    "essent": {"name": "Essent", "feed_in_2027": 0.0910, "return_cost_2027": 0.0884},
-    "greenchoice": {"name": "Greenchoice", "feed_in_2027": 0.0815, "return_cost_2027": 0.0790},
-    "budget": {"name": "Budget Energie", "feed_in_2027": 0.0868, "return_cost_2027": 0.0618},
-    "energiedirect": {"name": "Energiedirect", "feed_in_2027": 0.0799, "return_cost_2027": 0.0774},
-    "vandebron": {"name": "Vandebron", "feed_in_2027": 0.0643, "return_cost_2027": 0.0618},
-    "engie": {"name": "ENGIE", "feed_in_2027": 0.1398, "return_cost_2027": 0.1309},
-    "united": {"name": "United Consumers", "feed_in_2027": 0.1589, "return_cost_2027": 0.1539},
-    "innova": {"name": "Innova Energie", "feed_in_2027": 0.0756, "return_cost_2027": 0.0729},
+    # terugleverkosten 2027 volgens EnergieKiezer (peildatum sep 2026) waar beschikbaar, anders zonnesaldo.nl.
+    # Op 1 oktober 2026 waren nog niet alle tarieven voor 2027 definitief: 'voorlopig'.
+    "eneco": {"name": "Eneco", "feed_in_2027": 0.0835, "return_cost_2027": 0.0422, "status": "voorlopig"},
+    "vattenfall": {"name": "Vattenfall", "feed_in_2027": 0.0828, "return_cost_2027": 0.0484, "status": "voorlopig"},
+    "essent": {"name": "Essent", "feed_in_2027": 0.0910, "return_cost_2027": 0.0860, "status": "voorlopig"},
+    "greenchoice": {"name": "Greenchoice", "feed_in_2027": 0.0815, "return_cost_2027": 0.0790, "status": "voorlopig"},
+    "budget": {"name": "Budget Energie", "feed_in_2027": 0.0868, "return_cost_2027": 0.0618, "status": "voorlopig"},
+    "energiedirect": {"name": "Energiedirect", "feed_in_2027": 0.0799, "return_cost_2027": 0.0774, "status": "voorlopig"},
+    "vandebron": {"name": "Vandebron", "feed_in_2027": 0.0643, "return_cost_2027": 0.0745, "status": "voorlopig"},
+    "engie": {"name": "ENGIE", "feed_in_2027": 0.1398, "return_cost_2027": 0.1309, "status": "voorlopig"},
+    "united": {"name": "United Consumers", "feed_in_2027": 0.1589, "return_cost_2027": 0.1539, "status": "voorlopig"},
+    "innova": {"name": "Innova Energie", "feed_in_2027": 0.0756, "return_cost_2027": 0.0729, "status": "voorlopig"},
 }
-FIXED_SOURCE = "https://zonnesaldo.nl/terugleverkosten-2027"
+FIXED_SOURCE = "https://www.energiekiezer.nl/actuele-energieprijzen/energierekening/terugleverkosten"
+TAX_CREDIT_2027 = 628.69   # vermindering energiebelasting per jaar incl. btw (Belastingplan 2027)
 
 
 def catalog() -> dict:
     """Voor de app: alles wat nodig is om een leverancier te kiezen."""
     return {"checked_on": CHECKED_ON, "energy_tax": ENERGY_TAX, "dynamic": DYNAMIC, "fixed": FIXED,
-            "fixed_source": FIXED_SOURCE}
+            "fixed_source": FIXED_SOURCE, "tax_credit_2027": TAX_CREDIT_2027}

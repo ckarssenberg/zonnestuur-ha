@@ -32,6 +32,14 @@ CREATE TABLE IF NOT EXISTS battery_day (
     charged_kwh REAL NOT NULL DEFAULT 0, grid_kwh REAL NOT NULL DEFAULT 0,
     discharged_kwh REAL NOT NULL DEFAULT 0, eur REAL NOT NULL DEFAULT 0,
     PRIMARY KEY (day, battery_id));
+CREATE TABLE IF NOT EXISTS event (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts INTEGER NOT NULL, end_ts INTEGER, device TEXT NOT NULL, name TEXT NOT NULL, action TEXT NOT NULL,
+    code TEXT NOT NULL, text TEXT NOT NULL, inputs TEXT NOT NULL DEFAULT '{}',
+    kwh REAL, kwh_solar REAL, eur REAL);
+CREATE INDEX IF NOT EXISTS event_ts ON event(ts);
+CREATE TABLE IF NOT EXISTS daystat (
+    day TEXT NOT NULL, key TEXT NOT NULL, val REAL NOT NULL DEFAULT 0, PRIMARY KEY (day, key));
 CREATE TABLE IF NOT EXISTS sample (
     ts INTEGER PRIMARY KEY,            -- begin van het 5-minutenblok (unix-tijd)
     grid_w REAL, dev_w REAL, dev_solar_w REAL);
@@ -68,11 +76,17 @@ class Ledger:
 
     # ---- vastleggen -----------------------------------------------------
     def record(self, now: datetime, dt: float, grid_w: Optional[float],
-               device_powers: dict[str, float], value_per_kwh: float, all_counts: bool = False) -> None:
+               device_powers: dict[str, float], value_per_kwh: float, all_counts: bool = False,
+               grid_value: float = 0.0) -> dict[str, tuple]:
         """all_counts=True: geen zonnepanelen; al het verbruik telt als 'slim ingepland' en value_per_kwh is
-        het verschil met de gemiddelde prijs van de dag."""
+        het verschil met de gemiddelde prijs van de dag.
+
+        Besparing per apparaat = zonnestroom × (prijs zonder Zonnestuur − gemiste terugleververgoeding)
+                               + netstroom × (prijs zonder Zonnestuur − prijs nu)          (grid_value)
+        Geeft per apparaat (kWh, kWh zon, €) van deze ronde terug, voor het logboek."""
+        out: dict[str, tuple] = {}
         if dt <= 0 or dt > 600:
-            return  # gat in de data (bijv. na herstart): niet meetellen
+            return out  # gat in de data (bijv. na herstart): niet meetellen
         day = now.date().isoformat()
         if all_counts:
             shares = {k: max(0.0, p) for k, p in device_powers.items()}
@@ -83,9 +97,12 @@ class Ledger:
             kwh = max(0.0, p) * dt / 3_600_000
             kwh_solar = shares.get(dev, 0.0) * dt / 3_600_000
             acc = self._pending.setdefault((day, dev), [0.0, 0.0, 0.0])
+            eur = kwh_solar * value_per_kwh + (0.0 if all_counts else (kwh - kwh_solar) * grid_value)
             acc[0] += kwh
             acc[1] += kwh_solar
-            acc[2] += kwh_solar * value_per_kwh
+            acc[2] += eur
+            out[dev] = (kwh, kwh_solar, eur)
+        return out
 
     def record_house(self, now: datetime, dt: float, grid_w: float, import_price: float, feed_price: float,
                      dev_w: float = 0.0, batt_w: float = 0.0, pv_w: Optional[float] = None,
@@ -303,6 +320,60 @@ class Ledger:
                 "SELECT device_id, SUM(kwh), SUM(kwh_solar), SUM(eur_saved) FROM device_day "
                 "WHERE day >= ? GROUP BY device_id", (since.isoformat(),)).fetchall()
         return {r[0]: {"kwh": round(r[1], 2), "kwh_solar": round(r[2], 2), "eur_saved": round(r[3], 2)} for r in rows}
+
+    # ---- logboek: waarom schakelde Zonnestuur? ----------------------------
+    def add_event(self, ts: int, device: str, name: str, action: str, code: str, text: str, inputs: dict) -> int:
+        with self.lock:
+            cur = self.conn.execute("INSERT INTO event(ts, device, name, action, code, text, inputs) VALUES (?,?,?,?,?,?,?)",
+                                    (ts, device, name, action, code, text, json.dumps(inputs)))
+            self.conn.commit()
+            return int(cur.lastrowid)
+
+    def close_event(self, event_id: int, end_ts: int, kwh: float, kwh_solar: float, eur: float) -> None:
+        with self.lock:
+            self.conn.execute("UPDATE event SET end_ts=?, kwh=?, kwh_solar=?, eur=? WHERE id=?",
+                              (end_ts, kwh, kwh_solar, eur, event_id))
+            self.conn.commit()
+
+    def events(self, since_ts: int, limit: int = 200, device: str = "") -> list[dict]:
+        q = "SELECT id, ts, end_ts, device, name, action, code, text, inputs, kwh, kwh_solar, eur FROM event WHERE ts >= ?"
+        args: list = [since_ts]
+        if device:
+            q += " AND device = ?"
+            args.append(device)
+        with self.lock:
+            rows = self.conn.execute(q + " ORDER BY ts DESC, id DESC LIMIT ?", (*args, limit)).fetchall()
+        return [{"id": r[0], "ts": r[1], "end_ts": r[2], "device": r[3], "name": r[4], "action": r[5], "code": r[6],
+                 "text": r[7], "inputs": json.loads(r[8] or "{}"), "kwh": _r(r[9]), "kwh_solar": _r(r[10]),
+                 "eur": None if r[11] is None else round(r[11], 2)} for r in rows]
+
+    # ---- dagtellers (meetplan proef) ---------------------------------------
+    def inc(self, day: str, key: str, val: float = 1.0) -> None:
+        with self.lock:
+            self.conn.execute("INSERT INTO daystat(day, key, val) VALUES (?,?,?) ON CONFLICT(day, key) "
+                              "DO UPDATE SET val=val+excluded.val", (day, key, val))
+            self.conn.commit()
+
+    def set_stat(self, day: str, key: str, val: float) -> None:
+        with self.lock:
+            self.conn.execute("INSERT INTO daystat(day, key, val) VALUES (?,?,?) ON CONFLICT(day, key) "
+                              "DO UPDATE SET val=excluded.val", (day, key, val))
+            self.conn.commit()
+
+    def stats(self, since: str) -> dict[str, dict[str, float]]:
+        with self.lock:
+            rows = self.conn.execute("SELECT day, key, val FROM daystat WHERE day >= ?", (since,)).fetchall()
+        out: dict[str, dict[str, float]] = {}
+        for d, k, v in rows:
+            out.setdefault(d, {})[k] = v
+        return out
+
+    def device_days(self, since: date) -> list[dict]:
+        self.flush()
+        with self.lock:
+            rows = self.conn.execute("SELECT day, device_id, kwh, kwh_solar, eur_saved FROM device_day WHERE day >= ? "
+                                     "ORDER BY day", (since.isoformat(),)).fetchall()
+        return [{"day": r[0], "device": r[1], "kwh": r[2], "kwh_solar": r[3], "eur": r[4]} for r in rows]
 
     # ---- toestand bewaren over herstarts ---------------------------------
     def save_state(self, key: str, value: dict) -> None:

@@ -212,7 +212,24 @@ def tips(ctx: dict) -> list[dict]:
             ["Zet 's avonds de meterkast-stekkers één voor één uit en kijk bij 'Bij de meter' wat er zakt.",
              "Bekende sluipers: oude koelkast of vriezer, netwerkschijf/server, waterbed, aquarium, zwembadpomp, apparaten op stand-by.",
              "Een slimme stekker met meting (Shelly, HomeWizard) laat precies zien wat een apparaat gebruikt."], extra, kind="besparen")
-    T.sort(key=lambda t: -t["eur_year"])
+    # Volgorde: eerst iets koppelen of instellen (dat levert blijvend op), dan besparen, dan zelf verschuiven
+    # (meet nauwelijks iets op), en de thuisbatterij pas als de goedkopere stappen gezet zijn.
+    connect = {"warmwater", "auto", "auto-goedkoop", "omvormer"}
+    manual = {"witgoed", "gewoontes", "goedkoop"}
+    if any(t["id"] in ("warmwater", "auto") for t in T):
+        T = [t for t in T if t["id"] != "batterij"]
+
+    def group(t):
+        if t["id"] in connect or t["id"].startswith(("ev1fase", "buffer", "drempel")):
+            return 0
+        if t["id"] == "batterij":
+            return 3
+        if t["id"] in manual:
+            return 2
+        return 1
+    for t in T:
+        t["group"] = ["koppelen", "besparen", "zelf doen", "batterij"][group(t)]
+    T.sort(key=lambda t: (group(t), -t["eur_year"]))
     return T
 
 

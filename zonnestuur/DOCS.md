@@ -18,6 +18,31 @@ in plaats van die stroom voor bijna niets terug te leveren.
 - Onder **Instellingen > Minder terugleveren** kun je je omvormer laten begrenzen als terugleveren geld kost,
   en meldingen op je telefoon aanzetten.
 
+## Waarom deed Zonnestuur dat?
+
+- Het **Logboek** op het dashboard toont bij elke schakeling waarom (zon over, goedkoop uur, klaar-tijd, jij) en,
+  als het apparaat weer uit is, wat het gebruikte, hoeveel uit eigen zon en wat dat opleverde.
+- Bovenaan zie je of alles live is en of het schakelen vandaag gelukt is. Lukt een schakeling niet, dan probeert
+  Zonnestuur het één keer opnieuw en meldt het daarna.
+- **Zo rekenen we** (bij de opbrengst) legt elk bedrag uit. Vul onder Instellingen → Energiecontract ook je vaste
+  kosten in, dan klopt de geschatte rekening met je factuur.
+
+## Meldingen, weekrapport en doel
+
+- Meldingen kunnen via de Home Assistant-app, de gratis app **ntfy**, Telegram of e-mail. Je krijgt ze alleen bij een
+  storing, hoogstens één keer per dag bij een kans om geld te besparen, en op zondag 19:00 het **weekrapport**.
+- Kies onder Instellingen → Jouw doel wat je belangrijk vindt. Het doel is "zoveel beter dan zonder Zonnestuur",
+  zodat het seizoen niet meetelt.
+- **Meetdagen** (Instellingen): op willekeurige dagen stuurt Zonnestuur een apparaat een dag niet, zodat je eerlijk
+  ziet wat sturing oplevert. De meetgegevens kun je als CSV downloaden.
+
+## In Home Assistant
+
+Zonnestuur zet drie sensoren in Home Assistant: `sensor.zonnestuur_moment` (groen/oranje/rood: is het nu een
+goed moment voor de was?), `sensor.zonnestuur_zelf_gebruikt` en `sensor.zonnestuur_besparing_maand`. Koppel het
+moment aan een lamp of zet het op een dashboard. Voor een tablet aan de muur is er het **wandscherm** (link onderaan
+het dashboard).
+
 ## Thuisbatterij
 
 Onder **Instellingen > Thuisbatterij** kies je de batterij die Zonnestuur in Home Assistant vond (bijvoorbeeld de

@@ -17,6 +17,7 @@ is klaar).
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional
@@ -80,6 +81,7 @@ class Context:
     sunny_hours: dict[str, set] = field(default_factory=dict)     # device_id -> beste zonuren volgens de voorspelling
     price_hours: dict[str, set] = field(default_factory=dict)     # device_id -> goedkoopste uren (zonder zonnepanelen)
     price_now: Optional[float] = None                             # huidige afnameprijs €/kWh (dynamisch contract)
+    baseline: set = field(default_factory=set)                    # meetdag: deze apparaten vandaag niet sturen
 
 
 class Controller:
@@ -182,7 +184,7 @@ class Controller:
         if not on:
             st.setpoint_w = None
             return None
-        forced = reason.startswith(("garantie", "handmatig", "goedkoop"))
+        forced = reason.startswith(("garantie", "handmatig", "goedkoop", "meetdag"))
         if forced or ctx.grid_w is None:
             target = d.max_w
         else:
@@ -231,6 +233,14 @@ class Controller:
             return True, "handmatig aan"
         if st.mode == "off":
             return False, "handmatig uit"
+        if d.id in ctx.baseline:
+            # Meetdag: doen wat het apparaat zonder Zonnestuur ook zou doen. Boiler en auto: gewoon aan (eigen
+            # thermostaat of lader beslist); warmtepomp en thermostaat: geen extra opwarmen.
+            plain_on = d.driver not in ("ha_setpoint", "homey_setpoint", "sg_ready") and d.kind != "heatpump"
+            return plain_on, "meetdag: zonder sturing"
+        nb = str((d.params or {}).get("not_before") or "")
+        if re.fullmatch(r"\d\d:\d\d", nb) and ctx.now.strftime("%H:%M") < nb:
+            return False, f"wacht tot {nb} (jouw instelling)"
         hour = ctx.now.replace(minute=0, second=0, microsecond=0)
         cheap = ctx.cheapest_hours.get(d.id) or set()
         ready = self.next_unsatisfied(d, st, ctx.now) if d.ready_times and d.guarantee_min > 0 else None

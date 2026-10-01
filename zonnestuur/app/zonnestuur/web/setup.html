@@ -185,14 +185,14 @@ const DRIVER_LABEL = {
   shelly: "Shelly", shelly_gen1: "Shelly (oud model)", homewizard_socket: "HomeWizard Energy Socket", tasmota: "Tasmota",
   esphome: "ESPHome", mqtt_switch: "MQTT", homey_switch: "Homey · aan/uit", homey_setpoint: "Homey · temperatuur",
   sg_ready: "SG-ready (2 relais)", ocpp: "Laadpaal · OCPP",
-  ha_switch: "Home Assistant · schakelaar", ha_start_button: "Home Assistant · witgoed starten", ha_setpoint: "Home Assistant · temperatuur", ha_current: "Home Assistant · laadstroom",
+  ha_switch: "Home Assistant · schakelaar", ha_start_button: "Home Assistant · witgoed starten", ha_setpoint: "Home Assistant · temperatuur", ha_current: "Home Assistant · laadstroom", ha_power: "Home Assistant · traploos vermogen",
 };
 const METERS = [["p1_serial", "P1-kabel in dit kastje"], ["homewizard", "HomeWizard P1-meter"], ["shelly_em", "Shelly EM / Pro 3EM"], ["youless", "YouLess (LS120)"],
   ["dsmr_reader", "DSMR-reader"], ["esphome", "ESPHome (SlimmeLezer e.a.)"], ["ha", "Sensor in Home Assistant", "has_ha"],
   ["mqtt", "MQTT-topic", "mqtt"], ["homey", "Homey Pro", "has_homey_token"]];
 const ADD_TYPES = [["z2m", "Zigbee-stekker (Zigbee2MQTT)"], ["tasmota", "Tasmota via MQTT"], ["shellymqtt", "Shelly via MQTT"],
   ["mqttfree", "Eigen MQTT-topics"], ["esphome", "ESPHome-schakelaar"], ["homey", "Homey-apparaat"], ["ocpp", "Laadpaal via OCPP"],
-  ["sgready", "SG-ready warmtepomp (2 relais)"]];
+  ["sgready", "SG-ready warmtepomp (2 relais)"], ["hapower", "Traploze vermogensregelaar (Home Assistant)"]];
 let SYS = { mqtt: null, homey: null, ocpp: null };
 const hasSys = (need) => need === "mqtt" ? !!((CFG.mqtt && CFG.mqtt.host) || CFG.mqtt_addon) : !!CFG[need];
 const METER_KINDS = ["p1_serial", "p1", "shelly_em"], SWITCH_KINDS = ["shelly", "hw_socket", "tasmota"];
@@ -552,7 +552,8 @@ const eur = (v, d = 4) => (v == null || v === "" ? "–" : "€ " + nl(v, d));
 function applySupplier(c, key) {
   c.supplier = key;
   if (!key || !SUP) return;
-  if (c.type === "dynamic" && SUP.dynamic[key]) { c.supplier_markup = SUP.dynamic[key].markup; c.feed_in_adjust = SUP.dynamic[key].feed_in; }
+  if (c.type === "dynamic" && SUP.dynamic[key]) { c.supplier_markup = SUP.dynamic[key].markup; c.feed_in_adjust = SUP.dynamic[key].feed_in;
+    if (SUP.dynamic[key].monthly && !c.fixed_monthly) c.fixed_monthly = SUP.dynamic[key].monthly; }
   if (c.type === "fixed" && SUP.fixed[key]) { c.feed_in_price = SUP.fixed[key].feed_in_2027; c.return_cost = SUP.fixed[key].return_cost_2027; }
 }
 function contractHtml(c) {
@@ -581,6 +582,12 @@ function contractHtml(c) {
       <div class="field"><label for="cp_fa">Teruglevering: + of − op de marktprijs</label><input id="cp_fa" type="number" step="0.0001" value="${c.feed_in_adjust ?? -(c.feed_in_cost ?? 0)}"></div>
       <div class="field"><label for="cp_et">Energiebelasting per kWh</label><input id="cp_et" type="number" step="0.0001" value="${c.energy_tax ?? ""}" placeholder="automatisch"><span class="hint">Leeg = automatisch: ${Object.entries(tax).map(([y, v]) => `${y}: ${eur(v)}`).join(", ")}.</span></div>
     </div></details>`}
+    ${p && p.status === "voorlopig" ? `<p class="small" style="color:var(--warn);margin-top:6px">Tarief 2027 is nog voorlopig: controleer het als je leverancier de definitieve bedragen bekendmaakt.</p>` : ""}
+    <details style="margin-top:10px" ${c.fixed_monthly || c.grid_monthly ? "open" : ""}><summary>Vaste kosten (voor een rekening die klopt met je factuur)</summary><div class="row" style="margin-top:12px">
+      <div class="field"><label for="cp_fm">Vaste leveringskosten per maand</label><input id="cp_fm" type="number" step="0.01" min="0" max="100" value="${c.fixed_monthly || ""}" placeholder="bijv. 6,99"></div>
+      <div class="field"><label for="cp_gm">Netbeheerkosten per maand</label><input id="cp_gm" type="number" step="0.01" min="0" max="200" value="${c.grid_monthly || ""}" placeholder="bijv. 40"><span class="hint">Staat op je jaarafrekening; in 2027 ± 20% hoger dan in 2026.</span></div>
+      <div class="field"><label for="cp_tc">Vermindering energiebelasting per jaar</label><input id="cp_tc" type="number" step="0.01" min="0" max="2000" value="${c.tax_credit_year ?? ""}" placeholder="automatisch: € ${String(SUP.tax_credit_2027 || 628.69).replace(".", ",")}"><span class="hint">Leeg = automatisch (Belastingplan 2027). Krijg je hem niet (bijv. geen woonadres)? Vul 0 in.</span></div>
+    </div></details>
     ${ps.length ? `<div class="field" style="margin-top:12px"><label for="cp_pe">Actuele prijs uit Home Assistant (optioneel)</label><select id="cp_pe">
       <option value="">Niet gebruiken</option>${ps.map((x) => `<option value="${esc(x.entity)}" ${x.entity === c.price_entity ? "selected" : ""}>${esc(x.name)} (nu ${esc(x.state)} ${esc(x.unit)})</option>`).join("")}</select>
       <span class="hint">De prijs die je leverancier zelf doorgeeft, bijvoorbeeld via de Tibber-koppeling. Dan klopt de besparing precies.</span></div>` : ""}`;
@@ -589,6 +596,7 @@ function readContract(c) {
   if ($("cp_ip")) { c.import_price = Number($("cp_ip").value) || 0.29; c.feed_in_price = Number($("cp_fp").value) || 0; c.return_cost = Number($("cp_rc").value) || 0; }
   if ($("cp_sm")) { c.supplier_markup = Number($("cp_sm").value) || 0; c.feed_in_adjust = Number($("cp_fa").value); c.energy_tax = $("cp_et").value === "" ? null : Number($("cp_et").value); }
   if ($("cp_pe")) c.price_entity = $("cp_pe").value;
+  if ($("cp_fm")) { c.fixed_monthly = Number($("cp_fm").value) || 0; c.grid_monthly = Number($("cp_gm").value) || 0; c.tax_credit_year = $("cp_tc").value === "" ? null : Number($("cp_tc").value); }
 }
 function bindContract(c, rerender) {
   $("cp_sup").onchange = () => { readContract(c); applySupplier(c, $("cp_sup").value); rerender(); };
@@ -745,6 +753,7 @@ async function settings() {
   const orient = Object.entries(ORIENT).find(([, v]) => v === s.azimuth)?.[0] || "Zuid";
   const md = (CFG.meter && CFG.meter.driver) || "homewizard";
   CFG.mqtt = CFG.mqtt || {}; CFG.homey = CFG.homey || {}; CFG.ocpp = CFG.ocpp || {};
+  const N = CFG.notify || {};
   $("app").innerHTML = `<div class="settings">
     <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:6px"><h1 class="t" style="margin:0">Instellingen</h1><a class="btn ghost small" href="./">← Dashboard</a></div>
     <section class="card" id="licCard"><h2 class="t">Zonnestuur Pro</h2><p class="small muted">Laden…</p></section>
@@ -781,16 +790,48 @@ async function settings() {
         <div class="field" style="flex:0 1 160px"><label for="i_max">Vol vermogen (W)</label><input id="i_max" type="number" step="100" value="${CFG.inverter?.max_w || ""}"></div>
         <div class="field" style="flex:0 1 120px"><label for="i_unit">Eenheid</label><select id="i_unit">${["W", "kW", "%"].map((u) => `<option ${(CFG.inverter?.unit || "W") === u ? "selected" : ""}>${u}</option>`).join("")}</select></div>
       </div>
-      <p class="small muted" id="i_hint"></p>
-      <h3 class="t" style="font-size:15px;margin:14px 0 6px">Meldingen op je telefoon</h3>
-      <div class="row">
-        <div class="field"><label for="n_svc">Via (Home Assistant-app)</label><select id="n_svc"><option value="">Geen meldingen</option>${CFG.notify?.service ? `<option selected>${esc(CFG.notify.service)}</option>` : ""}</select></div>
-        <div class="field" style="flex:0 0 auto"><button class="btn ghost" id="n_test">Testmelding</button></div>
-      </div>
-      <label class="check-row"><input type="checkbox" id="n_tips" ${CFG.notify?.tips === false ? "" : "checked"}> Tips: "je levert nu veel terug, zet de wasmachine aan", "morgen negatieve prijzen"</label>
-      <label class="check-row"><input type="checkbox" id="n_alerts" ${CFG.notify?.alerts === false ? "" : "checked"}> Storingen: meter of apparaat reageert niet</label>
-      <p class="small muted" id="n_res" role="status"></p>` : `<p class="small muted" style="margin-top:-4px">Koppel Home Assistant om je omvormer af te knijpen bij negatieve prijzen en meldingen op je telefoon te krijgen.</p>`}
+      <p class="small muted" id="i_hint"></p>` : `<p class="small muted" style="margin-top:-4px">Koppel Home Assistant om je omvormer af te knijpen bij negatieve prijzen.</p>`}
     </section>
+    <section class="card" id="notifyCard"><h2 class="t">Meldingen en weekrapport</h2>
+      <p class="small muted" style="margin-top:-4px">Zonnestuur meldt zich alleen als er iets misgaat, hoogstens één keer per dag als er een kans is om geld te besparen, en op zondagavond met je weekrapport. Tussen 22:00 en 07:00 alleen storingen.</p>
+      ${CFG.has_ha ? `<div class="row"><div class="field"><label for="n_svc">Home Assistant-app</label><select id="n_svc"><option value="">Niet via Home Assistant</option>${N.service ? `<option selected>${esc(N.service)}</option>` : ""}</select></div></div>` : ""}
+      <div class="row"><div class="field"><label for="n_ntfy">ntfy-onderwerp (gratis app ntfy)</label><input id="n_ntfy" placeholder="bijv. zonnestuur-${Math.random().toString(36).slice(2, 8)}" value="${esc(N.ntfy?.topic || "")}" autocomplete="off" spellcheck="false">
+          <span class="hint">Installeer de app ntfy, tik op + en vul hetzelfde onderwerp in. Kies iets onraadbaars: wie het onderwerp kent, kan meelezen. De meldtekst gaat via de server van ntfy.</span></div>
+        <div class="field" style="flex:0 1 220px"><label for="n_ntfys">Server</label><input id="n_ntfys" value="${esc(N.ntfy?.server || "https://ntfy.sh")}"></div></div>
+      <details ${N.telegram?.chat_id || N.email?.host ? "open" : ""}><summary class="small">Telegram of e-mail</summary>
+        <div class="row" style="margin-top:10px"><div class="field"><label for="n_tgt">Telegram-bot-token${N.has_telegram_token ? " (leeg = houden)" : ""}</label><input id="n_tgt" type="password" autocomplete="off"><span class="hint">Maak een bot via @BotFather.</span></div>
+          <div class="field"><label for="n_tgc">Chat-ID</label><input id="n_tgc" value="${esc(N.telegram?.chat_id || "")}"></div></div>
+        <div class="row"><div class="field"><label for="n_eh">Mailserver (SMTP)</label><input id="n_eh" placeholder="smtp.gmail.com" value="${esc(N.email?.host || "")}"></div>
+          <div class="field" style="flex:0 1 100px"><label for="n_ep">Poort</label><input id="n_ep" type="number" value="${N.email?.port || 587}"></div>
+          <div class="field"><label for="n_eu">Gebruiker</label><input id="n_eu" autocomplete="off" value="${esc(N.email?.user || "")}"></div>
+          <div class="field"><label for="n_ew">Wachtwoord${N.has_email_password ? " (leeg = houden)" : ""}</label><input id="n_ew" type="password" autocomplete="new-password"></div>
+          <div class="field"><label for="n_et">Naar</label><input id="n_et" type="email" value="${esc(N.email?.to || "")}"></div></div>
+      </details>
+      <label class="check-row"><input type="checkbox" id="n_alerts" ${N.alerts === false ? "" : "checked"}> Storingen: meter of apparaat reageert niet, schakelen lukt niet, warm water in gevaar</label>
+      <label class="check-row"><input type="checkbox" id="n_tips" ${N.tips === false ? "" : "checked"}> Kansen: morgen negatieve prijzen of veel zon, vanavond dure stroom (hoogstens één per dag)</label>
+      <label class="check-row"><input type="checkbox" id="n_rep" ${N.reports === false ? "" : "checked"}> Weekrapport op zondag om 19:00</label>
+      <div class="row" style="margin-top:8px"><div class="field"><label for="n_link">Adres van Zonnestuur in meldingen (optioneel)</label><input id="n_link" placeholder="${CFG.ha_addon ? "bijv. https://jouw-ha.ui.nabu.casa" : "http://zonnestuur.local"}" value="${esc(N.link || "")}"></div>
+        <div class="field" style="flex:0 0 auto"><button class="btn ghost" id="n_test">Testmelding</button></div></div>
+      <p class="small muted" id="n_res" role="status"></p>
+    </section>
+    <section class="card" id="goalCard"><h2 class="t">Jouw doel</h2>
+      <p class="small muted" style="margin-top:-4px">Een doel werkt beter dan vergelijken met de buren. Het doel telt het seizoen niet mee: het is altijd "zoveel beter dan zonder Zonnestuur".</p>
+      <div class="row"><div class="field"><label for="g_mot">Wat vind je het belangrijkst?</label><select id="g_mot">${[["", "Kies…"], ["geld", "Geld besparen"], ["milieu", "Zo veel mogelijk eigen groene stroom"], ["allebei", "Allebei"]].map(([v, l]) => `<option value="${v}" ${CFG.motivation === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div class="field"><label for="g_type">Doel</label><select id="g_type"><option value="pct" ${(CFG.goal?.type || "pct") === "pct" ? "selected" : ""}>Procentpunten meer zelf gebruikt</option><option value="eur" ${CFG.goal?.type === "eur" ? "selected" : ""}>Euro's per maand</option></select></div>
+        <div class="field" style="flex:0 1 150px"><label for="g_pp">Punten boven zonder</label><input id="g_pp" type="number" min="1" max="40" value="${CFG.goal?.extra_pp || 10}"></div>
+        <div class="field" style="flex:0 1 150px"><label for="g_eur">€ per maand</label><input id="g_eur" type="number" min="1" max="500" value="${CFG.goal?.eur_month || 25}"></div></div>
+    </section>
+    <section class="card" id="trialCard"><h2 class="t">Meten wat Zonnestuur oplevert</h2>
+      <p class="small muted" style="margin-top:-4px">Op willekeurige dagen stuurt Zonnestuur een apparaat een dag niet. Dan zie je eerlijk wat sturing oplevert, in plaats van alleen een berekening. Warm water en de klaar-tijd blijven gewoon werken.</p>
+      <label class="check-row"><input type="checkbox" id="t_on" ${CFG.trial?.enabled ? "checked" : ""}> Meetdagen aan</label>
+      <div class="row" style="margin-top:8px"><div class="field" style="flex:0 1 200px"><label for="t_every">Gemiddeld 1 dag op de</label><select id="t_every">${[5, 7, 10, 14].map((n) => `<option ${(CFG.trial?.every || 7) == n ? "selected" : ""}>${n}</option>`).join("")}</select></div>
+        <div class="field"><label>Welke apparaten</label><div class="chips" id="t_devs">${CFG.devices.map((d) => `<button type="button" data-id="${esc(d.id)}" class="${!(CFG.trial?.devices || []).length || CFG.trial.devices.includes(d.id) ? "on" : ""}">${esc(d.name)}</button>`).join("")}</div></div></div>
+      <p class="small muted"><a href="api/export.csv?days=90${token ? "&token=" + encodeURIComponent(token) : ""}" download>Meetgegevens downloaden (CSV, laatste 90 dagen)</a> · alleen cijfers per dag, geen namen of adressen.</p>
+    </section>
+    ${CFG.has_ha ? `<section class="card"><h2 class="t">In Home Assistant</h2>
+      <label class="check-row"><input type="checkbox" id="k_ha" ${CFG.kiosk?.ha_sensors === false ? "" : "checked"}> Sensoren in Home Assistant zetten: <b>sensor.zonnestuur_moment</b> (groen/oranje/rood), zelf gebruikt, besparing deze maand</label>
+      <p class="small muted">Koppel het "goede moment" aan een lamp of ledstrip, of zet het op een dashboard. Voor een tablet aan de muur: open <a href="kiosk">het wandscherm</a>.</p>
+    </section>` : `<section class="card"><h2 class="t">Wandscherm</h2><p class="small muted" style="margin-top:-4px">Zet een oude tablet aan de muur met <a href="kiosk">het wandscherm</a>: in één oogopslag of het nu een goed moment is voor de was.</p></section>`}
     <section class="card"><h2 class="t">Meter</h2>
       <div class="row">
         <div class="field" style="flex:0 1 280px"><label for="s_md">Soort meter</label><select id="s_md">${METERS.map(([v, l, need]) =>
@@ -915,6 +956,7 @@ async function settings() {
       : t === "mqttfree" ? f("x_a", "Topic met toestand", "", 'placeholder="bijv. huis/boiler/state"') + f("x_b", "JSON-veld toestand (optioneel)", "") + f("x_c", "Opdracht-topic", "", 'placeholder="bijv. huis/boiler/set"')
       : t === "esphome" ? f("x_a", "Adres", "", 'placeholder="192.168.1.40"') + f("x_b", "Schakelaar (id)", "", 'placeholder="relay"') + f("x_c", "Vermogen-sensor (optioneel)", "")
       : t === "homey" ? `<div class="field"><label for="x_a">Apparaat in Homey</label><select id="x_a">${hd.map((x, i) => `<option value="${i}">${esc(x.name)} (${x.driver === "homey_setpoint" ? "temperatuur" : "aan/uit"})</option>`).join("") || "<option>koppel eerst Homey hierboven</option>"}</select></div>`
+      : t === "hapower" ? f("x_a", "Vermogen-instelling (number.…)", "", 'placeholder="bijv. number.boiler_vermogen"') + `<div class="field" style="flex:0 1 110px"><label for="x_u">Eenheid</label><select id="x_u"><option>W</option><option>%</option></select></div>` + f("x_b", "Schakelaar (optioneel)", "", 'placeholder="switch.…"') + f("x_c", "Vermogensmeting (optioneel)", "", 'placeholder="sensor.…"')
       : t === "ocpp" ? listOr("x_a", "Naam (ID) van de laadpaal", cps.map((c) => c.id), "zoals ingesteld in de laadpaal") + `<div class="field" style="flex:0 1 100px"><label for="x_ph">Fasen</label><select id="x_ph"><option>1</option><option selected>3</option></select></div>` + f("x_min", "Min. A", "6", 'type="number"') + f("x_max", "Max. A", "16", 'type="number"')
       : ""}${pw}</div>
       ${t === "mqttfree" ? `<div class="row">${f("x_d", "Topic met vermogen (optioneel)", "")}${f("x_e", "JSON-veld vermogen", "")}${f("x_on", "Bericht aan", "ON")}${f("x_off", "Bericht uit", "OFF")}</div>` : ""}
@@ -942,8 +984,9 @@ async function settings() {
       dev = { ...dev, driver: hdv.driver, params: hdv.driver === "homey_setpoint" ? { device: hdv.device, normal_temp: Number(g("x_tn")), boost_temp: Number(g("x_tb")) } : { device: hdv.device } }; }
     else if (t === "ocpp") { const ph = Number(g("x_ph")), mx = Number(g("x_max")) || 16;
       dev = { ...dev, driver: "ocpp", params: { cp_id: g("x_a"), phases: ph, min_a: Number(g("x_min")) || 6, max_a: mx }, power_w: Math.min(25000, mx * 230 * ph) }; }
+    else if (t === "hapower") dev = { ...dev, driver: "ha_power", params: { entity: g("x_a"), unit: g("x_u") || "W", switch_entity: g("x_b"), power_entity: g("x_c"), min_w: 100 } };
     else if (t === "sgready") dev = { ...dev, driver: "sg_ready", params: { a: relaySpec("ra"), b: relaySpec("rb"), force: $("x_force").checked } };
-    const need = { z2m: "x_a", tasmota: "x_a", shellymqtt: "x_a", mqttfree: "x_c", esphome: "x_b", ocpp: "x_a" }[t];
+    const need = { z2m: "x_a", tasmota: "x_a", shellymqtt: "x_a", mqttfree: "x_c", esphome: "x_b", ocpp: "x_a", hapower: "x_a" }[t];
     if (need && !g(need)) { $("x_res").textContent = "Vul eerst in welk apparaat het is."; $(need).focus(); return; }
     if (t === "esphome" && !g("x_a")) { $("x_res").textContent = "Vul het adres van het ESPHome-apparaat in."; return; }
     if (t === "sgready" && (!$("ra_a").value.trim() || !$("rb_a").value.trim())) { $("x_res").textContent = "Vul voor beide relais het adres of de naam in."; return; }
@@ -996,12 +1039,22 @@ async function settings() {
           .map((v) => `<option ${v === cur ? "selected" : ""} value="${esc(v)}">${esc(v.replace("notify.mobile_app_", "📱 ").replace("notify.", ""))}</option>`).join("");
       } catch (e) {}
     })();
-    $("n_test").onclick = async () => {
-      const svc = $("n_svc").value; if (!svc) { $("n_res").textContent = "Kies eerst waar de melding heen moet."; return; }
-      const r = await api("api/notify/test", { method: "POST", body: JSON.stringify({ service: svc }) });
-      $("n_res").textContent = r.ok ? "Verstuurd. Kijk op je telefoon." : r.error;
-    };
   }
+  const readNotify = () => {
+    const g = (id) => ($(id) ? $(id).value.trim() : "");
+    const n = { tips: $("n_tips").checked, alerts: $("n_alerts").checked, reports: $("n_rep").checked, link: g("n_link") };
+    if (g("n_svc")) n.service = g("n_svc");
+    if (g("n_ntfy")) n.ntfy = { topic: g("n_ntfy"), server: g("n_ntfys") || "https://ntfy.sh" };
+    if (g("n_tgc")) n.telegram = { chat_id: g("n_tgc"), token: g("n_tgt") };
+    if (g("n_eh")) n.email = { host: g("n_eh"), port: Number(g("n_ep")) || 587, user: g("n_eu"), password: $("n_ew").value, to: g("n_et") };
+    return n;
+  };
+  $("n_test").onclick = async () => {
+    $("n_res").textContent = "Versturen…";
+    const r = await api("api/notify/test", { method: "POST", body: JSON.stringify({ notify: readNotify() }) });
+    $("n_res").textContent = r.ok ? `Verstuurd via ${r.sent.join(", ")}. Kijk op je telefoon of in je mail.` : r.error;
+  };
+  document.querySelectorAll("#t_devs button").forEach((b) => b.onclick = () => b.classList.toggle("on"));
   $("tokBtn").onclick = async () => {
     try {
       const v = $("s_tok").value;
@@ -1025,8 +1078,13 @@ async function settings() {
       next.batteries = readBattery(B);
       const ent = $("i_ent").value.trim();
       next.inverter = ent ? { entity: ent, max_w: Number($("i_max").value) || 0, unit: $("i_unit").value } : {};
-      next.notify = $("n_svc").value ? { service: $("n_svc").value, tips: $("n_tips").checked, alerts: $("n_alerts").checked } : {};
     }
+    next.notify = readNotify();
+    next.motivation = $("g_mot").value;
+    next.goal = { type: $("g_type").value, extra_pp: Number($("g_pp").value) || 10, eur_month: Number($("g_eur").value) || 25 };
+    const tdev = [...document.querySelectorAll("#t_devs button.on")].map((b) => b.dataset.id);
+    next.trial = { enabled: $("t_on").checked, every: Number($("t_every").value) || 7, devices: tdev.length === CFG.devices.length ? [] : tdev };
+    if ($("k_ha")) next.kiosk = { ha_sensors: $("k_ha").checked };
     try { CFG = await postCfg(next); toast("Opgeslagen"); setErr(""); }
     catch (e) { setErr(e.message); }
   };
@@ -1051,6 +1109,7 @@ async function editDevice(i) {
     <div class="row">
       <div class="field" ${d.driver === "ha_current" ? "hidden" : ""}><label for="e_power">Vermogen als hij aan staat (W)</label><input id="e_power" type="number" step="50" value="${d.power_w}"></div>
       <div class="field"><label for="e_prio">Prioriteit</label><input id="e_prio" type="number" min="1" max="20" value="${d.priority}"><span class="hint">1 krijgt als eerste de zon.</span></div>
+      <div class="field" style="flex:0 1 200px"><label for="e_nb">Nooit vóór</label><input id="e_nb" type="time" value="${esc(P.not_before || "")}"><span class="hint">Bijv. niet vóór 08:00 (geluid). Leeg = altijd.</span></div>
     </div>
     ${d.driver === "ha_setpoint" ? `<div class="row">
       <div class="field"><label for="e_tn">Normale temperatuur (°C)</label><input id="e_tn" type="number" step="0.5" value="${P.normal_temp}"></div>
@@ -1123,6 +1182,8 @@ async function editDevice(i) {
     n.start_surplus_w = $("e_start").value === "" ? null : num("e_start", null); n.start_delay_s = Math.max(0, num("e_sd", 60));
     n.stop_import_w = num("e_stop", 300); n.stop_delay_s = Math.max(0, num("e_xd", 120));
     n.min_on_s = Math.max(0, num("e_minon", 10)) * 60; n.min_off_s = Math.max(0, num("e_minoff", 5)) * 60; n.detect_full = $("e_full").checked;
+    n.params = n.params || {};
+    if ($("e_nb").value) n.params.not_before = $("e_nb").value; else delete n.params.not_before;
     if ($("e_fs")) { n.params = n.params || {}; n.params.failsafe = $("e_fs").checked; n.params.failsafe_window = $("e_fsw").value; }
     if ($("e_tn")) { n.params.normal_temp = num("e_tn", n.params.normal_temp); n.params.boost_temp = num("e_tb", n.params.boost_temp); }
     if ($("e_ph")) {
