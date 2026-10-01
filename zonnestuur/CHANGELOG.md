@@ -1,5 +1,13 @@
 # Wijzigingen
 
+## 0.22.0 – Auto laden en nieuw wandscherm
+- Auto laden in twee tikken: Zonnestuur vindt je laadpaal en auto in Home Assistant, herkent 1 of 3 fasen en vraagt alleen hoe laat hij vol moet zijn en hoeveel je rijdt.
+- Vertrektijd en klaar-tijd met − en + direct op de apparaatkaart.
+- Nieuw wandscherm: de stroomklok met de prijs (of zon) van de komende 24 uur, het advies van nu, bediening per apparaat en instellingen per scherm (dag/nacht, dimmen, welke apparaten).
+- Zonder zonnepanelen geeft het 'goed moment' de goedkope uren aan.
+- Waarschuwing als 'zonnepanelen' aan staat terwijl je nooit teruglevert.
+- Verbruik van een warmtepomp meten via zijn aan/uit-sensor als er geen vermogensmeting is.
+
 ## 0.21.0 – Laten zien wat het doet en oplevert
 - Logboek: bij elke schakeling waarom, en achteraf wat het gebruikte, hoeveel uit eigen zon en wat het opleverde. Ook op elke apparaatkaart.
 - Betrouwbaarheid: controle of schakelen echt lukte (met één nieuwe poging), live/lokaal-status en een melding als het misgaat.

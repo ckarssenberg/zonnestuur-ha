@@ -224,8 +224,10 @@ class HASetpointBoost:
     Zonnestuur de compressor zelf hoeft te schakelen. 'Uit' zet de normale temperatuur terug.
     """
 
-    def __init__(self, ha: HomeAssistant, entity: str, normal_temp: float, boost_temp: float, power_entity: str = ""):
+    def __init__(self, ha: HomeAssistant, entity: str, normal_temp: float, boost_temp: float, power_entity: str = "",
+                 running_entity: str = "", nominal_w: float = 0.0):
         self.ha, self.entity, self.power_entity = ha, entity, power_entity
+        self.running_entity, self.nominal_w = running_entity, nominal_w   # zonder vermogensmeting: 'draait' × vermogen
         self.domain = entity.split(".", 1)[0]          # climate, water_heater of number (bijv. warmwater-doeltemperatuur)
         self.normal, self.boost = normal_temp, boost_temp
 
@@ -238,6 +240,8 @@ class HASetpointBoost:
             target = None
         on = target is not None and float(target) >= self.boost - 0.1
         power = self.ha.number(self.power_entity) if self.power_entity else None
+        if power is None and self.running_entity:
+            power = self.nominal_w if self.ha.state(self.running_entity).get("state") == "on" else 0.0
         return SwitchStatus(on, float(power or 0.0), None)
 
     def set(self, on: bool) -> None:
@@ -419,7 +423,7 @@ def make_switch(cfg, d):
         return HASwitch(ha, p["entity"], p.get("power_entity", ""))
     if drv == "ha_setpoint":
         return HASetpointBoost(ha, p["entity"], float(p.get("normal_temp", 50)), float(p.get("boost_temp", 60)),
-                               p.get("power_entity", ""))
+                               p.get("power_entity", ""), p.get("running_entity", ""), float(d.power_w))
     if drv == "ha_start_button":
         return HAStartButton(ha, p["button_entity"], p.get("remote_entity", ""), p.get("power_entity", ""))
     if drv == "ha_current":
@@ -569,7 +573,7 @@ def ha_candidates(states: list[dict]) -> dict:
                 temp = 50.0
             devices.append({"driver": "ha_setpoint", "entity": eid, "name": name, "kind": "boiler", "normal_temp": temp,
                             "boost_temp": min(float(a.get("max", 65) or 65), temp + 10), "power_entity": _match_power(eid, by_id),
-                            "score": 3})
+                            "running_entity": _match_running(eid, by_id), "score": 3})
         elif dom == "number" and (unit == "A" or any(w in eid for w in ("charging_current", "charge_current", "charging_amps",
                                                                           "laadstroom", "available_current", "beschikbare_stroom"))):
             if any(w in t for w in ("3 to 1", "phase switch", "fallback", "offline", "terugschakel", "fase", "phase",
@@ -790,6 +794,24 @@ def _match_power(eid: str, by_id: dict) -> str:
             if a.get("device_class") == "power" or a.get("unit_of_measurement") in ("W", "kW"):
                 return cand
     return ""
+
+
+def _match_running(eid: str, by_id: dict) -> str:
+    """Aan/uit-sensor van de compressor of het element van hetzelfde apparaat (als er geen vermogensmeting is)."""
+    obj = eid.split(".", 1)[-1]
+    best, score = "", 0
+    for cand, s in by_id.items():
+        if not cand.startswith("binary_sensor."):
+            continue
+        c = cand.split(".", 1)[1]
+        n = _common(c, obj)
+        if n < 10:
+            continue
+        w = c[c.rfind("_", 0, n) + 1:]                  # vanaf de laatste woordgrens: '..._dk_heatpump'
+        if any(k in w for k in ("heatpump", "warmtepomp", "compressor", "running", "draait", "heating")) and "element" not in w:
+            if n > score:
+                best, score = cand, n
+    return best
 
 
 def _match_remote_start(eid: str, by_id: dict) -> str:

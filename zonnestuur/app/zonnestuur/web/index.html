@@ -100,6 +100,12 @@
   .c-today { grid-column: span 12 !important; }
   .c-welcome, .c-log, .c-compare { grid-column: span 12; }
   .c-welcome { border: 1.5px solid color-mix(in srgb, var(--sun) 45%, transparent); }
+  .ev-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-top: 14px; }
+  .ev-form label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  .ev-form select { font: inherit; font-size: 15px; font-weight: 600; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--card-line); background: var(--card-solid); color: var(--ink); min-width: 150px; }
+  .btn-line.on-sun { background: var(--glow); border-color: var(--glow); color: #1b1200; }
+  .ready-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13.5px; }
+  .ready-row button { font: inherit; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--card-line); background: var(--card-solid); color: var(--ink); cursor: pointer; font-size: 17px; }
   .c-welcome .opts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .c-welcome .opts button, .btn-line { font: inherit; font-size: 14px; font-weight: 600; padding: 10px 16px; border-radius: 12px; cursor: pointer;
     border: 1px solid var(--card-line); background: var(--card-solid, var(--chip)); color: var(--ink); }
@@ -381,6 +387,19 @@
       <p class="small muted" id="welRes" role="status" style="margin:10px 0 0"></p>
     </section>
 
+    <!-- auto laden -->
+    <section class="card c-welcome" id="evOffer" hidden aria-labelledby="evTitle">
+      <div class="eyebrow">Auto laden</div>
+      <h2 class="sec" id="evTitle">Laat je auto laden in de goedkoopste uren</h2>
+      <p class="small muted" id="evFound" style="margin:4px 0 0"></p>
+      <div class="ev-form">
+        <label>Hoe laat moet hij vol zijn?<select id="evReady"></select></label>
+        <label>Hoeveel km rijd je per dag?<select id="evKm"></select></label>
+        <button class="btn-line on-sun" id="evAdd">Laden instellen</button>
+      </div>
+      <p class="small muted" id="evRes" role="status" style="margin:10px 0 0">Zonnestuur leert daarna zelf hoeveel je auto echt nodig heeft. Aanpassen kan altijd op de apparaatkaart.</p>
+    </section>
+
     <!-- zonnecoach -->
     <section class="card c-coach" aria-labelledby="coachTitle">
       <div class="title-row"><div><div class="eyebrow">Zonnecoach</div><h2 class="sec" id="coachTitle">Gebruik je genoeg van je eigen zon?</h2></div><span class="small muted" id="coachNote"></span></div>
@@ -636,7 +655,7 @@ function renderStatus(s) {
   const swPill = sw || fl ? `<a class="pill ${fl ? "warn" : ""}" href="#logTitle">${fl ? `⚠︎ Sturing vandaag: ${fl} van ${sw} schakelingen mislukt` : `✓ Sturing vandaag: ${sw} ${sw === 1 ? "schakeling" : "schakelingen"}, alles gelukt`}</a>` : "";
   const meet = (s.baseline_today || []).map((id) => (s.devices.find((d) => d.id === id) || {}).name).filter(Boolean);
   const meetPill = meet.length ? `<span class="pill" title="Op meetdagen stuurt Zonnestuur een apparaat niet, om eerlijk te meten wat sturing oplevert">Meetdag: ${esc(meet.join(", "))} zonder sturing</span>` : "";
-  $("pills").innerHTML = licPill + swPill + meetPill + (s.problems || []).map((p) => `<span class="pill ${p.level === "warn" ? "warn" : ""}">${p.level === "warn" ? "⚠︎ " : ""}${esc(p.text)}</span>`).join("");
+  $("pills").innerHTML = licPill + swPill + meetPill + (s.problems || []).map((p) => p.link ? `<a class="pill" href="${esc(p.link)}">${esc(p.text)}</a>` : `<span class="pill ${p.level === "warn" ? "warn" : ""}">${p.level === "warn" ? "⚠︎ " : ""}${esc(p.text)}</span>`).join("");
   renderWelcome(s);
 
   // kerncijfers
@@ -818,6 +837,7 @@ function renderDevices(s) {
           : `Laadt traploos tussen <b>${kw(d.min_w)}</b> en <b>${kw(d.max_w)} kW</b>`}</span></div>` : ""}
         <div class="fact"><i class="dot" style="background:var(--sun)"></i><span>Deze maand <b>${nl(d.month.kwh, 1)} kWh</b>${PRICE ? " slim ingepland" : `, waarvan <b>${nl(d.month.kwh_solar, 1)}</b> uit zon`} · <b>${eur(d.month.eur_saved)}</b> bespaard</span></div>
       </div>
+      ${d.kind === "ev" || (d.ready_times || []).length ? `<div class="ready-row"><span class="muted">${d.kind === "ev" ? "Vol om" : "Klaar om"}</span><button data-rd="-30" aria-label="Eerder">−</button><b class="num">${esc((d.ready_times || [])[0] || "geen")}</b><button data-rd="30" aria-label="Later">+</button></div>` : ""}
       ${d.last_event ? `<div class="why"><b>Waarom?</b> ${esc(d.last_event.text)}${d.last_event.outcome ? ` <span class="muted">${d.last_event.running ? "Tot nu: " : ""}${esc(d.last_event.outcome)}</span>` : ""}</div>` : ""}
       <div class="seg" role="group" aria-label="Bediening ${esc(d.name)}">
         <button data-mode="auto" class="${d.mode === "auto" ? "active" : ""}">Automatisch</button>
@@ -825,7 +845,14 @@ function renderDevices(s) {
         <button data-mode="off" data-skip="1" class="${d.mode === "off" ? "active" : ""}">Vandaag overslaan</button>
       </div>
       ${d.mode !== "auto" && d.override_until ? `<div class="small muted" style="margin-top:6px">Door jou ${d.mode === "on" ? "aangezet" : "uitgezet"} tot ${esc(d.override_until.slice(11, 16))}${d.override_until.slice(0, 10) !== s.now.slice(0, 10) ? " (morgen)" : ""}. Daarna weer automatisch.</div>` : ""}`;
-    el.querySelectorAll("button").forEach((b) => b.addEventListener("click", async () => {
+    el.querySelectorAll("[data-rd]").forEach((b) => b.addEventListener("click", async () => {
+      const cur = (d.ready_times || [])[0] || (d.kind === "ev" ? "07:00" : "18:00");
+      let m = Number(cur.slice(0, 2)) * 60 + Number(cur.slice(3, 5)) + Number(b.dataset.rd); m = (m + 1440) % 1440;
+      const t = `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+      await api(`api/device/${encodeURIComponent(d.id)}/ready`, { method: "POST", body: JSON.stringify({ times: [t, ...(d.ready_times || []).slice(1)] }) });
+      refresh();
+    }));
+    el.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", async () => {
       await api(`api/device/${encodeURIComponent(d.id)}/mode`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: b.dataset.mode, hours: b.dataset.skip ? Math.max(0.1, (new Date(new Date().setHours(24, 0, 0, 0)) - Date.now()) / 3.6e6) : b.dataset.hours ? Number(b.dataset.hours) : null }),
@@ -1447,6 +1474,30 @@ document.querySelectorAll("#welOpts button").forEach((b) => b.addEventListener("
   } catch (e) { $("welRes").textContent = e.message; }
 }));
 
+// ---------- auto laden ----------
+(function () {
+  const r = $("evReady"), k = $("evKm");
+  for (let m = 5 * 60; m <= 10 * 60; m += 30) { const t = `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`; r.insertAdjacentHTML("beforeend", `<option ${t === "07:30" ? "selected" : ""}>${t}</option>`); }
+  for (const km of [10, 20, 40, 60, 80, 120]) k.insertAdjacentHTML("beforeend", `<option value="${km}" ${km === 40 ? "selected" : ""}>${km} km</option>`);
+  $("evAdd").addEventListener("click", async () => {
+    $("evAdd").disabled = true;
+    try {
+      const res = await api("api/setup/ev", { method: "POST", body: JSON.stringify({ ready: r.value, km_day: Number(k.value) }) });
+      if (!res.ok) throw new Error(res.error);
+      $("evRes").textContent = `Klaar. Je auto laadt nu in de goedkoopste uren en is om ${r.value} vol (± ${res.run_min} minuten laden per dag op ${nl(res.kw, 1)} kW).`;
+      setTimeout(() => { $("evOffer").hidden = true; refresh(); }, 2500);
+    } catch (e) { $("evRes").textContent = e.message; $("evAdd").disabled = false; }
+  });
+})();
+async function loadEvOffer() {
+  try {
+    const o = await api("api/setup/ev");
+    $("evOffer").hidden = !o.offer;
+    if (o.offer) $("evFound").textContent = `Gevonden in Home Assistant: ${o.charger || "je laadpaal"}${o.car ? " en je auto (" + o.car + ")" : ""}. Laadt met maximaal ${nl(o.max_kw, 1)} kW (${o.phases} ${o.phases === 1 ? "fase" : "fasen"}).`
+      + (STATUS && !STATUS.has_panels ? " Zonder zonnepanelen kiest Zonnestuur de goedkoopste uren van de nacht." : " Bij zon laadt hij mee met je overschot; de rest in de goedkoopste uren.");
+  } catch (e) {}
+}
+
 // ---------- logboek: wat en waarom ----------
 const LOG_BADGE = { ZON_OVERSCHOT: ["zon", "Zon"], ZON_WEG: ["", "Zon weg"], PRIJS_LAAG: ["prijs", "Goedkoop"], PRIJS_NEGATIEF: ["prijs", "Negatieve prijs"],
   GARANTIE: ["", "Klaar-tijd"], HANDMATIG: ["jij", "Jij"], MEETDAG: ["", "Meetdag"], PLAN_KLAAR: ["", "Klaar"], NIET_VOOR: ["jij", "Jouw instelling"],
@@ -1518,7 +1569,7 @@ async function refreshCharts() {
     drawCharts();
   } catch (e) {}
 }
-refresh(); refreshCharts();
+refresh(); refreshCharts(); setTimeout(loadEvOffer, 800);
 setInterval(refresh, 4000);
 setInterval(refreshCharts, 60000);
 let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(drawCharts, 150); });

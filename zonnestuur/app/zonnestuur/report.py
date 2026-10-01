@@ -81,12 +81,16 @@ def moment(now: datetime, grid_w: Optional[float], surplus_next_w: Optional[floa
         why = "je hebt nu zonnestroom over" if surplus is not None and surplus > 500 else "stroom is nu heel goedkoop"
         return {"state": "groen", "word": "Nu goed moment", "text": f"Zet nu de was, droger of vaatwasser aan: {why}.",
                 "icon": "sun"}
+    if not has_panels and price_rank is not None and price_rank <= 0.25:
+        return {"state": "groen", "word": "Nu goedkoop", "text": "Stroom hoort nu bij de goedkoopste van vandaag. Goed moment voor de was, droger of vaatwasser.",
+                "icon": "sun"}
     if (surplus is None or surplus <= 100) and price_rank is not None and price_rank >= 0.75:
-        return {"state": "rood", "word": "Liever wachten" + (f" tot {next_green}" if next_green else ""),
+        return {"state": "rood", "word": f"Wacht tot {next_green}" if next_green else "Liever wachten",
                 "text": "Stroom is nu bij de duurste van vandaag" + (f"; om {next_green} is het beter." if next_green else "."),
                 "icon": "wait"}
-    if has_panels and next_green:
-        return {"state": "oranje", "word": f"Kan, beter om {next_green}", "text": f"Nu komt je stroom van het net. Om {next_green} verwacht Zonnestuur zon over.",
+    if next_green:
+        why = f"Om {next_green} verwacht Zonnestuur zon over." if has_panels else f"Om {next_green} is stroom goedkoper."
+        return {"state": "oranje", "word": f"Kan, beter om {next_green}", "text": f"Nu komt je stroom van het net. {why}",
                 "icon": "later"}
     return {"state": "oranje", "word": "Gewoon moment", "text": "Geen zon over en geen bijzondere prijs: aanzetten kan, wachten levert weinig op.",
             "icon": "ok"}

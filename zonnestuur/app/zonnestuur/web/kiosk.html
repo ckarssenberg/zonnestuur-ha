@@ -4,140 +4,394 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <title>Wandscherm · Zonnestuur</title>
 <style>
   @font-face { font-family: "Inter"; src: url("fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
   @font-face { font-family: "Inter Tight"; src: url("fonts/inter-tight.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
-  /* Wandscherm: leesbaar op 3 meter. Overdag licht, 's avonds automatisch donker. */
+  /* Wandscherm "stroomklok": de dag als wijzerplaat, elk uur gekleurd naar prijs (of zon), met nu als wijzer.
+     Overdag porselein, 's avonds diep nachtblauw. Eén opvallend element (de klok), de rest rustig. */
   :root {
     color-scheme: light;
-    --bg: #f4f3ee; --card: #ffffff; --line: rgba(14, 17, 22, .08); --ink: #0d1015; --ink-2: #555d69; --ink-3: #868d98;
-    --sun: #b86e00; --net: #2f5bdb; --chip: rgba(14, 17, 22, .05);
-    --groen: #1f8a4c; --groen-bg: rgba(31, 138, 76, .12); --oranje: #b86e00; --oranje-bg: rgba(255, 178, 36, .18);
-    --rood: #c43c3b; --rood-bg: rgba(227, 73, 72, .12);
+    --bg: #eceff3; --panel: #f8fafc; --line: #dde2e8; --ink: #121821; --ink-2: #4f5a68; --ink-3: #8a94a1;
+    --now: #ff9f1c; --now-ink: #8a4b00;
+    --cheap: #2a78d6; --mid: #c4cbd3; --dear: #e34948; --sun: #f0a020;
+    --ok: #17845a; --ok-bg: #dff3ea; --wait: #c2382f; --wait-bg: #fbe4e1; --meh: #8a4b00; --meh-bg: #fdf0db;
+    --seg: #e3e8ee; --seg-on: #ffffff; --shadow: 0 1px 2px rgba(18, 24, 33, .05), 0 18px 40px -26px rgba(18, 24, 33, .35);
   }
-  :root[data-night="1"] {
+  :root[data-mode="dark"] {
     color-scheme: dark;
-    --bg: #05070a; --card: #10141a; --line: rgba(255, 255, 255, .08); --ink: #f3f5f8; --ink-2: #a2abb7; --ink-3: #6c7582;
-    --sun: #c98500; --net: #5b8cff; --chip: rgba(255, 255, 255, .06);
-    --groen: #4ade80; --groen-bg: rgba(74, 222, 128, .12); --oranje: #ffc24d; --oranje-bg: rgba(255, 178, 36, .14);
-    --rood: #ff8a8a; --rood-bg: rgba(230, 103, 103, .14);
+    --bg: #0b1220; --panel: #111a2b; --line: #1f2a3d; --ink: #eef2f7; --ink-2: #a6b1c2; --ink-3: #6b778a;
+    --now: #ffb224; --now-ink: #ffcf73;
+    --cheap: #3c8cf0; --mid: #36425a; --dear: #ef6461; --sun: #ffb224;
+    --ok: #4ade80; --ok-bg: rgba(74, 222, 128, .12); --wait: #ff8a80; --wait-bg: rgba(239, 100, 97, .14); --meh: #ffcf73; --meh-bg: rgba(255, 178, 36, .12);
+    --seg: #1a2537; --seg-on: #2a3953; --shadow: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 20px 50px -30px rgba(0, 0, 0, .9);
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { height: 100%; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 18px/1.4 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
-  main { height: 100%; display: grid; grid-template-rows: auto 1fr auto; gap: 16px; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); max-width: 1400px; margin: 0 auto; }
-  .top { display: flex; align-items: center; gap: 12px; color: var(--ink-2); font-size: 16px; }
-  .top b { color: var(--ink); font-weight: 650; }
-  .top .spacer { flex: 1; }
-  .top a { color: var(--ink-3); font-size: 14px; }
-  .grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; min-height: 0; }
-  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 26px; padding: 26px; min-width: 0; }
-  .moment { display: grid; align-content: center; gap: 14px; border-width: 2px; }
-  .moment.groen { background: var(--groen-bg); border-color: var(--groen); }
-  .moment.oranje { background: var(--oranje-bg); border-color: var(--oranje); }
-  .moment.rood { background: var(--rood-bg); border-color: var(--rood); }
-  .light { display: flex; align-items: center; gap: 18px; }
-  .dot { width: clamp(64px, 9vw, 110px); height: clamp(64px, 9vw, 110px); border-radius: 50%; display: grid; place-items: center; flex: none; color: #fff; }
-  .groen .dot { background: var(--groen); } .oranje .dot { background: var(--oranje); } .rood .dot { background: var(--rood); }
-  .dot svg { width: 56%; height: 56%; }
-  .word { font: 700 clamp(40px, 6.5vw, 84px)/1.02 "Inter Tight", "Inter", sans-serif; letter-spacing: -.03em; text-wrap: balance; }
-  .why { font-size: clamp(20px, 2.2vw, 28px); color: var(--ink-2); max-width: 32ch; }
-  .side { display: grid; gap: 16px; grid-template-rows: auto auto 1fr; min-width: 0; }
-  .nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .num .k { font-size: 15px; color: var(--ink-2); }
-  .num .v { font: 650 clamp(32px, 3.6vw, 48px)/1.1 "Inter Tight", "Inter", sans-serif; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-  .num .v small { font-size: .45em; color: var(--ink-2); margin-left: 3px; }
-  .eyebrow { font-size: 14px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 10px; }
-  .timeline { position: relative; height: 48px; border-radius: 12px; background: var(--chip); overflow: hidden; }
-  .timeline .w { position: absolute; top: 0; bottom: 0; background: var(--groen); opacity: .85; border-radius: 8px; }
-  .timeline .now { position: absolute; top: -2px; bottom: -2px; width: 3px; background: var(--ink); border-radius: 2px; }
-  .axis { display: flex; justify-content: space-between; font-size: 15px; color: var(--ink-3); margin-top: 6px; font-variant-numeric: tabular-nums; }
-  .money { font: 650 clamp(48px, 6vw, 80px)/1 "Inter Tight", "Inter", sans-serif; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-  .foot { color: var(--ink-3); font-size: 14px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.4 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+         -webkit-font-smoothing: antialiased; -webkit-user-select: none; user-select: none; transition: background .6s; }
+  body.dim main { filter: brightness(.7); }
+  .num { font-family: "Inter Tight", "Inter", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  main { height: 100%; min-height: 560px; display: grid; grid-template-rows: auto 1fr auto; gap: 18px; max-width: 1500px; margin: 0 auto;
+         padding: max(18px, env(safe-area-inset-top)) clamp(16px, 2.4vw, 32px) max(18px, env(safe-area-inset-bottom)); }
+
+  /* bovenbalk */
+  .bar { display: flex; align-items: center; gap: 14px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; }
+  .brand svg { width: 26px; height: 26px; }
+  .time { margin-left: auto; text-align: right; line-height: 1.15; }
+  .time b { display: block; font-size: 26px; font-weight: 650; }
+  .time span { font-size: 14px; color: var(--ink-2); }
+  .live { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; color: var(--ink-2); padding: 8px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
+  .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+  .live.off i { background: var(--wait); }
+  .icon { width: 48px; height: 48px; border-radius: 16px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+  .icon svg { width: 22px; height: 22px; }
+
+  /* hoofdindeling */
+  .stage { display: grid; grid-template-columns: minmax(340px, 1fr) minmax(380px, 1.05fr); gap: 18px; min-height: 0; }
+  .stage > .panel { min-height: 0; overflow: auto; }
+  @media (max-width: 900px) { main { height: auto; } .stage { grid-template-columns: 1fr; } .stage > .panel { overflow: visible; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 30px; box-shadow: var(--shadow); min-width: 0; }
+
+  /* de stroomklok */
+  .clock { display: grid; place-items: center; align-content: center; padding: clamp(14px, 2vw, 26px); gap: 12px; }
+  .dial { width: min(100%, 540px, calc(100vh - 300px)); min-width: 280px; aspect-ratio: 1; position: relative; }
+  @media (max-width: 900px) { .dial { width: min(100%, 520px); } }
+  .dial svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .center { position: absolute; inset: 24%; display: grid; place-content: center; justify-items: center; text-align: center; gap: 6px; }
+  .verdict { display: inline-flex; align-self: center; justify-self: center; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; font-weight: 650; font-size: clamp(15px, 1.6vw, 19px); }
+  .verdict.groen { background: var(--ok-bg); color: var(--ok); }
+  .verdict.rood { background: var(--wait-bg); color: var(--wait); }
+  .verdict.oranje { background: var(--meh-bg); color: var(--meh); }
+  .verdict i { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
+  .price { font-size: clamp(38px, 5.2vw, 76px); font-weight: 650; line-height: 1; white-space: nowrap; }
+  .unit { font-size: 14px; color: var(--ink-2); margin-top: -2px; }
+  .why { font-size: clamp(13px, 1.15vw, 16px); color: var(--ink-2); max-width: 26ch; margin: 0 auto; text-wrap: balance; }
+  .key { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; font-size: 14px; color: var(--ink-2); }
+  .key span { display: inline-flex; align-items: center; gap: 7px; }
+  .key i { width: 12px; height: 12px; border-radius: 4px; }
+
+  /* apparaten */
+  .devs { padding: 10px 0; display: flex; flex-direction: column; }
+  .devs h2 { font: 650 20px/1.2 "Inter Tight", "Inter", sans-serif; letter-spacing: -.01em; margin: 14px 26px 6px; }
+  .dev { padding: 18px 26px; border-top: 1px solid var(--line); display: grid; grid-template-columns: 52px 1fr; gap: 6px 16px; }
+  .dev:first-of-type { border-top: 0; }
+  .dev .ico { width: 52px; height: 52px; border-radius: 17px; display: grid; place-items: center; background: var(--seg); color: var(--ink-2); grid-row: span 2; }
+  .dev.on .ico { background: var(--now); color: #1b1200; }
+  .dev .ico svg { width: 26px; height: 26px; }
+  .dev .top { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+  .dev .name { font-weight: 650; font-size: 19px; }
+  .dev .kw { margin-left: auto; font-size: 22px; font-weight: 650; }
+  .dev .kw small { font-size: 13px; color: var(--ink-2); font-weight: 550; margin-left: 2px; }
+  .dev .state { color: var(--ink-2); font-size: 15px; grid-column: 2; }
+  .controls { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
+  .seg { display: inline-grid; grid-auto-flow: column; background: var(--seg); border-radius: 16px; padding: 4px; gap: 4px; }
+  .seg button { font: inherit; font-size: 15px; font-weight: 600; min-height: 48px; padding: 0 14px; border: 0; border-radius: 12px; background: transparent; color: var(--ink-2); cursor: pointer; }
+  .seg button.on { background: var(--seg-on); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+  .stepper { display: inline-flex; align-items: center; gap: 6px; background: var(--seg); border-radius: 16px; padding: 4px 4px 4px 14px; font-size: 15px; color: var(--ink-2); }
+  .stepper b { color: var(--ink); font-size: 18px; min-width: 56px; text-align: center; }
+  .stepper button { font: inherit; width: 44px; height: 44px; border-radius: 12px; border: 0; background: var(--seg-on); color: var(--ink); font-size: 22px; cursor: pointer; }
+  button:focus-visible { outline: 3px solid var(--cheap); outline-offset: 2px; }
+  .empty { padding: 24px 26px; color: var(--ink-2); }
+
+  /* onderbalk */
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; }
+  .fact { padding: 18px 22px; }
+  .fact .k { font-size: 14px; color: var(--ink-2); }
+  .fact .v { font-size: clamp(26px, 2.6vw, 34px); font-weight: 650; margin-top: 2px; }
+  .fact .d { font-size: 14px; color: var(--ink-3); margin-top: 2px; }
+
+  /* instellingen */
+  .sheet-bg { position: fixed; inset: 0; background: rgba(5, 10, 20, .45); display: grid; place-items: end center; z-index: 10; }
+  .sheet { max-height: 92vh; overflow: auto; width: min(640px, 100%); background: var(--panel); border-radius: 30px 30px 0 0; padding: 26px 26px max(26px, env(safe-area-inset-bottom)); box-shadow: 0 -20px 60px rgba(0, 0, 0, .25); }
+  .sheet h2 { font: 650 24px/1.2 "Inter Tight", "Inter", sans-serif; margin: 0 0 4px; }
+  .sheet p { color: var(--ink-2); margin: 0 0 18px; font-size: 15px; }
+  .row { display: grid; gap: 10px; margin-bottom: 20px; }
+  .row > span { font-weight: 600; font-size: 15px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips button { font: inherit; font-size: 15px; font-weight: 600; min-height: 46px; padding: 0 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--ink-2); cursor: pointer; }
+  .chips button.on { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+  .sheet .done { width: 100%; font: inherit; font-weight: 650; font-size: 17px; min-height: 54px; border-radius: 16px; border: 0; background: var(--now); color: #1b1200; cursor: pointer; }
+  .sheet a { color: var(--ink-2); font-size: 14px; }
+  .seg button { white-space: nowrap; }
+  .why-out { display: none; color: var(--ink-2); text-align: center; margin: 0; max-width: 34ch; font-size: 15px; }
+  @media (max-width: 560px) {
+    .center .why, .time span, .unit { display: none; }
+    .why-out { display: block; }
+    .center { inset: 20%; }
+    .verdict { font-size: 14px; padding: 6px 12px; }
+    .dev { padding: 16px 18px; } .devs h2 { margin-left: 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) { body { transition: none; } }
 </style>
 </head>
 <body>
 <main>
-  <div class="top"><b>Zonnestuur</b><span id="clock"></span><span class="spacer"></span><a href="./">Dashboard</a></div>
-  <div class="grid">
-    <section class="card moment oranje" id="moment" aria-live="polite">
-      <div class="light"><div class="dot" id="dot" aria-hidden="true"></div><div class="word" id="word">Even kijken…</div></div>
-      <div class="why" id="why">&nbsp;</div>
-    </section>
-    <div class="side">
-      <section class="card">
-        <div class="nums">
-          <div class="num"><div class="k">Zon</div><div class="v" id="pv">–</div></div>
-          <div class="num"><div class="k" id="gridK">Net</div><div class="v" id="grid">–</div></div>
-          <div class="num"><div class="k">Apparaten</div><div class="v" id="dev">–</div></div>
+  <header class="bar">
+    <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="7" fill="#ffb224"/><path d="M16 3v3M16 26v3M3 16h3M26 16h3M6.8 6.8l2.1 2.1M23.1 23.1l2.1 2.1M6.8 25.2l2.1-2.1M23.1 8.9l2.1-2.1" stroke="#ffb224" stroke-width="2.4" stroke-linecap="round"/></svg>Zonnestuur</div>
+    <span class="live" id="live"><i></i><span id="liveTxt">verbinden</span></span>
+    <div class="time"><b class="num" id="clockTime">--:--</b><span id="clockDate">&nbsp;</span></div>
+    <button class="icon" id="setBtn" aria-label="Instellingen van dit scherm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
+  </header>
+
+  <div class="stage">
+    <section class="panel clock" aria-label="Stroomklok van vandaag">
+      <div class="dial">
+        <svg id="dial" viewBox="-34 -34 468 468" role="img" aria-label="Prijs of zon per uur vandaag, met de huidige tijd"></svg>
+        <div class="center">
+          <span class="verdict oranje" id="verdict"><i></i><span id="word">Even kijken</span></span>
+          <div class="price num" id="price">–</div>
+          <div class="unit">per kWh, alles inbegrepen</div>
+          <div class="why" id="why">&nbsp;</div>
         </div>
-      </section>
-      <section class="card">
-        <div class="eyebrow">Vandaag zon over</div>
-        <div class="timeline" id="tl"></div>
-        <div class="axis"><span>06</span><span>09</span><span>12</span><span>15</span><span>18</span><span>21</span></div>
-      </section>
-      <section class="card">
-        <div class="eyebrow">Opgeleverd deze maand</div>
-        <div class="money" id="money">–</div>
-        <div style="color:var(--ink-2);margin-top:8px" id="moneyNote">&nbsp;</div>
-      </section>
-    </div>
+      </div>
+      <p class="why-out" id="whyOut"></p>
+      <div class="key" id="key"></div>
+    </section>
+
+    <section class="panel devs" aria-labelledby="devH">
+      <h2 id="devH">Wat Zonnestuur regelt</h2>
+      <div id="devices"><div class="empty">Laden…</div></div>
+    </section>
   </div>
-  <div class="foot"><span>Groen: zet nu de was, droger of vaatwasser aan. Rood: liever wachten.</span><span id="upd"></span></div>
+
+  <div class="facts" id="facts"></div>
 </main>
+
+<div class="sheet-bg" id="sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetH">
+    <h2 id="sheetH">Dit scherm</h2>
+    <p>Deze instellingen gelden alleen voor dit scherm.</p>
+    <div class="row"><span>Uiterlijk</span><div class="chips" id="optMode"><button data-v="auto">Dag en nacht vanzelf</button><button data-v="light">Altijd licht</button><button data-v="dark">Altijd donker</button></div></div>
+    <div class="row"><span>'s Nachts (22:00–07:00)</span><div class="chips" id="optDim"><button data-v="1">Dimmen</button><button data-v="0">Niet dimmen</button></div></div>
+    <div class="row"><span>De klok toont</span><div class="chips" id="optDial"><button data-v="auto">Vanzelf</button><button data-v="price">Stroomprijs</button><button data-v="sun">Zon</button></div></div>
+    <div class="row"><span>Apparaten op dit scherm</span><div class="chips" id="optDevs"></div></div>
+    <button class="done" id="sheetDone">Klaar</button>
+    <p style="margin:14px 0 0"><a href="./">Naar het volledige dashboard</a> · <a href="instellingen">Alle instellingen</a></p>
+  </div>
+</div>
+
 <script>
 const $ = (id) => document.getElementById(id);
 const nl = (v, d = 0) => (v ?? 0).toLocaleString("nl-NL", { minimumFractionDigits: d, maximumFractionDigits: d });
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const hhmm = (d) => d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
 let token = ""; try { token = localStorage.getItem("zs_token") || ""; } catch (e) {}
-const api = (p) => fetch(p, { headers: token ? { "X-Token": token } : {} }).then((r) => r.json());
+const api = (p, o = {}) => fetch(p, Object.assign({}, o, { headers: Object.assign({ "Content-Type": "application/json" }, token ? { "X-Token": token } : {}) })).then((r) => r.json());
+
+// ---- voorkeuren van dit scherm
+const PREF = { mode: "auto", dim: "1", dial: "auto", hide: [] };
+try { Object.assign(PREF, JSON.parse(localStorage.getItem("zs_kiosk") || "{}")); } catch (e) {}
+const savePref = () => { try { localStorage.setItem("zs_kiosk", JSON.stringify(PREF)); } catch (e) {} };
+
+let S = null, P = null, M = null, C = null;
+
+function applyMode() {
+  const h = new Date().getHours(), night = h >= 21 || h < 7;
+  document.documentElement.dataset.mode = PREF.mode === "auto" ? (night ? "dark" : "light") : PREF.mode;
+  document.body.classList.toggle("dim", PREF.dim === "1" && (h >= 22 || h < 7));
+}
+
+// ---- de stroomklok
+const R_OUT = 196, R_IN = 156;
+function polar(r, hour) { const a = (hour / 24) * 2 * Math.PI - Math.PI / 2; return [200 + r * Math.cos(a), 200 + r * Math.sin(a)]; }
+function arc(h0, h1, r0, r1) {
+  const [a, b] = polar(r1, h0), [c, d] = polar(r1, h1), [e, f] = polar(r0, h1), [g, k] = polar(r0, h0), big = h1 - h0 > 12 ? 1 : 0;
+  return `M${a},${b} A${r1},${r1} 0 ${big} 1 ${c},${d} L${e},${f} A${r0},${r0} 0 ${big} 0 ${g},${k} Z`;
+}
+function dialMode() { return PREF.dial !== "auto" ? PREF.dial : (S && S.has_panels ? "sun" : "price"); }
+function hourData() {
+  // de komende 24 uur, elk uur op zijn plek op de klok (na middernacht dus de nacht van morgen)
+  const h0 = new Date(); h0.setMinutes(0, 0, 0);
+  const t0 = h0.getTime() / 1000, out = [];
+  if (dialMode() === "price" && P && P.slots && P.slots.length) {
+    const byH = {};
+    for (const r of P.slots) if (r.ts >= t0 && r.ts < t0 + 86400) { const h = new Date(r.ts * 1000).getHours(); (byH[h] = byH[h] || []).push(r); }
+    const vals = Object.values(byH).map((rs) => rs.reduce((a, r) => a + r.all_in, 0) / rs.length);
+    const sorted = [...vals].sort((a, b) => a - b), q = (p) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
+    const lo = q(0.33), hi = q(0.67);
+    for (let h = 0; h < 24; h++) {
+      const rs = byH[h]; if (!rs) { out.push(null); continue; }
+      const v = rs.reduce((a, r) => a + r.all_in, 0) / rs.length;
+      out.push({ v, color: v <= lo ? "var(--cheap)" : v >= hi ? "var(--dear)" : "var(--mid)", planned: rs.some((r) => r.planned && r.planned.length) });
+    }
+  } else if (C && C.windows) {
+    for (let h = 0; h < 24; h++) out.push({ v: 0, color: "var(--mid)", planned: false });
+    for (const w of C.windows.filter((w) => !w.tomorrow)) {
+      const a = Number(w.from.slice(0, 2)), b = Number(w.to.slice(0, 2));
+      for (let h = a; h < Math.max(a + 1, b); h++) out[h] = { v: 1, color: "var(--sun)", planned: false };
+    }
+    for (const d of (S && S.devices) || []) for (const bh of d.best_hours || []) { const h = Number(bh.slice(0, 2)); if (out[h]) out[h].planned = true; }
+  }
+  return out;
+}
+function drawDial() {
+  const svg = $("dial"), now = new Date(), hn = now.getHours() + now.getMinutes() / 60, data = hourData();
+  let h = "";
+  for (let i = 0; i < 24; i++) {
+    const d = data[i], past = false;
+    h += `<path d="${arc(i + 0.04, i + 0.96, R_IN, R_OUT)}" fill="${d ? d.color : "var(--seg)"}" opacity="${past ? 0.32 : 1}"/>`;
+    if (d && d.planned) { const [x, y] = polar(R_IN - 11, i + 0.5); h += `<circle cx="${x}" cy="${y}" r="4.5" fill="var(--now)" opacity="${past ? 0.4 : 1}"/>`; }
+  }
+  for (const t of [0, 6, 12, 18]) {
+    const [x, y] = polar(R_OUT + 20, t);
+    h += `<text x="${x}" y="${y + 5}" text-anchor="middle" font-size="16" font-weight="600" fill="var(--ink-3)" font-family="Inter Tight, Inter, sans-serif">${String(t).padStart(2, "0")}</text>`;
+  }
+  const [x1, y1] = polar(R_IN - 2, hn), [x2, y2] = polar(R_OUT + 8, hn);
+  h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--now)" stroke-width="6" stroke-linecap="round"/>`;
+  h += `<circle cx="${x2}" cy="${y2}" r="9" fill="var(--now)" stroke="var(--panel)" stroke-width="4"/>`;
+  svg.innerHTML = h;
+  const mode = dialMode();
+  $("key").innerHTML = mode === "price"
+    ? `<span>Komende 24 uur:</span><span><i style="background:var(--cheap)"></i>Goedkoop</span><span><i style="background:var(--mid)"></i>Gemiddeld</span><span><i style="background:var(--dear)"></i>Duur</span><span><i style="background:var(--now);border-radius:50%"></i>Gepland</span>`
+    : `<span><i style="background:var(--sun)"></i>Zon over</span><span><i style="background:var(--now);border-radius:50%"></i>Gepland</span>`;
+}
+
+// ---- het oordeel in het midden
+function drawCenter() {
+  if (M) {
+    $("verdict").className = "verdict " + M.state;
+    $("word").textContent = M.word;
+    $("why").textContent = M.text;
+    $("whyOut").textContent = M.text;
+  }
+  if (S) $("price").textContent = `€ ${nl(S.price_now, 2)}`;
+}
+
+// ---- apparaten met bediening
 const ICON = {
-  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>',
-  wait: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9"/></svg>',
-  later: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
-  ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  boiler: '<path d="M12 3c3 4 6 7 6 11a6 6 0 0 1-12 0c0-4 3-7 6-11z"/>',
+  ev: '<path d="M5 16V11l2-4h10l2 4v5"/><path d="M4 16h16v2H4z"/><circle cx="8" cy="16" r="1.6"/><circle cx="16" cy="16" r="1.6"/>',
+  heatpump: '<rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="12" cy="12" r="3.5"/>',
+  generic: '<rect x="6" y="3" width="12" height="18" rx="3"/><circle cx="12" cy="13" r="3.5"/><path d="M9 6.5h2"/>',
 };
-async function moment() {
-  try {
-    const m = await api("api/moment");
-    $("moment").className = "card moment " + m.state;
-    $("dot").innerHTML = ICON[m.icon] || ICON.ok;
-    $("word").textContent = m.word;
-    $("why").textContent = m.text;
-    $("upd").textContent = "bijgewerkt " + new Date().toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
-  } catch (e) { $("word").textContent = "Geen verbinding"; $("why").textContent = "Het wandscherm probeert het zo opnieuw."; }
+function stateText(d) {
+  if (!d.online) return /aangesloten|stekker/i.test(d.reason) ? "Niet aangesloten" : /klaarzet|start op afstand/i.test(d.reason) ? "Zet hem klaar met 'start op afstand'" : "Niet bereikbaar";
+  if (d.mode === "on") return `Door jou aangezet${d.override_until ? " tot " + d.override_until.slice(11, 16) : ""}`;
+  if (d.mode === "off") return `Vandaag overgeslagen${d.override_until ? " tot " + d.override_until.slice(11, 16) : ""}`;
+  const r = String(d.reason || "");
+  if (d.on && d.power_w > 50) return d.kind === "ev" ? "Laadt nu" + (/goedkoop/.test(r) ? ", goedkoop uur" : /zon|overschot/.test(r) ? ", op zon" : "") : "Draait nu" + (/goedkoop/.test(r) ? ", goedkoop uur" : /zon|overschot/.test(r) ? ", op zon" : "");
+  if (d.on && d.kind === "ev") return "Vol of wacht op de auto";
+  const m = r.match(/goedkoop uur \((\d\d:\d\d)\)/) || r.match(/\((\d\d:\d\d)\)/);
+  if (m) return `Wacht op goedkoper uur, ${m[1]}`;
+  if ((d.best_hours || []).length) return `Gepland om ${d.best_hours[0]}`;
+  if (/vandaag klaar|niets gepland/.test(r)) return "Klaar voor vandaag";
+  return r ? r.charAt(0).toUpperCase() + r.slice(1) : "Automatisch";
 }
-async function status() {
-  try {
-    const s = await api("api/status");
-    const now = new Date(s.now), h = now.getHours();
-    document.documentElement.dataset.night = h >= 21 || h < 7 ? "1" : "";
-    $("clock").textContent = now.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" }) + " · " + now.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
-    const dev = s.devices.reduce((a, d) => a + (d.power_w || 0), 0);
-    const g = s.grid_w;
-    $("grid").innerHTML = g == null ? "–" : `${nl(Math.abs(g) / 1000, 1)}<small>kW</small>`;
-    $("gridK").textContent = g == null ? "Net" : g < -30 ? "Naar het net" : "Van het net";
-    $("dev").innerHTML = `${nl(dev / 1000, 1)}<small>kW</small>`;
-    $("pv").innerHTML = s.forecast_now_w == null ? "–" : `${nl(s.forecast_now_w / 1000, 1)}<small>kW</small>`;
-    const V = s.value || { month: { eur: s.month.eur_saved } };
-    $("money").textContent = "€ " + nl(V.month.eur, 2);
-    $("moneyNote").textContent = s.has_panels ? `${nl(s.month.kwh_solar, 1)} kWh eigen zon naar je apparaten` : "door te draaien in de goedkoopste uren";
-  } catch (e) {}
+function drawDevices() {
+  const box = $("devices"), devs = ((S && S.devices) || []).filter((d) => !PREF.hide.includes(d.id));
+  if (!devs.length) { box.innerHTML = `<div class="empty">Kies op het instellingenscherm welke apparaten je hier wilt zien.</div>`; return; }
+  box.innerHTML = devs.map((d) => {
+    const running = d.on && d.power_w > 50, ready = (d.ready_times || [])[0];
+    const midnight = Math.max(0.1, (new Date(new Date().setHours(24, 0, 0, 0)) - Date.now()) / 3.6e6);
+    return `<div class="dev ${running ? "on" : ""}">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICON[d.kind] || ICON.generic}</svg></div>
+      <div class="top"><span class="name">${esc(d.name)}</span><span class="kw num">${running ? nl(d.power_w / 1000, 1) + "<small>kW</small>" : ""}</span></div>
+      <div class="state">${esc(stateText(d))}</div>
+      <div class="controls">
+        <div class="seg" role="group" aria-label="${esc(d.name)} bedienen">
+          <button data-id="${esc(d.id)}" data-mode="auto" class="${d.mode === "auto" ? "on" : ""}">Automatisch</button>
+          <button data-id="${esc(d.id)}" data-mode="on" data-hours="2" class="${d.mode === "on" ? "on" : ""}">Nu aan</button>
+          <button data-id="${esc(d.id)}" data-mode="off" data-hours="${midnight}" class="${d.mode === "off" ? "on" : ""}">Overslaan</button>
+        </div>
+        ${d.kind === "ev" || ready ? `<div class="stepper"><span>${d.kind === "ev" ? "Vol om" : "Klaar om"}</span><button data-id="${esc(d.id)}" data-step="-30" aria-label="Eerder">−</button><b class="num">${esc(ready || "–")}</b><button data-id="${esc(d.id)}" data-step="30" aria-label="Later">+</button></div>` : ""}
+      </div></div>`;
+  }).join("");
+  box.querySelectorAll("[data-mode]").forEach((b) => b.onclick = async () => {
+    b.closest(".seg").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+    await api(`api/device/${encodeURIComponent(b.dataset.id)}/mode`, { method: "POST", body: JSON.stringify({ mode: b.dataset.mode, hours: b.dataset.mode === "auto" ? null : Number(b.dataset.hours) }) });
+    loadStatus();
+  });
+  box.querySelectorAll("[data-step]").forEach((b) => b.onclick = async () => {
+    const d = S.devices.find((x) => x.id === b.dataset.id), cur = (d.ready_times || [])[0] || (d.kind === "ev" ? "07:00" : "18:00");
+    let m = (Number(cur.slice(0, 2)) * 60 + Number(cur.slice(3, 5)) + Number(b.dataset.step) + 1440) % 1440;
+    const t = `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    b.parentElement.querySelector("b").textContent = t;
+    await api(`api/device/${encodeURIComponent(d.id)}/ready`, { method: "POST", body: JSON.stringify({ times: [t, ...(d.ready_times || []).slice(1)] }) });
+    loadStatus();
+  });
 }
-async function windows() {
-  try {
-    const c = await api("api/coach");
-    const tl = $("tl"); const pos = (hhmm) => { const [a, b] = hhmm.split(":").map(Number); return Math.max(0, Math.min(100, ((a + b / 60) - 6) / 15 * 100)); };
-    tl.innerHTML = (c.windows || []).filter((w) => !w.tomorrow).map((w) => `<div class="w" style="left:${pos(w.from)}%;width:${pos(w.to) - pos(w.from)}%"></div>`).join("");
-    const n = new Date(), p = ((n.getHours() + n.getMinutes() / 60) - 6) / 15 * 100;
-    if (p >= 0 && p <= 100) tl.insertAdjacentHTML("beforeend", `<div class="now" style="left:${p}%"></div>`);
-  } catch (e) {}
+
+// ---- onderbalk
+function cheapestBlock(hours = 3) {
+  if (!P || !P.slots || !P.slots.length) return null;
+  const nowTs = Date.now() / 1000, byH = {};
+  for (const r of P.slots) if (r.end > nowTs) { const k = Math.floor(r.ts / 3600) * 3600; (byH[k] = byH[k] || []).push(r.all_in); }
+  const ks = Object.keys(byH).map(Number).sort((a, b) => a - b);
+  let best = null;
+  for (let i = 0; i + hours <= ks.length; i++) {
+    if (ks[i + hours - 1] - ks[i] !== (hours - 1) * 3600) continue;
+    const avg = ks.slice(i, i + hours).reduce((a, k) => a + byH[k].reduce((x, y) => x + y, 0) / byH[k].length, 0) / hours;
+    if (!best || avg < best.avg) best = { start: ks[i], avg };
+  }
+  return best;
 }
-moment(); status(); windows();
-setInterval(moment, 30000); setInterval(status, 10000); setInterval(windows, 300000);
+function drawFacts() {
+  if (!S) return;
+  const V = S.value || { month: { eur: S.month.eur_saved } };
+  const f = [];
+  f.push(["Opgeleverd deze maand", `€ ${nl(V.month.eur, 2)}`, S.has_panels ? `${nl(S.month.kwh_solar, 1)} kWh eigen zon gebruikt` : "door in goedkope uren te draaien"]);
+  const g = S.grid_w;
+  f.push([g != null && g < -30 ? "Je levert terug" : "Je huis gebruikt nu", g == null ? "–" : `${nl(Math.abs(g) / 1000, 1)} kW`, S.has_panels ? `zon nu ± ${nl((S.forecast_now_w || 0) / 1000, 1)} kW` : "van het net"]);
+  const b = cheapestBlock(3);
+  if (b) { const a = new Date(b.start * 1000), e = new Date((b.start + 3 * 3600) * 1000);
+    f.push(["Goedkoopste 3 uur", `${hhmm(a)}–${hhmm(e)}`, `gemiddeld € ${nl(b.avg, 2)} per kWh${a.getDate() !== new Date().getDate() ? ", morgen" : ""}`]); }
+  $("facts").innerHTML = f.map(([k, v, d]) => `<div class="panel fact"><div class="k">${k}</div><div class="v num">${v}</div><div class="d">${d}</div></div>`).join("");
+}
+
+// ---- verversen
+function tick() {
+  const n = new Date();
+  $("clockTime").textContent = hhmm(n);
+  $("clockDate").textContent = n.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
+  applyMode();
+}
+async function loadStatus() {
+  try {
+    S = await api("api/status");
+    const H = S.health || {}, bad = (S.problems || []).some((p) => p.level === "warn");
+    $("live").classList.toggle("off", bad);
+    $("liveTxt").textContent = bad ? "Let op" : "Live";
+    drawCenter(); drawDevices(); drawFacts(); drawDial();
+  } catch (e) { $("live").classList.add("off"); $("liveTxt").textContent = "Geen verbinding"; }
+}
+async function loadMoment() { try { M = await api("api/moment"); drawCenter(); } catch (e) {} }
+async function loadSlow() {
+  try { P = await api("api/prices"); } catch (e) { P = null; }
+  try { C = await api("api/coach"); } catch (e) { C = null; }
+  drawDial(); drawFacts();
+}
+
+// ---- instellingen van dit scherm
+function sheet(open) {
+  $("sheet").hidden = !open;
+  if (!open) return;
+  const mark = (id, v) => $(id).querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
+  mark("optMode", PREF.mode); mark("optDim", PREF.dim); mark("optDial", PREF.dial);
+  $("optDevs").innerHTML = ((S && S.devices) || []).map((d) => `<button data-id="${esc(d.id)}" class="${PREF.hide.includes(d.id) ? "" : "on"}">${esc(d.name)}</button>`).join("");
+  $("optDevs").querySelectorAll("button").forEach((b) => b.onclick = () => {
+    b.classList.toggle("on");
+    PREF.hide = [...$("optDevs").querySelectorAll("button:not(.on)")].map((x) => x.dataset.id); savePref(); drawDevices();
+  });
+}
+for (const [id, key] of [["optMode", "mode"], ["optDim", "dim"], ["optDial", "dial"]]) {
+  $(id).querySelectorAll("button").forEach((b) => b.onclick = () => {
+    PREF[key] = b.dataset.v; savePref();
+    $(id).querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+    applyMode(); drawDial();
+  });
+}
+$("setBtn").onclick = () => sheet(true);
+$("sheetDone").onclick = () => sheet(false);
+$("sheet").addEventListener("click", (e) => { if (e.target === $("sheet")) sheet(false); });
+
+tick(); loadStatus(); loadMoment(); loadSlow();
+setInterval(tick, 15000); setInterval(loadStatus, 8000); setInterval(loadMoment, 30000); setInterval(loadSlow, 300000);
+setInterval(drawDial, 60000);
 (async () => { try { await navigator.wakeLock.request("screen"); } catch (e) {} })();
 document.addEventListener("visibilitychange", async () => { if (document.visibilityState === "visible") { try { await navigator.wakeLock.request("screen"); } catch (e) {} } });
 </script>

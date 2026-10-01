@@ -112,6 +112,12 @@ class Engine:
         for b in self.batteries.values():
             if not b.online:
                 out.append({"level": "warn", "text": f"{b.cfg.name}: {b.error or 'niet bereikbaar'}"})
+        try:
+            hint = self.panels_hint()
+        except Exception:
+            hint = None
+        if hint:
+            out.append({"level": "info", "text": hint, "link": "instellingen"})
         at = getattr(self, "_last_error_at", None)
         if not out and self.last_error and at is not None and time.monotonic() - at < 180:
             msg = re.sub(r"https?://\S+", "", self.last_error).replace("  ", " ").strip(" :")
@@ -311,6 +317,130 @@ class Engine:
         since = int((now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days - 1)).timestamp())
         with self.lock:
             return {"events": self.events.view(since, 150), "health": self.health.view(now, time.monotonic())}
+
+    # ---- auto laden in twee tikken ------------------------------------------
+    def _max_power_w(self, entity: str, days: int = 21) -> Optional[float]:
+        """Hoogste gemeten vermogen in de afgelopen weken (om 1 of 3 fasen te herkennen)."""
+        from .drivers import _request
+        ha = effective_ha(self.cfg)
+        if not entity or not ha.get("token"):
+            return None
+        start = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+        try:
+            data = _request(f"{ha['url'].rstrip('/')}/api/history/period/{start}?filter_entity_id={entity}&minimal_response&no_attributes",
+                            headers={"Authorization": f"Bearer {ha['token']}"}, timeout=15)
+        except DeviceError:
+            return None
+        best = None
+        for series in data or []:
+            for p in series:
+                try:
+                    v = float(p.get("state"))
+                except (TypeError, ValueError):
+                    continue
+                best = v if best is None else max(best, v)
+        return best
+
+    def ev_offer(self) -> dict:
+        """Gevonden laadpaal of auto in Home Assistant die nog niet gestuurd wordt, met slimme standaarden."""
+        if any(d.kind == "ev" for d in self.cfg.devices) or not effective_ha(self.cfg).get("token"):
+            return {"offer": False}
+        cached = getattr(self, "_ev_offer", None)
+        if cached and time.monotonic() - cached[0] < 600:
+            return cached[1]
+        out = {"offer": False}
+        try:
+            c = self.ha_candidates()
+            evs = [d for d in c.get("devices", []) if d.get("driver") == "ha_current"]
+            if evs:
+                ev = evs[0]
+                peak = self._max_power_w(ev.get("power_entity", ""))
+                phases = 3 if (peak or 0) > 4000 else (1 if peak else 3)
+                max_a = int(ev.get("max_a", 16))
+                car = ""
+                for e in (ev.get("switch_entity"), ev.get("plug_entity"), ev.get("power_entity")):
+                    if e:
+                        car = e.split(".", 1)[1].split("_")[0].capitalize()
+                        break
+                out = {"offer": True, "candidate": ev, "phases": phases, "max_kw": round(max_a * 230 * phases / 1000, 1),
+                       "peak_kw": None if peak is None else round(peak / 1000, 1), "car": car,
+                       "charger": ev.get("name", "").replace(" Beschikbare stroom", "").replace(" Available current", "")}
+        except Exception as exc:
+            log.debug("auto zoeken: %s", exc)
+        self._ev_offer = (time.monotonic(), out)
+        return out
+
+    def add_ev(self, body: dict) -> dict:
+        offer = self.ev_offer()
+        if not offer.get("offer"):
+            return {"ok": False, "error": "Geen laadpaal of auto gevonden in Home Assistant"}
+        ev = offer["candidate"]
+        ready = str(body.get("ready") or "07:30")
+        if not re.fullmatch(r"\d\d:\d\d", ready):
+            return {"ok": False, "error": "Kies een vertrektijd"}
+        km = max(0.0, min(500.0, float(body.get("km_day") or 40)))
+        phases = int(body.get("phases") or offer["phases"])
+        max_a = int(ev.get("max_a", 16))
+        kw = max_a * 230 * phases / 1000
+        run_min = max(30, round(km * 0.18 / kw * 60 / 15) * 15)            # ± 0,18 kWh per km
+        dev = {"id": "auto", "name": str(body.get("name") or "Auto")[:40], "kind": "ev", "driver": "ha_current",
+               "params": {"current_entity": ev["current_entity"], "switch_entity": ev.get("switch_entity", ""),
+                          "power_entity": ev.get("power_entity", ""), "plug_entity": ev.get("plug_entity", ""),
+                          "phases": phases, "min_a": ev.get("min_a", 6), "max_a": max_a,
+                          "min_interval_s": ev.get("min_interval_s", 30)},
+               "power_w": min(25000, round(kw * 1000)), "priority": len(self.cfg.devices) + 1,
+               "ready_times": [ready], "ready_days": [int(x) for x in body.get("days") or []],
+               "guarantee_min": int(min(600, max(60, round(run_min * 1.5 / 15) * 15))), "full_lookback_h": 12,
+               "detect_full": True, "expected_run_min": int(run_min), "learn_run": True, "min_on_s": 900, "min_off_s": 600}
+        ids = {d.id for d in self.cfg.devices}
+        n = 2
+        while dev["id"] in ids:
+            dev["id"] = f"auto-{n}"
+            n += 1
+        from .config import merge_public
+        try:
+            new = merge_public(self.cfg, {"devices": [dict(vars(d)) for d in self.cfg.devices] + [dev]})
+        except ValueError as exc:
+            return {"ok": False, "error": str(exc)}
+        self.apply_config(new)
+        self._ev_offer = None
+        return {"ok": True, "device": dev["id"], "run_min": run_min, "kw": round(kw, 1)}
+
+    def set_ready(self, device_id: str, times: list, days: Optional[list] = None) -> dict:
+        from .config import merge_public
+        devs = []
+        found = False
+        for d in self.cfg.devices:
+            x = dict(vars(d))
+            if d.id == device_id:
+                found = True
+                x["ready_times"] = sorted({t for t in times if re.fullmatch(r"\d\d:\d\d", str(t))})
+                if days is not None:
+                    x["ready_days"] = [] if len(days) == 7 else sorted(int(v) for v in days)
+            devs.append(x)
+        if not found:
+            return {"ok": False, "error": "onbekend apparaat"}
+        try:
+            self.apply_config(merge_public(self.cfg, {"devices": devs}))
+        except ValueError as exc:
+            return {"ok": False, "error": str(exc)}
+        return {"ok": True}
+
+    def panels_hint(self) -> Optional[str]:
+        """Staat 'zonnepanelen' aan terwijl er al weken niets wordt teruggeleverd? Dan klopt de instelling waarschijnlijk niet."""
+        if not self.cfg.solar.has_panels or self.cfg.solar.pv_entity or not self.cfg.has_meter:
+            return None
+        c = getattr(self, "_panels_hint", None)
+        if c and time.monotonic() - c[0] < 3600:
+            return c[1]
+        now = datetime.now(self.tz)
+        rows = self.ledger.house_hours(int((now - timedelta(days=14)).timestamp()), int(now.timestamp()))
+        days = len({r["ts"] // 86400 for r in rows if r["import_kwh"] > 0})
+        exp = sum(r["export_kwh"] for r in rows)
+        hint = ("Je levert nooit stroom terug. Heb je geen zonnepanelen? Zet ze dan uit bij Instellingen → Zonnepanelen: "
+                "dan stuurt Zonnestuur op de goedkoopste uren.") if days >= 3 and exp < 0.3 else None
+        self._panels_hint = (time.monotonic(), hint)
+        return hint
 
     # ---- doel, weekrapport, moment, contractcheck, uitleg --------------------
     def goal_view(self, now: Optional[datetime] = None) -> dict:
@@ -1700,6 +1830,8 @@ def make_handler(engine: Engine):
                 self.end_headers()
                 self.wfile.write(body)
                 return
+            if url.path == "/api/setup/ev":
+                return self._json(200, engine.ev_offer())
             if url.path == "/api/events":
                 return self._json(200, engine.events_view(min(14, max(1, int(q.get("days", ["2"])[0])))))
             if url.path == "/api/coach":
@@ -1757,6 +1889,10 @@ def make_handler(engine: Engine):
                 except ValueError as exc:
                     return self._json(400, {"error": str(exc)})
                 return self._json(200, {"ok": True})
+            if url.path == "/api/setup/ev":
+                return self._json(200, engine.add_ev(body))
+            if len(parts) == 4 and parts[:2] == ["api", "device"] and parts[3] == "ready":
+                return self._json(200, engine.set_ready(parts[2], list(body.get("times") or []), body.get("days")))
             if url.path == "/api/config":
                 try:
                     new = merge_public(engine.cfg, body)
