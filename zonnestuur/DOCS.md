@@ -18,6 +18,17 @@ in plaats van die stroom voor bijna niets terug te leveren.
 - Onder **Instellingen > Minder terugleveren** kun je je omvormer laten begrenzen als terugleveren geld kost,
   en meldingen op je telefoon aanzetten.
 
+## Auto laden
+
+- Staat je laadpaal in Home Assistant, dan verschijnt op het dashboard de kaart **Auto laden**. Vink aan welke auto's
+  aan die laadpaal laden, kies hoe laat hij vol moet zijn en tik op **Laden instellen**.
+- Auto's met een accupercentage in Home Assistant (bijvoorbeeld via Tibber of de app van de fabrikant) laden precies
+  tot het percentage dat je kiest. **Altijd minstens** laadt direct bij als de accu leger is dan dat.
+- Hangen er meer auto's aan één laadpaal, dan herkent Zonnestuur welke eraan hangt aan de stekker-sensor van de auto.
+  Lukt dat niet, tik dan de auto aan op de kaart van de laadpaal.
+- Met **Nu vol laden** laadt hij meteen tot je doel. Met een **maximumprijs** laadt hij nooit duurder dan dat,
+  ook niet voor de vertrektijd. Alleen onder je minimum laadt hij altijd.
+
 ## Waarom deed Zonnestuur dat?
 
 - Het **Logboek** op het dashboard toont bij elke schakeling waarom (zon over, goedkoop uur, klaar-tijd, jij) en,

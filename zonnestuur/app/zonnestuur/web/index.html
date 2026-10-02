@@ -104,6 +104,33 @@
   .ev-form label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
   .ev-form select { font: inherit; font-size: 15px; font-weight: 600; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--card-line); background: var(--card-solid); color: var(--ink); min-width: 150px; }
   .btn-line.on-sun { background: var(--glow); border-color: var(--glow); color: #1b1200; }
+  .evp { display: grid; gap: 10px; margin: 2px 0 14px; padding: 14px; border-radius: 16px; background: var(--chip); }
+  .ev-cars { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ev-car { font: inherit; display: inline-flex; align-items: baseline; gap: 8px; padding: 9px 14px; border-radius: 12px; border: 1.5px solid var(--card-line);
+    background: var(--card-solid); color: var(--ink); cursor: pointer; font-size: 14.5px; font-weight: 650; }
+  .ev-car small { font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .ev-car.on { border-color: var(--sun); box-shadow: 0 0 0 3px var(--glow-soft); }
+  .ev-bar { position: relative; height: 12px; border-radius: 6px; background: color-mix(in srgb, var(--ink) 9%, transparent); margin: 4px 0 2px; }
+  .ev-bar .fill { position: absolute; inset: 0 auto 0 0; border-radius: 6px; background: linear-gradient(90deg, var(--good), color-mix(in srgb, var(--good) 70%, var(--glow))); transition: width .6s; }
+  .ev-bar .tgt, .ev-bar .min { position: absolute; top: -4px; bottom: -4px; width: 3px; border-radius: 2px; background: var(--ink); transform: translateX(-1.5px); }
+  .ev-bar .min { background: var(--warn); }
+  .ev-big { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--ink-2); }
+  .ev-big b.num { font-size: 26px; font-weight: 700; color: var(--ink); letter-spacing: -.02em; }
+  .ev-plan { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+  .ev-plan b { color: var(--ink); }
+  .ev-ctl { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13.5px; color: var(--ink-2); }
+  .ev-ctl .ready-row { margin: 0; }
+  .ev-ctl select, .ev-edit select, .ev-edit input { font: inherit; font-size: 13.5px; font-weight: 600; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--card-line); background: var(--card-solid); color: var(--ink); }
+  .ev-warn { font-size: 12.5px; line-height: 1.45; padding: 8px 10px; border-radius: 10px; background: var(--warn-soft); color: var(--ink); }
+  .ev-edit summary { cursor: pointer; font-size: 13px; color: var(--ink-2); font-weight: 600; }
+  .ev-edit .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 10px; }
+  .ev-edit label { display: grid; gap: 4px; font-size: 12.5px; color: var(--ink-2); font-weight: 600; }
+  .ev-found { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); }
+  .ev-offer-cars { display: grid; gap: 8px; margin-top: 14px; }
+  .ev-offer-cars label.car { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px;
+    background: var(--card-solid); border: 1px solid var(--card-line); font-size: 14px; font-weight: 650; }
+  .ev-offer-cars label.car small { font-weight: 500; color: var(--ink-2); }
+  .ev-offer-cars select { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 9px; border: 1px solid var(--card-line); background: var(--card-solid); color: var(--ink); max-width: 230px; }
   .ready-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13.5px; }
   .ready-row button { font: inherit; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--card-line); background: var(--card-solid); color: var(--ink); cursor: pointer; font-size: 17px; }
   .c-welcome .opts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -392,12 +419,13 @@
       <div class="eyebrow">Auto laden</div>
       <h2 class="sec" id="evTitle">Laat je auto laden in de goedkoopste uren</h2>
       <p class="small muted" id="evFound" style="margin:4px 0 0"></p>
+      <div class="ev-offer-cars" id="evCars"></div>
       <div class="ev-form">
         <label>Hoe laat moet hij vol zijn?<select id="evReady"></select></label>
-        <label>Hoeveel km rijd je per dag?<select id="evKm"></select></label>
+        <label id="evKmL">Hoeveel km rijd je per dag?<select id="evKm"></select></label>
         <button class="btn-line on-sun" id="evAdd">Laden instellen</button>
       </div>
-      <p class="small muted" id="evRes" role="status" style="margin:10px 0 0">Zonnestuur leert daarna zelf hoeveel je auto echt nodig heeft. Aanpassen kan altijd op de apparaatkaart.</p>
+      <p class="small muted" id="evRes" role="status" style="margin:10px 0 0">Aanpassen kan altijd op de kaart van de laadpaal: welke auto, tot hoeveel procent, een minimum en een maximumprijs.</p>
     </section>
 
     <!-- zonnecoach -->
@@ -801,6 +829,7 @@ function renderDevices(s) {
   const wrap = $("devices");
   const now = new Date(s.now);
   $("devices").closest("section").hidden = !s.devices.length;
+  const openEv = new Set([...wrap.querySelectorAll("details.ev-edit[open]")].map((x) => x.closest("article").dataset.id));
   wrap.innerHTML = "";
   for (const d of s.devices) {
     const el = document.createElement("article");
@@ -831,17 +860,20 @@ function renderDevices(s) {
       <div class="facts">
         ${bestTxt ? `<div class="fact"><i class="dot" style="background:var(--glow)"></i><span>${PRICE ? "Goedkoopste uren gepland" : "Gepland vandaag"} <b>${bestTxt}</b></span></div>` : ""}
         ${readyTxt ? `<div class="fact"><i class="dot" style="background:${d.next_ready_ok ? "var(--good)" : "var(--ink)"}"></i><span>${
-          d.next_ready_ok ? `${READY_WORD[d.kind] || "Klaar"} voor <b>${readyTxt}</b>: gelukt` : `${READY_WORD[d.kind] || "Klaar"} voor <b>${readyTxt}</b> gegarandeerd`}</span></div>` : ""}
+          d.next_ready_ok ? `${READY_WORD[d.kind] || "Klaar"} voor <b>${readyTxt}</b>: gelukt` : d.ev && d.ev.short ? `Om <b>${readyTxt}</b> ± ${d.ev.short.pct}%: zo veel als er nog in past` : `${READY_WORD[d.kind] || "Klaar"} voor <b>${readyTxt}</b> gegarandeerd`}</span></div>` : ""}
         ${d.modulating ? `<div class="fact"><i class="dot" style="background:var(--sun)"></i><span>${d.on && d.setpoint_w
-          ? `Laadt traploos mee: nu <b>${Math.round(d.setpoint_w / d.w_per_step)} A</b> (${kw(d.setpoint_w)} kW)`
+          ? (d.ev && d.ev.kw ? `Laadt met <b>${nl(Math.min(d.ev.kw, d.setpoint_w / 1000), 1)} kW</b>: zoveel kan de ${esc((d.ev.cars.find((c) => c.id === d.ev.active) || {}).name || "auto")} hier aan`
+             : `Laadt traploos mee: nu <b>${Math.round(d.setpoint_w / d.w_per_step)} A</b> (${kw(d.setpoint_w)} kW)`)
           : `Laadt traploos tussen <b>${kw(d.min_w)}</b> en <b>${kw(d.max_w)} kW</b>`}</span></div>` : ""}
         <div class="fact"><i class="dot" style="background:var(--sun)"></i><span>Deze maand <b>${nl(d.month.kwh, 1)} kWh</b>${PRICE ? " slim ingepland" : `, waarvan <b>${nl(d.month.kwh_solar, 1)}</b> uit zon`} · <b>${eur(d.month.eur_saved)}</b> bespaard</span></div>
       </div>
-      ${d.kind === "ev" || (d.ready_times || []).length ? `<div class="ready-row"><span class="muted">${d.kind === "ev" ? "Vol om" : "Klaar om"}</span><button data-rd="-30" aria-label="Eerder">−</button><b class="num">${esc((d.ready_times || [])[0] || "geen")}</b><button data-rd="30" aria-label="Later">+</button></div>` : ""}
+      ${d.ev ? evPanel(d) : ""}
+      ${(d.kind === "ev" && !(d.ev && d.ev.cars.length)) || (d.kind !== "ev" && (d.ready_times || []).length) ? `<div class="ready-row"><span class="muted">${d.kind === "ev" ? "Vol om" : "Klaar om"}</span><button data-rd="-30" aria-label="Eerder">−</button><b class="num">${esc((d.ready_times || [])[0] || "geen")}</b><button data-rd="30" aria-label="Later">+</button></div>` : ""}
       ${d.last_event ? `<div class="why"><b>Waarom?</b> ${esc(d.last_event.text)}${d.last_event.outcome ? ` <span class="muted">${d.last_event.running ? "Tot nu: " : ""}${esc(d.last_event.outcome)}</span>` : ""}</div>` : ""}
       <div class="seg" role="group" aria-label="Bediening ${esc(d.name)}">
-        <button data-mode="auto" class="${d.mode === "auto" ? "active" : ""}">Automatisch</button>
-        <button data-mode="on" data-hours="2" class="${d.mode === "on" ? "active" : ""}">Nu aan (2 u)</button>
+        <button data-mode="auto" class="${d.mode === "auto" && !(d.ev && d.ev.mode === "vol") ? "active" : ""}">Automatisch</button>
+        ${d.ev && d.ev.cars.length ? `<button data-evmode="vol" class="${d.ev.mode === "vol" && d.mode === "auto" ? "active" : ""}">Nu vol laden</button>`
+          : `<button data-mode="on" data-hours="2" class="${d.mode === "on" ? "active" : ""}">Nu aan (2 u)</button>`}
         <button data-mode="off" data-skip="1" class="${d.mode === "off" ? "active" : ""}">Vandaag overslaan</button>
       </div>
       ${d.mode !== "auto" && d.override_until ? `<div class="small muted" style="margin-top:6px">Door jou ${d.mode === "on" ? "aangezet" : "uitgezet"} tot ${esc(d.override_until.slice(11, 16))}${d.override_until.slice(0, 10) !== s.now.slice(0, 10) ? " (morgen)" : ""}. Daarna weer automatisch.</div>` : ""}`;
@@ -852,7 +884,11 @@ function renderDevices(s) {
       await api(`api/device/${encodeURIComponent(d.id)}/ready`, { method: "POST", body: JSON.stringify({ times: [t, ...(d.ready_times || []).slice(1)] }) });
       refresh();
     }));
+    el.dataset.id = d.id;
+    if (openEv.has(d.id)) { const dt = el.querySelector("details.ev-edit"); if (dt) dt.open = true; }
+    if (d.ev) bindEv(el, d);
     el.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", async () => {
+      if (d.ev && d.ev.mode === "vol") await evPost(d.id, { mode: "slim" });
       await api(`api/device/${encodeURIComponent(d.id)}/mode`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: b.dataset.mode, hours: b.dataset.skip ? Math.max(0.1, (new Date(new Date().setHours(24, 0, 0, 0)) - Date.now()) / 3.6e6) : b.dataset.hours ? Number(b.dataset.hours) : null }),
@@ -861,6 +897,77 @@ function renderDevices(s) {
     }));
     wrap.appendChild(el);
   }
+}
+
+// ---------- auto laden: auto's aan de laadpaal ----------
+const evPost = (id, body) => api(`api/device/${encodeURIComponent(id)}/ev`, { method: "POST", body: JSON.stringify(body) });
+function evPanel(d) {
+  const E = d.ev;
+  if (!E.cars.length) {
+    return E.found.length ? `<div class="evp"><div class="ev-found">Gevonden in Home Assistant: <b>${E.found.map((f) => esc(f.name)).join(", ")}</b>.
+      Koppel ${E.found.length > 1 ? "ze" : "hem"}, dan laadt Zonnestuur precies tot het percentage dat je wilt.
+      <button class="btn-line on-sun" data-evadd="${esc(E.found.map((f) => f.id).join(","))}">Koppelen</button></div></div>` : "";
+  }
+  const car = E.cars.find((c) => c.id === E.active) || E.cars[0];
+  const soc = car.soc;
+  const chips = E.cars.length > 1 ? `<div class="ev-cars" role="group" aria-label="Welke auto hangt aan de lader?">${E.cars.map((c) =>
+    `<button class="ev-car ${c.id === car.id ? "on" : ""}" data-evcar="${esc(c.id)}">${esc(c.name)}<small>${c.soc != null ? Math.round(c.soc) + "%" : "?"}</small></button>`).join("")}</div>
+    <div class="small muted">${E.chosen_by === "stekker" ? `Herkend: ${esc(car.name)} hangt aan de lader.` : E.chosen_by === "jij" ? `Jij koos ${esc(car.name)}. Tot de stekker eruit gaat.` : `Hangt er een andere auto aan de lader? Tik hem aan.`}</div>` : "";
+  const bar = soc != null ? `<div class="ev-bar" role="img" aria-label="Accu ${Math.round(soc)}%, doel ${car.target_pct}%"><span class="fill" style="width:${soc}%"></span>
+    <span class="min" style="left:${car.min_pct}%" title="Minimum ${car.min_pct}%"></span><span class="tgt" style="left:${E.target ?? car.target_pct}%" title="Doel"></span></div>` : "";
+  let big = soc != null ? `<b class="num">${Math.round(soc)}%</b><span>${esc(car.name)}${car.range_km != null ? ` · ± ${car.range_km} km` : ""}</span>` : `<span>Accupercentage van ${esc(car.name)} onbekend</span>`;
+  let plan = "";
+  if (soc != null && E.need_min > 0) {
+    plan = `Nog <b>${nl(E.need_kwh, 1)} kWh</b> tot ${Math.round(E.target)}% · ± ${hm(E.need_min)} laden op ${nl(E.kw, 1)} kW.`;
+    if (E.mode === "vol") plan += ` <b>Laadt nu meteen vol.</b>`;
+    else if (E.short) plan += `<br>Tot ${E.short.ready} haalt hij ± <b>${E.short.pct}%</b>, dus hij laadt nu door. Daarna gaat hij in de goedkoopste uren verder.`;
+    else if (E.plan) plan += `<br>Gepland <b>${E.plan[0]}–${E.done_at}</b>: kost ± <b>${eur(E.cost)}</b>${E.cost_direct > E.cost + 0.05 ? ` <span class="muted">(meteen laden: ${eur(E.cost_direct)})</span>` : ""}.`;
+  } else if (soc != null) plan = `Doel van ${Math.round(E.target ?? car.target_pct)}% gehaald. ${car.car_limit && car.car_limit < car.target_pct ? `De auto zelf stopt bij ${car.car_limit}%.` : ""}`;
+  const warn = [];
+  if (car.stale_days != null && car.stale_days >= 2) warn.push(`Het percentage van de ${esc(car.name)} is ${Math.round(car.stale_days)} dagen oud.`);
+  if (car.conn === false) warn.push(`Home Assistant heeft nu geen verbinding met de ${esc(car.name)}. Zit de auto in de Tibber- of autofabrikant-app nog gekoppeld? Tot die tijd rekent Zonnestuur met het laatst bekende percentage en wat er sindsdien geladen is.`);
+  const mp = E.max_price;
+  const priceOpts = [0, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40].map((v) => `<option value="${v}" ${Math.abs(v - mp) < 0.001 ? "selected" : ""}>${v ? "max " + eur(v) : "geen maximum"}</option>`).join("");
+  const ready = (d.ready_times || [])[0] || "geen";
+  return `<div class="evp">
+    ${chips}
+    <div class="ev-big">${big}</div>${bar}
+    ${plan ? `<div class="ev-plan">${plan}</div>` : ""}
+    ${warn.length ? `<div class="ev-warn">${warn.join(" ")}</div>` : ""}
+    <div class="ev-ctl">
+      <div class="ready-row"><span>Vol om</span><button data-rd="-30" aria-label="Eerder">−</button><b class="num">${esc(ready)}</b><button data-rd="30" aria-label="Later">+</button></div>
+      <div class="ready-row"><span>Laden tot</span><button data-evt="-10" aria-label="Minder">−</button><b class="num">${car.target_pct}%</b><button data-evt="10" aria-label="Meer">+</button></div>
+      <div class="ready-row"><span>Altijd minstens</span><button data-evm="-10" aria-label="Minder">−</button><b class="num">${car.min_pct}%</b><button data-evm="10" aria-label="Meer">+</button></div>
+      <label class="ready-row"><span>Prijs</span><select data-evprice aria-label="Maximumprijs per kWh">${priceOpts}</select></label>
+    </div>
+    <details class="ev-edit"><summary>Gegevens van de ${esc(car.name)}</summary>
+      <div class="grid">
+        <label>Model<select data-evf="model">${(MODELS.length ? MODELS : [{ key: car.model, name: car.model_name }]).map((m) => `<option value="${m.key}" ${m.key === car.model ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select></label>
+        <label>Lader in de auto<select data-evf="ac">${AC_OPTIONS.map(([k, p]) => `<option value="${k}|${p}" ${Math.abs(k - car.ac_kw) < 0.01 && p === car.ac_phases ? "selected" : ""}>${nl(k, 1)} kW (${p} ${p === 1 ? "fase" : "fasen"})</option>`).join("")}</select></label>
+        <label>Bruikbare accu (kWh)<input data-evf="battery_kwh" type="number" min="5" max="200" step="0.1" value="${car.battery_kwh}"></label>
+      </div>
+      <p class="small muted" style="margin:8px 0 0">Laadt aan deze laadpaal met maximaal ${nl(car.kw, 1)} kW. ${E.cars.length > 1 ? `<button class="btn-line" data-evrm="${esc(car.id)}" style="margin-left:6px">${esc(car.name)} ontkoppelen</button>` : ""}</p>
+    </details>
+    ${E.found.length ? `<div class="ev-found">Ook gevonden: <b>${E.found.map((f) => esc(f.name)).join(", ")}</b> <button class="btn-line" data-evadd="${esc(E.found.map((f) => f.id).join(","))}">Toevoegen</button></div>` : ""}
+  </div>`;
+}
+function bindEv(el, d) {
+  const E = d.ev, car = E.cars.find((c) => c.id === E.active) || E.cars[0];
+  const go = async (body) => { const r = await evPost(d.id, body); if (r && r.ok === false) alert(r.error); refresh(); };
+  el.querySelectorAll("[data-evadd]").forEach((b) => b.onclick = () => go({ add_cars: b.dataset.evadd.split(",") }));
+  if (!car) return;
+  el.querySelectorAll("[data-evcar]").forEach((b) => b.onclick = () => go({ car: b.dataset.evcar }));
+  el.querySelectorAll("[data-evmode]").forEach((b) => b.onclick = () => go({ mode: b.dataset.evmode }));
+  el.querySelectorAll("[data-evt]").forEach((b) => b.onclick = () => go({ car_settings: { id: car.id, target_pct: car.target_pct + Number(b.dataset.evt) } }));
+  el.querySelectorAll("[data-evm]").forEach((b) => b.onclick = () => go({ car_settings: { id: car.id, min_pct: Math.max(0, car.min_pct + Number(b.dataset.evm)) } }));
+  el.querySelectorAll("[data-evprice]").forEach((x) => x.onchange = () => go({ max_price: Number(x.value) }));
+  el.querySelectorAll("[data-evrm]").forEach((b) => b.onclick = () => confirm(`${car.name} ontkoppelen van de laadpaal?`) && go({ remove_car: b.dataset.evrm }));
+  el.querySelectorAll("[data-evf]").forEach((x) => x.onchange = () => {
+    const cs = { id: car.id };
+    if (x.dataset.evf === "ac") { const [k, p] = x.value.split("|"); cs.ac_kw = Number(k); cs.ac_phases = Number(p); }
+    else cs[x.dataset.evf] = x.dataset.evf === "model" ? x.value : Number(x.value);
+    go({ car_settings: cs });
+  });
 }
 
 // ---------- planning per apparaat en batterij (zelfde tijdas als de prijsgrafiek) ----------
@@ -1482,26 +1589,39 @@ document.querySelectorAll("#welOpts button").forEach((b) => b.addEventListener("
   $("evAdd").addEventListener("click", async () => {
     $("evAdd").disabled = true;
     try {
-      const res = await api("api/setup/ev", { method: "POST", body: JSON.stringify({ ready: r.value, km_day: Number(k.value) }) });
+      const cars = [...document.querySelectorAll("#evCars input[type=checkbox]:checked")].map((c) => ({ id: c.value, model: c.closest("label").querySelector("select").value }));
+      const res = await api("api/setup/ev", { method: "POST", body: JSON.stringify({ ready: r.value, km_day: Number(k.value), cars }) });
       if (!res.ok) throw new Error(res.error);
-      $("evRes").textContent = `Klaar. Je auto laadt nu in de goedkoopste uren en is om ${r.value} vol (± ${res.run_min} minuten laden per dag op ${nl(res.kw, 1)} kW).`;
+      $("evRes").textContent = res.cars && res.cars.length
+        ? `Klaar. ${res.cars.join(" en ")} ${res.cars.length > 1 ? "laden" : "laadt"} nu in de goedkoopste uren tot 80% en ${res.cars.length > 1 ? "zijn" : "is"} om ${r.value} klaar. Zonnestuur rekent met het accupercentage uit hoeveel er bij moet.`
+        : `Klaar. Je auto laadt nu in de goedkoopste uren en is om ${r.value} vol (± ${res.run_min} minuten laden per dag op ${nl(res.kw, 1)} kW).`;
       setTimeout(() => { $("evOffer").hidden = true; refresh(); }, 2500);
     } catch (e) { $("evRes").textContent = e.message; $("evAdd").disabled = false; }
   });
 })();
+let MODELS = [];
+const AC_OPTIONS = [[3.6, 1], [6.6, 1], [7.2, 2], [7.4, 1], [11, 3], [22, 3]];
 async function loadEvOffer() {
   try {
     const o = await api("api/setup/ev");
+    MODELS = o.models || MODELS;
     $("evOffer").hidden = !o.offer;
-    if (o.offer) $("evFound").textContent = `Gevonden in Home Assistant: ${o.charger || "je laadpaal"}${o.car ? " en je auto (" + o.car + ")" : ""}. Laadt met maximaal ${nl(o.max_kw, 1)} kW (${o.phases} ${o.phases === 1 ? "fase" : "fasen"}).`
+    if (!o.offer) return;
+    const cars = o.cars || [];
+    $("evFound").textContent = `Gevonden in Home Assistant: laadpaal ${o.charger || ""} (tot ${nl(o.max_kw, 1)} kW)${cars.length ? ` en ${cars.length === 1 ? "je auto" : cars.length + " auto's"}. Vink aan welke hier laden en controleer het model: daarmee weet Zonnestuur hoe groot de accu is en hoe snel hij laadt.` : "."}`
       + (STATUS && !STATUS.has_panels ? " Zonder zonnepanelen kiest Zonnestuur de goedkoopste uren van de nacht." : " Bij zon laadt hij mee met je overschot; de rest in de goedkoopste uren.");
+    $("evCars").innerHTML = cars.map((c) => `<label class="car"><input type="checkbox" value="${esc(c.id)}" checked>
+      <span>${esc(c.name)} <small>${c.soc != null ? `· nu ${Math.round(c.soc)}%` : ""}</small></span>
+      <select aria-label="Model van ${esc(c.name)}">${MODELS.map((m) => `<option value="${m.key}" ${m.key === c.model ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select></label>`).join("");
+    $("evKmL").hidden = !!cars.length;
   } catch (e) {}
 }
 
 // ---------- logboek: wat en waarom ----------
 const LOG_BADGE = { ZON_OVERSCHOT: ["zon", "Zon"], ZON_WEG: ["", "Zon weg"], PRIJS_LAAG: ["prijs", "Goedkoop"], PRIJS_NEGATIEF: ["prijs", "Negatieve prijs"],
   GARANTIE: ["", "Klaar-tijd"], HANDMATIG: ["jij", "Jij"], MEETDAG: ["", "Meetdag"], PLAN_KLAAR: ["", "Klaar"], NIET_VOOR: ["jij", "Jouw instelling"],
-  OMVORMER_AF: ["prijs", "Omvormer"], OMVORMER_VOL: ["", "Omvormer"], BATTERIJ: ["", "Batterij"], MISLUKT: ["fout", "Mislukt"], PROGRAMMA: ["zon", "Gestart"] };
+  OMVORMER_AF: ["prijs", "Omvormer"], OMVORMER_VOL: ["", "Omvormer"], BATTERIJ: ["", "Batterij"], MISLUKT: ["fout", "Mislukt"], PROGRAMMA: ["zon", "Gestart"],
+  AUTO_MIN: ["", "Minimum"], DOEL_BEREIKT: ["", "Doel bereikt"], MAXPRIJS: ["prijs", "Te duur"] };
 function drawLog() {
   const E = EVENTS; if (!E) return;
   const H = E.health || {};

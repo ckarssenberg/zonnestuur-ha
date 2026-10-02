@@ -8,6 +8,7 @@ import argparse
 import json
 import os
 import logging
+import math
 import re
 import signal
 import threading
@@ -34,6 +35,7 @@ from .drivers import HomeAssistant, ha_candidates, make_meter, make_switch, ha_c
 from .controller import Context, Controller, plan_cheapest_hours, plan_sunny_hours, plan_cheapest_block, plan_day, Need
 from .forecast import SolarForecast
 from .ledger import Ledger
+from . import ev as ev_mod
 from .prices import PriceProvider
 
 log = logging.getLogger("zonnestuur")
@@ -80,6 +82,7 @@ class Engine:
         self.notifier = Notifier.from_config(cfg.notify)
         self.events = EventTracker(self.ledger)
         self.health = Health()
+        self.cars: dict = {}                 # laadpaal-id -> CarTracker
         self.batteries = {b["id"]: BatteryRuntime(BatteryConfig.from_dict(b)) for b in cfg.batteries}
         self._lic_cache: Optional[tuple] = None
         self.model = HouseModel(fallback_w=cfg.solar.base_load_w)
@@ -208,7 +211,12 @@ class Engine:
                                  self.ledger.device_daily((now - timedelta(days=RUN_DAYS)).date()), power)
 
     def run_min(self, d) -> float:
-        """Hoe lang dit apparaat per dag nodig heeft: geleerd als dat kan, anders de instelling."""
+        """Hoe lang dit apparaat per dag nodig heeft: geleerd als dat kan, anders de instelling.
+
+        Auto met bekend accupercentage: precies wat er tot het doel nog bij moet."""
+        e = self.ev_need(d)
+        if e is not None:
+            return e["need_min"]
         learned = self.model.run_min(d.id) if d.learn_run else None
         if learned:
             return max(15.0, min(12 * 60.0, learned))
@@ -341,14 +349,29 @@ class Engine:
                 best = v if best is None else max(best, v)
         return best
 
+    def _found_cars(self) -> list[dict]:
+        """Auto's die Home Assistant kent (accupercentage + actieradius of stekker)."""
+        c = getattr(self, "_cars_found", None)
+        if c and time.monotonic() - c[0] < 600:
+            return c[1]
+        found: list = []
+        if effective_ha(self.cfg).get("token"):
+            try:
+                found = ev_mod.discover_cars(ha_client(self.cfg).states())
+            except Exception as exc:
+                log.debug("auto's zoeken: %s", exc)
+        self._cars_found = (time.monotonic(), found)
+        return found
+
     def ev_offer(self) -> dict:
-        """Gevonden laadpaal of auto in Home Assistant die nog niet gestuurd wordt, met slimme standaarden."""
+        """Gevonden laadpaal (en auto's) in Home Assistant die nog niet gestuurd wordt, met slimme standaarden."""
+        models = [{"key": m["key"], "name": m["name"]} for m in ev_mod.MODELS]
         if any(d.kind == "ev" for d in self.cfg.devices) or not effective_ha(self.cfg).get("token"):
-            return {"offer": False}
+            return {"offer": False, "models": models}
         cached = getattr(self, "_ev_offer", None)
         if cached and time.monotonic() - cached[0] < 600:
             return cached[1]
-        out = {"offer": False}
+        out = {"offer": False, "models": models}
         try:
             c = self.ha_candidates()
             evs = [d for d in c.get("devices", []) if d.get("driver") == "ha_current"]
@@ -357,23 +380,42 @@ class Engine:
                 peak = self._max_power_w(ev.get("power_entity", ""))
                 phases = 3 if (peak or 0) > 4000 else (1 if peak else 3)
                 max_a = int(ev.get("max_a", 16))
-                car = ""
-                for e in (ev.get("switch_entity"), ev.get("plug_entity"), ev.get("power_entity")):
-                    if e:
-                        car = e.split(".", 1)[1].split("_")[0].capitalize()
-                        break
-                out = {"offer": True, "candidate": ev, "phases": phases, "max_kw": round(max_a * 230 * phases / 1000, 1),
-                       "peak_kw": None if peak is None else round(peak / 1000, 1), "car": car,
+                cars = self._found_cars()
+                out = {"offer": True, "candidate": ev, "phases": phases, "max_a": max_a,
+                       "max_kw": round(max_a * 230 * phases / 1000, 1),
+                       "peak_kw": None if peak is None else round(peak / 1000, 1),
+                       "car": ", ".join(x["name"] for x in cars), "cars": cars, "models": models,
                        "charger": ev.get("name", "").replace(" Beschikbare stroom", "").replace(" Available current", "")}
         except Exception as exc:
             log.debug("auto zoeken: %s", exc)
         self._ev_offer = (time.monotonic(), out)
         return out
 
+    def _cars_from_body(self, wanted, found: list[dict]) -> list[dict]:
+        """Autoprofielen uit wat je aanvinkt (id + eventueel model/lader), aangevuld met wat Home Assistant weet."""
+        by_id = {c["id"]: c for c in found}
+        out = []
+        for w in wanted or []:
+            w = w if isinstance(w, dict) else {"id": str(w)}
+            f = by_id.get(str(w.get("id")))
+            if not f:
+                continue
+            f = dict(f)
+            if w.get("model") in ev_mod.MODEL_BY_KEY:
+                f["model"] = w["model"]
+            car = ev_mod.new_car(f, int(w.get("target_pct") or 80), int(w.get("min_pct") or 20))
+            for k in ("ac_kw", "battery_kwh"):
+                if w.get(k):
+                    car[k] = float(w[k])
+            if w.get("ac_phases"):
+                car["ac_phases"] = int(w["ac_phases"])
+            out.append(car)
+        return out
+
     def add_ev(self, body: dict) -> dict:
         offer = self.ev_offer()
         if not offer.get("offer"):
-            return {"ok": False, "error": "Geen laadpaal of auto gevonden in Home Assistant"}
+            return {"ok": False, "error": "Geen laadpaal gevonden in Home Assistant"}
         ev = offer["candidate"]
         ready = str(body.get("ready") or "07:30")
         if not re.fullmatch(r"\d\d:\d\d", ready):
@@ -382,12 +424,21 @@ class Engine:
         phases = int(body.get("phases") or offer["phases"])
         max_a = int(ev.get("max_a", 16))
         kw = max_a * 230 * phases / 1000
-        run_min = max(30, round(km * 0.18 / kw * 60 / 15) * 15)            # ± 0,18 kWh per km
-        dev = {"id": "auto", "name": str(body.get("name") or "Auto")[:40], "kind": "ev", "driver": "ha_current",
+        found = offer.get("cars") or []
+        cars = self._cars_from_body(body["cars"] if "cars" in body else [c["id"] for c in found], found)
+        if cars:
+            kw = max(ev_mod.charge_kw(c, phases, max_a) for c in cars)
+            per_km = sum(c["kwh_km"] for c in cars) / len(cars)
+        else:
+            per_km = 0.18
+        run_min = max(30, round(km * per_km / kw * 60 / 15) * 15)
+        dev = {"id": "auto", "name": str(body.get("name") or ("Auto" if len(cars) != 1 else cars[0]["name"]))[:40],
+               "kind": "ev", "driver": "ha_current",
                "params": {"current_entity": ev["current_entity"], "switch_entity": ev.get("switch_entity", ""),
                           "power_entity": ev.get("power_entity", ""), "plug_entity": ev.get("plug_entity", ""),
                           "phases": phases, "min_a": ev.get("min_a", 6), "max_a": max_a,
-                          "min_interval_s": ev.get("min_interval_s", 30)},
+                          "min_interval_s": ev.get("min_interval_s", 30), "cars": cars,
+                          "max_price": float(body.get("max_price") or 0)},
                "power_w": min(25000, round(kw * 1000)), "priority": len(self.cfg.devices) + 1,
                "ready_times": [ready], "ready_days": [int(x) for x in body.get("days") or []],
                "guarantee_min": int(min(600, max(60, round(run_min * 1.5 / 15) * 15))), "full_lookback_h": 12,
@@ -404,7 +455,229 @@ class Engine:
             return {"ok": False, "error": str(exc)}
         self.apply_config(new)
         self._ev_offer = None
-        return {"ok": True, "device": dev["id"], "run_min": run_min, "kw": round(kw, 1)}
+        return {"ok": True, "device": dev["id"], "run_min": run_min, "kw": round(kw, 1), "cars": [c["name"] for c in cars]}
+
+    # ---- auto's aan de laadpaal ------------------------------------------------
+    @staticmethod
+    def _ev_cars(d) -> list[dict]:
+        return list((d.params or {}).get("cars") or []) if d.kind == "ev" else []
+
+    def _charger(self, d) -> tuple[int, float]:
+        p = d.params or {}
+        return int(p.get("phases", 1)), float(p.get("max_a", 16))
+
+    def ev_need(self, d) -> Optional[dict]:
+        """Hoeveel moet de auto die nu aan de lader hangt nog laden? None = onbekend (geen percentage)."""
+        cars = self._ev_cars(d)
+        t = self.cars.get(d.id)
+        if not cars or not t or not t.active:
+            return None
+        car = next((c for c in cars if c["id"] == t.active), None)
+        if not car:
+            return None
+        soc = t.soc(car)
+        if soc is None:
+            return None
+        target = float(car.get("target_pct", 80))
+        car_limit = t.readings.get(car["id"], {}).get("target")
+        if car_limit:
+            target = min(target, float(car_limit))      # de auto stopt zelf bij zijn eigen laadlimiet
+        kwh = ev_mod.need(car, soc, target)
+        kw = ev_mod.charge_kw(car, *self._charger(d))
+        mins = 0 if kwh < 0.1 else max(15, math.ceil(kwh / kw * 60))
+        return {"car": car, "soc": soc, "target": target, "need_kwh": kwh, "kw": kw, "need_min": mins}
+
+    def _update_cars(self, now: datetime, mono: float, dt: float) -> None:
+        for d in self.cfg.devices:
+            cars = self._ev_cars(d)
+            if not cars:
+                self.cars.pop(d.id, None)
+                continue
+            t = self.cars.setdefault(d.id, ev_mod.CarTracker())
+            st = self.controller.states[d.id]
+            if effective_ha(self.cfg).get("token"):
+                try:
+                    t.read(ha_client(self.cfg), cars, mono)
+                except Exception as exc:
+                    log.debug("auto uitlezen: %s", exc)
+            plugged = st.online or not str(st.offline_reason).startswith("wacht tot de auto")
+            car = t.resolve(cars, plugged if (st.online or st.offline_reason) else None)
+            if st.power_w > 50 and dt > 0:
+                t.charged(st.power_w * min(dt, 600) / 3600)
+            sw = self.switches.get(d.id)
+            if car and sw is not None and hasattr(sw, "max_a") and hasattr(sw, "phases"):
+                ph, amax = self._charger(d)
+                sw.phases = max(1, min(ph, int(car.get("ac_phases") or ph)))
+                sw.max_a = min(amax, ev_mod.car_amps(car))
+            e = self.ev_need(d)
+            if e is not None and e["need_min"] <= 0:
+                st.full_at = now                              # doel gehaald telt als 'vol'
+                if t.mode == "vol":
+                    t.mode = "slim"
+
+    def _ev_context(self) -> dict:
+        out = {}
+        for d in self.cfg.devices:
+            t = self.cars.get(d.id)
+            if not t or not t.active:
+                continue
+            car = next((c for c in self._ev_cars(d) if c["id"] == t.active), None)
+            if not car:
+                continue
+            e = self.ev_need(d)
+            soc = None if e is None else e["soc"]
+            out[d.id] = {"car": car["name"], "soc": soc, "mode": t.mode, "min_pct": int(car.get("min_pct", 0)),
+                         "target": None if e is None else e["target"],
+                         "below_min": soc is not None and soc < float(car.get("min_pct", 0)),
+                         "reached": e is not None and e["need_min"] <= 0,
+                         "need_min": None if e is None else e["need_min"],
+                         "max_price": float((d.params or {}).get("max_price") or 0)}
+        return out
+
+    def _under_max(self, d, candidates: list) -> list:
+        mp = float((d.params or {}).get("max_price") or 0) if d.kind == "ev" else 0.0
+        return [c for c in candidates if c[2] <= mp] if mp > 0 else candidates
+
+    def _planned_hours(self, d) -> list:
+        plan = getattr(self, "_price_plans", {}).get(d.id) if self.cfg.strategy == "price" else getattr(self, "_combo_plans", {}).get(d.id)
+        return sorted((plan or {}).get("hours") or [])
+
+    def ev_view(self, d, now: datetime) -> Optional[dict]:
+        if d.kind != "ev":
+            return None
+        cars = self._ev_cars(d)
+        linked = {c.get("soc_entity") for c in cars}
+        found = [{"id": f["id"], "name": f["name"], "model": f["model"], "model_name": f["model_name"], "soc": f["soc"]}
+                 for f in self._found_cars() if f["soc_entity"] not in linked]
+        out: dict = {"cars": [], "found": found, "max_price": float((d.params or {}).get("max_price") or 0)}
+        if not cars:
+            return out
+        t = self.cars.get(d.id) or ev_mod.CarTracker()
+        ph, amax = self._charger(d)
+        for c in cars:
+            r = t.readings.get(c["id"], {})
+            soc = t.soc(c)
+            out["cars"].append({"id": c["id"], "name": c["name"], "model": c.get("model", "other"),
+                                "model_name": ev_mod.MODEL_BY_KEY.get(c.get("model"), ev_mod.MODEL_BY_KEY["other"])["name"],
+                                "soc": soc, "target_pct": int(c.get("target_pct", 80)), "min_pct": int(c.get("min_pct", 20)),
+                                "battery_kwh": c.get("battery_kwh"), "ac_kw": c.get("ac_kw"), "ac_phases": c.get("ac_phases"),
+                                "kw": ev_mod.charge_kw(c, ph, amax),
+                                "range_km": None if soc is None else round(soc / 100 * float(c.get("battery_kwh") or 50) / float(c.get("kwh_km") or 0.17)),
+                                "stale_days": None if t.stale_days(c, now) is None else round(t.stale_days(c, now), 1),
+                                "conn": r.get("conn"), "plug": r.get("plug"), "car_limit": r.get("target")})
+        out.update(active=t.active, chosen_by=t.chosen_by, mode=t.mode)
+        e = self.ev_need(d)
+        if e is None:
+            return out
+        out.update(need_kwh=round(e["need_kwh"], 1), need_min=e["need_min"], kw=e["kw"], target=e["target"], soc=e["soc"])
+        if e["need_min"] <= 0:
+            return out
+        hours = [h for h in self._planned_hours(d) if h + timedelta(hours=1) > now]
+        left, cost = e["need_kwh"], 0.0
+        for h in hours:
+            k = min(e["kw"], left)
+            cost += k * self.prices.import_price(h, live=False)
+            left -= k
+        if hours and left < 0.05:
+            out["cost"] = round(cost, 2)
+            out["plan"] = [h.strftime("%H:%M") for h in hours]
+            out["done_at"] = (hours[-1] + timedelta(hours=1)).strftime("%H:%M")
+        readies = [r for r in self.controller.ready_datetimes(d, now) if r > now]
+        if readies:
+            ready = min(readies)
+            can = e["kw"] * (ready - now).total_seconds() / 3600
+            if can < e["need_kwh"] - 0.05:                # past niet meer vóór de vertrektijd: zeg wat wél lukt
+                car = e["car"]
+                out["short"] = {"ready": ready.strftime("%H:%M"), "pct": round(ev_mod.soc_after(car, e["soc"], can))}
+        left, direct, h = e["need_kwh"], 0.0, now
+        while left > 0.05 and h < now + timedelta(hours=24):
+            k = min(e["kw"], left)
+            direct += k * self.prices.import_price(h, live=False)
+            left -= k
+            h += timedelta(hours=1)
+        out["cost_direct"] = round(direct, 2)
+        return out
+
+    def _edit_device_params(self, device_id: str, fn) -> dict:
+        from .config import merge_public
+        devs, found = [], False
+        for d in self.cfg.devices:
+            x = dict(vars(d))
+            if d.id == device_id:
+                found = True
+                x["params"] = dict(x.get("params") or {})
+                err = fn(x["params"])
+                if err:
+                    return {"ok": False, "error": err}
+            devs.append(x)
+        if not found:
+            return {"ok": False, "error": "onbekend apparaat"}
+        try:
+            self.apply_config(merge_public(self.cfg, {"devices": devs}))
+        except ValueError as exc:
+            return {"ok": False, "error": str(exc)}
+        return {"ok": True}
+
+    def set_ev(self, device_id: str, body: dict) -> dict:
+        """Auto kiezen, nu vol laden, doel en minimum per auto, maximumprijs, auto's toevoegen of verwijderen."""
+        d = self._device(device_id)
+        if not d or d.kind != "ev":
+            return {"ok": False, "error": "onbekend apparaat"}
+        now = datetime.now(self.tz)
+        with self.lock:
+            t = self.cars.setdefault(device_id, ev_mod.CarTracker())
+            if "car" in body:
+                if body["car"] and body["car"] not in {c["id"] for c in self._ev_cars(d)}:
+                    return {"ok": False, "error": "onbekende auto"}
+                t.choose(body.get("car"))
+            if body.get("mode") in ("slim", "vol"):
+                t.mode = body["mode"]
+                self.controller.set_mode(device_id, "auto", now)
+                if t.mode == "vol":
+                    self.ledger.inc(now.date().isoformat(), "override")
+        edits = {k: body[k] for k in ("max_price", "car_settings", "add_cars", "remove_car") if k in body}
+        if not edits:
+            return {"ok": True}
+        found = self._found_cars() if "add_cars" in edits else []
+
+        def fn(p: dict):
+            cars = [dict(c) for c in p.get("cars") or []]
+            if "max_price" in edits:
+                v = float(edits["max_price"] or 0)
+                if v < 0 or v > 2:
+                    return "Maximumprijs tussen € 0 en € 2"
+                p["max_price"] = round(v, 3)
+            if "add_cars" in edits:
+                have = {c["id"] for c in cars}
+                cars += [c for c in self._cars_from_body(edits["add_cars"], found) if c["id"] not in have]
+            if "remove_car" in edits:
+                cars = [c for c in cars if c["id"] != edits["remove_car"]]
+            cs = edits.get("car_settings")
+            if cs:
+                car = next((c for c in cars if c["id"] == cs.get("id")), None)
+                if not car:
+                    return "onbekende auto"
+                if cs.get("model") in ev_mod.MODEL_BY_KEY and cs["model"] != car.get("model"):
+                    car.update(ev_mod.car_from_model(cs["model"]))
+                for k, lo, hi in (("target_pct", 30, 100), ("min_pct", 0, 80)):
+                    if k in cs:
+                        car[k] = int(max(lo, min(hi, int(cs[k]))))
+                if car.get("min_pct", 0) >= car.get("target_pct", 80):
+                    car["min_pct"] = max(0, car["target_pct"] - 10)
+                if cs.get("ac_kw"):
+                    car["ac_kw"] = float(cs["ac_kw"])
+                if cs.get("ac_phases"):
+                    car["ac_phases"] = int(cs["ac_phases"])
+                if cs.get("battery_kwh"):
+                    car["battery_kwh"] = max(5.0, min(200.0, float(cs["battery_kwh"])))
+                if cs.get("name"):
+                    car["name"] = str(cs["name"])[:40]
+            p["cars"] = cars
+            return None
+
+        res = self._edit_device_params(device_id, fn)
+        self._cars_found = None
+        return res
 
     def set_ready(self, device_id: str, times: list, days: Optional[list] = None) -> dict:
         from .config import merge_public
@@ -765,6 +1038,9 @@ class Engine:
                     self.last_error = f"{d.name}: {exc}"
                     log.warning(self.last_error)
 
+            # 2a. auto's: welke hangt aan de lader en hoe vol is hij
+            self._update_cars(now, mono, dt)
+
             # 2b. thuisbatterijen uitlezen
             self._read_batteries()
 
@@ -784,7 +1060,8 @@ class Engine:
                 cheapest, sunny, price_hours, price_now = {}, {}, {}, None
             basic_id = None if pro else self._basic_device()
             ctx = Context(now=now, mono=mono, grid_w=self._grid_for_controller(now), dt=dt, cheapest_hours=cheapest, sunny_hours=sunny,
-                          price_hours=price_hours, price_now=price_now, baseline=self.baseline_ids(now))
+                          price_hours=price_hours, price_now=price_now, baseline=self.baseline_ids(now),
+                          ev=self._ev_context())
             for dec in self.controller.step(ctx):
                 if (basic_id and dec.on and dec.device_id != basic_id
                         and not dec.reason.startswith(("handmatig", "garantie"))):
@@ -1081,13 +1358,17 @@ class Engine:
         out: dict[str, set] = {}
         for d in self.cfg.devices:
             st = self.controller.states[d.id]
+            e = self.ev_need(d)
+            if e is not None and e["need_min"] <= 0:
+                plans.pop(d.id, None)
+                continue
             if d.ready_times and d.guarantee_min > 0:
                 end = self.controller.next_unsatisfied(d, st, now)
                 if end is None:
                     plans.pop(d.id, None)
                     continue
                 start = end - timedelta(hours=d.full_lookback_h)
-                need_s = d.guarantee_min * 60
+                need_s = d.guarantee_min * 60 if e is None else e["need_min"] * 60 * 1.1
             elif self.run_min(d) > 0 or d.one_shot:
                 end = now.replace(hour=23, minute=0, second=0, microsecond=0)
                 if end <= now:
@@ -1097,7 +1378,7 @@ class Engine:
             else:
                 continue
             old = plans.get(d.id)
-            key = (end.isoformat(), len(self.prices.slots))
+            key = (end.isoformat(), len(self.prices.slots), None if e is None else round(e["need_min"] / 30))
             if old and old["end"] == end.isoformat() and (old["key"] == key or any(h <= hour for h in old["hours"])):
                 out[d.id] = old["hours"]
                 continue
@@ -1107,7 +1388,7 @@ class Engine:
                 plans[d.id] = {"end": end.isoformat(), "key": key, "hours": set()}
                 continue
             plan_start = max(hour, start)
-            candidates = self.prices.upcoming(plan_start.astimezone(timezone.utc), end.astimezone(timezone.utc))
+            candidates = self._under_max(d, self.prices.upcoming(plan_start.astimezone(timezone.utc), end.astimezone(timezone.utc)))
             if d.one_shot:
                 b = plan_cheapest_block(remaining, candidates)
                 hours = {b} if b else set()
@@ -1144,13 +1425,21 @@ class Engine:
         for d in self.cfg.devices:
             ready = self.controller.ready_datetimes(d, now)
             end = ready[0] if ready else (now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1))
-            key = (end.isoformat(), len(self.prices.slots))
+            e = self.ev_need(d)
+            key = (end.isoformat(), len(self.prices.slots), None if e is None else round(e["need_min"] / 30))
             old = plans.get(d.id)
             if old and old["end"] == end.isoformat() and (old["key"] == key or any(h <= hour for h in old["hours"])):
                 out[d.id] = old["hours"]
                 continue
-            run_s = max(self.run_min(d), d.guarantee_min if d.ready_times else 0) * 60 or 3600
-            candidates = self.prices.upcoming(hour.astimezone(timezone.utc), end.astimezone(timezone.utc))
+            if e is not None:
+                if e["need_min"] <= 0:
+                    plans[d.id] = {"end": end.isoformat(), "key": key, "hours": set()}
+                    out[d.id] = set()
+                    continue
+                run_s = e["need_min"] * 60 * 1.1                # 10% marge: laden gaat aan het eind trager
+            else:
+                run_s = max(self.run_min(d), d.guarantee_min if d.ready_times else 0) * 60 or 3600
+            candidates = self._under_max(d, self.prices.upcoming(hour.astimezone(timezone.utc), end.astimezone(timezone.utc)))
             if d.one_shot:
                 start = plan_cheapest_block(run_s, candidates)
                 hours = {start} if start else set()
@@ -1409,6 +1698,7 @@ class Engine:
                                                   if ready else None),
                                 "best_hours": self._best_hours(d.id, now),
                                 "last_event": next(iter(self.events.view_device(d.id, int((now - timedelta(days=2)).timestamp()))), None),
+                                "ev": self.ev_view(d, now),
                                 **st.to_dict(), "month": per_dev.get(d.id, {"kwh": 0, "kwh_solar": 0, "eur_saved": 0})})
             return {
                 "version": __version__,
@@ -1891,6 +2181,8 @@ def make_handler(engine: Engine):
                 return self._json(200, {"ok": True})
             if url.path == "/api/setup/ev":
                 return self._json(200, engine.add_ev(body))
+            if len(parts) == 4 and parts[:2] == ["api", "device"] and parts[3] == "ev":
+                return self._json(200, engine.set_ev(parts[2], body))
             if len(parts) == 4 and parts[:2] == ["api", "device"] and parts[3] == "ready":
                 return self._json(200, engine.set_ready(parts[2], list(body.get("times") or []), body.get("days")))
             if url.path == "/api/config":

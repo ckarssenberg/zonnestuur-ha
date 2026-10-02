@@ -587,7 +587,7 @@ def ha_candidates(states: list[dict]) -> dict:
             pw = _match_power(eid, by_id) or (_match_power(sw, by_id) if sw else "")
             plug = _match_plug(sw or eid, by_id)
             devices.append({"driver": "ha_current", "current_entity": eid, "name": name, "kind": "ev",
-                            "min_a": a.get("min", 6) if (a.get("min") or 0) >= 6 else 6, "max_a": min(16, a.get("max", 16) or 16),
+                            "min_a": a.get("min", 6) if (a.get("min") or 0) >= 6 else 6, "max_a": min(32, a.get("max", 16) or 16),
                             "switch_entity": sw, "power_entity": pw, "plug_entity": plug, "score": 4,
                             # Zaptec: laadstroom niet vaker dan eens per 15 minuten aanpassen (advies van Zaptec)
                             "min_interval_s": 900 if zaptec else 30})
@@ -621,8 +621,8 @@ def ha_candidates(states: list[dict]) -> dict:
             readonly.append({"name": name, "brand": "zaptec" if any("fallback_current" in e for e in siblings) else "",
                              "via": "een andere koppeling, zoals Tibber"})
     batteries = battery_candidates(states)
-    taken = {b.get(k) for b in batteries for k in ("mode_entity", "setpoint_entity", "charge_entity", "discharge_entity")}
-    devices = [d for d in devices if not ({d.get("entity"), (d.get("params") or {}).get("entity"),
+    taken = {b.get(k) for b in batteries for k in ("mode_entity", "setpoint_entity", "charge_entity", "discharge_entity")} - {None, ""}
+    devices = [d for d in devices if not ({d.get("entity"), d.get("current_entity"), (d.get("params") or {}).get("entity"),
                                            (d.get("params") or {}).get("current_entity")} & taken)]
     return {"power_sensors": power_sensors, "devices": devices, "price_sensors": price_sensors, "readonly_chargers": readonly,
             "inverter_limits": inverter_limits, "batteries": batteries}

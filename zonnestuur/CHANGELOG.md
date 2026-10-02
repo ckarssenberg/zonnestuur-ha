@@ -1,5 +1,16 @@
 # Wijzigingen
 
+## 0.23.0 – Auto's koppelen en laden tot een percentage
+- Auto's uit Home Assistant (bijvoorbeeld via Tibber, SEAT/Volkswagen, Stellantis, Tesla, Kia/Hyundai) koppelen aan de laadpaal, met hun accupercentage.
+- Laden tot een percentage in plaats van een schatting per kilometer; tussen twee metingen schat Zonnestuur het percentage zelf bij.
+- Per auto: laden tot (doel), altijd minstens (direct laden als de accu leger is), model, accu en lader in de auto.
+- Meerdere auto's aan één laadpaal: Zonnestuur herkent welke eraan hangt, of je tikt hem aan.
+- Nu vol laden met één tik, en een maximumprijs per kWh.
+- Plan en kosten van het laden, vergeleken met meteen laden. Past het niet meer vóór de vertrektijd, dan zegt Zonnestuur hoeveel procent het wél wordt.
+- Laadvermogen per auto: een auto die op één of twee fasen laadt krijgt de juiste stroom.
+- Waarschuwing als het percentage van een auto oud is of de auto geen verbinding heeft.
+- Herkennen van apparaten werkte niet als er ook een thuisbatterij gevonden werd. Opgelost.
+
 ## 0.22.0 – Auto laden en nieuw wandscherm
 - Auto laden in twee tikken: Zonnestuur vindt je laadpaal en auto in Home Assistant, herkent 1 of 3 fasen en vraagt alleen hoe laat hij vol moet zijn en hoeveel je rijdt.
 - Vertrektijd en klaar-tijd met − en + direct op de apparaatkaart.

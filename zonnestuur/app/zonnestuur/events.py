@@ -38,6 +38,14 @@ def classify(reason: str, on: bool) -> str:
         return "MEETDAG"
     if r.startswith("garantie"):
         return "GARANTIE"
+    if r.startswith("nu vol laden"):
+        return "HANDMATIG"
+    if r.startswith("onder ") and "%" in r:
+        return "AUTO_MIN"
+    if "doel bereikt" in r:
+        return "DOEL_BEREIKT"
+    if r.startswith("boven je maximumprijs"):
+        return "MAXPRIJS"
     if "negatieve" in r:
         return "PRIJS_NEGATIEF"
     if r.startswith("goedkoop"):
@@ -74,6 +82,13 @@ def explain(code: str, on: bool, now: datetime, device, reason: str, inp: dict) 
         m = re.search(r"(\d\d:\d\d)", reason)
         word = READY_WORD.get(device.kind, "klaar")
         return f"Aan om {t}: anders is {name.lower()} om {m.group(1) if m else 'de klaar-tijd'} niet {word}. Dit stuk komt van het net."
+    if code == "AUTO_MIN":
+        m = re.search(r"onder (\d+)%", reason)
+        return f"Aan om {t}: de accu zat onder je minimum van {m.group(1) if m else '?'}%. Tot dat minimum laadt hij meteen, de rest in goedkope uren."
+    if code == "DOEL_BEREIKT":
+        return f"Uit om {t}: {reason.replace(': doel bereikt', '')}, je doel is bereikt."
+    if code == "MAXPRIJS":
+        return f"Uit om {t}: stroom is nu duurder dan jouw maximumprijs. Hij laadt verder zodra het goedkoper is."
     if code == "PRIJS_NEGATIEF":
         return f"Aan om {t}: de stroomprijs is negatief ({eur(price) if price is not None else 'onder nul'}); je krijgt geld om stroom te gebruiken."
     if code == "PRIJS_LAAG":

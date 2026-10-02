@@ -82,6 +82,7 @@ class Context:
     price_hours: dict[str, set] = field(default_factory=dict)     # device_id -> goedkoopste uren (zonder zonnepanelen)
     price_now: Optional[float] = None                             # huidige afnameprijs €/kWh (dynamisch contract)
     baseline: set = field(default_factory=set)                    # meetdag: deze apparaten vandaag niet sturen
+    ev: dict = field(default_factory=dict)                        # laadpaal-id -> auto, percentage, doel, minimum, modus
 
 
 class Controller:
@@ -184,7 +185,7 @@ class Controller:
         if not on:
             st.setpoint_w = None
             return None
-        forced = reason.startswith(("garantie", "handmatig", "goedkoop", "meetdag"))
+        forced = reason.startswith(("garantie", "handmatig", "goedkoop", "meetdag", "onder ", "nu vol"))
         if forced or ctx.grid_w is None:
             target = d.max_w
         else:
@@ -238,6 +239,16 @@ class Controller:
             # thermostaat of lader beslist); warmtepomp en thermostaat: geen extra opwarmen.
             plain_on = d.driver not in ("ha_setpoint", "homey_setpoint", "sg_ready") and d.kind != "heatpump"
             return plain_on, "meetdag: zonder sturing"
+        e = ctx.ev.get(d.id)
+        if e:
+            if e.get("below_min"):
+                return True, f"onder {e['min_pct']}%: {e['car']} laadt direct bij"
+            if e.get("reached"):
+                return False, f"{e['car']} is {round(e['target'])}%: doel bereikt"
+            if e.get("mode") == "vol":
+                return True, f"nu vol laden ({e['car']})"
+            if e.get("max_price") and ctx.price_now is not None and ctx.price_now > e["max_price"]:
+                return False, f"boven je maximumprijs (€ {e['max_price']:.2f})".replace(".", ",")
         nb = str((d.params or {}).get("not_before") or "")
         if re.fullmatch(r"\d\d:\d\d", nb) and ctx.now.strftime("%H:%M") < nb:
             return False, f"wacht tot {nb} (jouw instelling)"
@@ -254,7 +265,10 @@ class Controller:
         if any(h > hour for h in cheap):
             return None                                   # er komt nog een gepland goedkoop uur vóór de klaar-tijd
         left_s = (ready - ctx.now).total_seconds()
-        if left_s <= d.guarantee_min * 60:
+        g_min = d.guarantee_min
+        if e and e.get("need_min") is not None:
+            g_min = e["need_min"] * 1.15 + 10                 # precies wat de auto nog nodig heeft, met marge
+        if left_s <= g_min * 60:
             return True, f"garantie: klaar om {ready:%H:%M}"
         return None
 
