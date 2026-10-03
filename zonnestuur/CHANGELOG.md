@@ -1,5 +1,15 @@
 # Wijzigingen
 
+## 0.24.0 – Slimmer batterijladen voor elk merk, laden via elke auto
+- Batterij: elk kwartier een nieuw plan over de bekende prijzen (tot 48 uur), met vasthouden, laden op vermogensstappen, verlies per richting, slijtage en schakelkosten. Laadt tot wat de dure uren nodig hebben (van het net hoogstens 95%) en doet niets als het minder dan € 0,03 oplevert.
+- Batterij: laadsessie stopt bij het doel en houdt dan vast; vasthouden stopt als er zon naar het net gaat.
+- Batterij: winterreserve, piekgrens (capaciteitstarief), werkdag en weekend apart geleerd, onmogelijke uitlezingen genegeerd, seintje als hij 14 dagen niet vol was.
+- Batterij: veilig terug naar zijn eigen regeling bij stoppen, zonder Pro of bij een andere instelling.
+- Meer batterijmerken herkend (o.a. Marstek via Modbus met RS485 en 'force mode', Huawei, SolarEdge, GoodWe, Growatt, Sungrow, Victron, Tesla), met standaardwaarden per merk. Eigen scripts voor elk ander merk.
+- Auto: ruim 45 modellen, en laden via de auto zelf als de laadpaal niet te sturen is (schakelaar, laadstroom of start/stop-knoppen). De laadlimiet in de auto volgt je doel.
+- Dashboard logischer: Nu, Planning (vooruit), Apparaten (bedienen, met de batterij als kaart en het logboek) en Inzicht (terugkijken). Nieuwe batterijkaart met het plan voor 24 uur.
+- Wandscherm toont ook de thuisbatterij.
+
 ## 0.23.0 – Auto's koppelen en laden tot een percentage
 - Auto's uit Home Assistant (bijvoorbeeld via Tibber, SEAT/Volkswagen, Stellantis, Tesla, Kia/Hyundai) koppelen aan de laadpaal, met hun accupercentage.
 - Laden tot een percentage in plaats van een schatting per kilometer; tussen twee metingen schat Zonnestuur het percentage zelf bij.

@@ -112,9 +112,13 @@ class Engine:
             st = self.controller.states.get(d.id)
             if st and not st.online and not st.offline_reason:
                 out.append({"level": "warn", "text": f"{d.name} reageert niet"})
+        now = datetime.now(self.tz)
         for b in self.batteries.values():
             if not b.online:
                 out.append({"level": "warn", "text": f"{b.cfg.name}: {b.error or 'niet bereikbaar'}"})
+            elif (b.full_days(now) or 0) >= 14:
+                out.append({"level": "info", "text": f"{b.cfg.name} is al {b.full_days(now)} dagen niet vol geweest. Laat hem op een zonnige "
+                            "dag een keer tot 100% laden: dan klopt zijn percentage weer."})
         try:
             hint = self.panels_hint()
         except Exception:
@@ -375,6 +379,23 @@ class Engine:
         try:
             c = self.ha_candidates()
             evs = [d for d in c.get("devices", []) if d.get("driver") == "ha_current"]
+            if not evs:
+                # Geen stuurbare laadpaal: dan laden via de auto zelf (laadschakelaar, laadstroom of start/stop-knoppen)
+                cars = self._found_cars()
+                car = next((x for x in cars if (x.get("control") or {}).get("driver")), None)
+                if car:
+                    k = car["control"]
+                    m = ev_mod.MODEL_BY_KEY.get(car["model"]) or ev_mod.MODEL_BY_KEY["other"]
+                    cand = {"driver": k["driver"], "current_entity": k.get("current", ""), "switch_entity": k.get("switch", ""),
+                            "start_entity": k.get("start", ""), "stop_entity": k.get("stop", ""),
+                            "power_entity": k.get("power", ""), "plug_entity": car.get("plug_entity", ""),
+                            "charging_entity": car.get("charging_entity", ""), "min_a": k.get("min_a", 6),
+                            "max_a": k.get("max_a", ev_mod.car_amps(m)), "name": car["name"], "via_car": True, "min_interval_s": 60}
+                    ph = int(m["ac_phases"])
+                    out = {"offer": True, "candidate": cand, "phases": ph, "max_a": int(cand["max_a"]),
+                           "max_kw": round(min(m["ac_kw"], cand["max_a"] * 230 * ph / 1000), 1), "peak_kw": None,
+                           "car": car["name"], "cars": [car], "models": models, "charger": "", "via_car": True,
+                           "readonly": c.get("readonly_chargers") or []}
             if evs:
                 ev = evs[0]
                 peak = self._max_power_w(ev.get("power_entity", ""))
@@ -432,13 +453,20 @@ class Engine:
         else:
             per_km = 0.18
         run_min = max(30, round(km * per_km / kw * 60 / 15) * 15)
+        drv = ev.get("driver", "ha_current")
+        params = {"power_entity": ev.get("power_entity", ""), "plug_entity": ev.get("plug_entity", ""),
+                  "phases": phases, "min_a": ev.get("min_a", 6), "max_a": max_a, "cars": cars,
+                  "max_price": float(body.get("max_price") or 0)}
+        if drv == "ha_current":
+            params.update(current_entity=ev["current_entity"], switch_entity=ev.get("switch_entity", ""),
+                          min_interval_s=ev.get("min_interval_s", 30))
+        elif drv == "ha_switch":
+            params.update(entity=ev["switch_entity"])
+        else:
+            params.update(start_entity=ev["start_entity"], stop_entity=ev.get("stop_entity", ""),
+                          charging_entity=ev.get("charging_entity", ""))
         dev = {"id": "auto", "name": str(body.get("name") or ("Auto" if len(cars) != 1 else cars[0]["name"]))[:40],
-               "kind": "ev", "driver": "ha_current",
-               "params": {"current_entity": ev["current_entity"], "switch_entity": ev.get("switch_entity", ""),
-                          "power_entity": ev.get("power_entity", ""), "plug_entity": ev.get("plug_entity", ""),
-                          "phases": phases, "min_a": ev.get("min_a", 6), "max_a": max_a,
-                          "min_interval_s": ev.get("min_interval_s", 30), "cars": cars,
-                          "max_price": float(body.get("max_price") or 0)},
+               "kind": "ev", "driver": drv, "params": params,
                "power_w": min(25000, round(kw * 1000)), "priority": len(self.cfg.devices) + 1,
                "ready_times": [ready], "ready_days": [int(x) for x in body.get("days") or []],
                "guarantee_min": int(min(600, max(60, round(run_min * 1.5 / 15) * 15))), "full_lookback_h": 12,
@@ -509,11 +537,28 @@ class Engine:
                 ph, amax = self._charger(d)
                 sw.phases = max(1, min(ph, int(car.get("ac_phases") or ph)))
                 sw.max_a = min(amax, ev_mod.car_amps(car))
+            if car and str(car.get("target_entity", "")).startswith("number."):
+                self._sync_car_limit(car, t)
             e = self.ev_need(d)
             if e is not None and e["need_min"] <= 0:
                 st.full_at = now                              # doel gehaald telt als 'vol'
                 if t.mode == "vol":
                     t.mode = "slim"
+
+    def _sync_car_limit(self, car: dict, t) -> None:
+        """Kan de auto zelf een laadlimiet instellen, dan zet Zonnestuur die op jouw doel (zo stopt de auto ook zelf)."""
+        want = float(car.get("target_pct", 80))
+        have = t.readings.get(car["id"], {}).get("target")
+        done = getattr(self, "_car_limit_set", {})
+        if have is not None and abs(have - want) < 1 or done.get(car["id"]) == want:
+            return
+        try:
+            ha_client(self.cfg).call("number", "set_value", {"entity_id": car["target_entity"], "value": want})
+            log.info("%s: laadlimiet van de auto op %d%%", car["name"], want)
+        except Exception as exc:
+            log.debug("laadlimiet %s: %s", car["name"], exc)
+        done[car["id"]] = want
+        self._car_limit_set = done
 
     def _ev_context(self) -> dict:
         out = {}
@@ -1102,6 +1147,7 @@ class Engine:
                 self._limit_inverter(now, mono)
                 self._notify(now, mono)
             else:
+                self.release_batteries()
                 for b in self.batteries.values():
                     b.reason = "batterij regelt zichzelf; slim plannen met Zonnestuur Pro"
                 if self.limiter and self.limiter.active:
@@ -1170,16 +1216,20 @@ class Engine:
         start = now.replace(minute=0, second=0, microsecond=0)
         rows = self.ledger.house_hours(int((now - timedelta(days=15)).timestamp()), int(now.timestamp()) + 3600)
         net = hourly_profile(rows, self.tz)
+        prof = {False: hourly_profile(rows, self.tz, weekend=False), True: hourly_profile(rows, self.tz, weekend=True)}
         imp = import_profile(rows, self.tz)
         base = self.cfg.solar.base_load_w / 1000
         if net is None:
             net = [base] * 24
             imp = [base] * 24
+        # Meer batterijen: elk dekt zijn deel van het huis (anders rekenen ze allebei met het hele verbruik)
+        total_cap = sum(x.cfg.capacity_kwh for x in self.batteries.values()) or b.cfg.capacity_kwh
+        share = b.cfg.capacity_kwh / total_cap
         if self.cfg.contract.type == "dynamic" and self.prices.slots:
             per_hour: dict[datetime, list[float]] = {}
-            for s, e, p in self.prices.upcoming(start, start + timedelta(hours=36)):
+            for s, e, p in self.prices.upcoming(start, start + timedelta(hours=48)):
                 per_hour.setdefault(s.astimezone(self.tz).replace(minute=0, second=0, microsecond=0), []).append(p)
-            times = sorted(t for t in per_hour if t >= start)[:36]
+            times = sorted(t for t in per_hour if t >= start)[:48]          # kwartierprijzen: gemiddeld per uur
             price = {t: sum(v) / len(v) for t, v in per_hour.items()}
         else:
             times = [start + timedelta(hours=i) for i in range(24)]
@@ -1188,7 +1238,7 @@ class Engine:
         hours = []
         for t in times:
             h = t.hour
-            n = net[h]
+            n = (prof[t.weekday() >= 5] or net)[h]                       # werkdag en weekend apart
             load = self.model.base_w(t) / 1000 if learned else max(imp[h], base)   # geleerd eigen verbruik van dit uur
             if self.cfg.solar.has_panels:
                 fc = self.forecast.production_w(t)
@@ -1196,7 +1246,7 @@ class Engine:
                     n = load - fc / 1000
             elif learned:
                 n = load
-            hours.append(HourIn(t, price[t], self.prices.feed_in_price(t), n))
+            hours.append(HourIn(t, price[t], self.prices.feed_in_price(t), n * share))
         return hours
 
     def _run_batteries(self, now: datetime, mono: float) -> None:
@@ -1211,17 +1261,23 @@ class Engine:
         for b in self.batteries.values():
             if not b.online or b.soc is None:
                 continue
-            key = f"{now:%Y%m%d%H}:{len(self.prices.slots)}:{self.forecast.production_w(now) is not None}"
+            b.note_full(now)
+            # elk kwartier opnieuw rekenen (nieuwe prijzen, zon en laadniveau), en meteen bij nieuwe prijzen
+            key = f"{now:%Y%m%d%H}{now.minute // 15}:{len(self.prices.slots)}:{self.forecast.production_w(now) is not None}"
             if key != b.plan_key:
                 hours = self._battery_hours(now, b)
                 b.plan = plan_battery(b.cfg, b.soc, hours)
                 b.value = plan_value(b.cfg, b.soc, hours, b.plan)
                 b.plan_key = key
             prev = b.action
-            b.decide_action(now, cheap_devices)
+            b.decide_action(now, cheap_devices, self.grid_w, mono)
+            guard = b.peak_guard(self.grid_w, mono)
+            if guard:
+                self.events.note(now, f"batterij:{b.cfg.id}", b.cfg.name, "BATTERIJ", f"{b.cfg.name}: {guard}.")
             if b.action != prev and prev is not None:
-                word = {"auto": "levert aan het huis en laadt met overschot", "save": "spaart voor later (laadt alleen met zon)",
-                        "charge": "laadt van het net", "idle": "staat stil"}.get(b.action, b.action)
+                word = {"auto": "levert aan het huis en laadt met overschot", "save": "houdt vast (ontlaadt niet)",
+                        "charge": f"laadt van het net{f' tot {round(b.target_soc)}%' if b.target_soc else ''}",
+                        "idle": "staat stil"}.get(b.action, b.action)
                 self.events.note(now, f"batterij:{b.cfg.id}", b.cfg.name, "BATTERIJ", f"{b.cfg.name} {word} vanaf {now:%H:%M}: {b.reason}.")
             try:
                 msg = b.apply(ha, mono, self.grid_w)
@@ -1230,6 +1286,23 @@ class Engine:
             except (DeviceError, ValueError, OSError) as exc:
                 self.last_error = f"{b.cfg.name}: {exc}"
                 log.warning(self.last_error)
+
+    def release_batteries(self) -> None:
+        """Bij stoppen of zonder Pro: elke batterij terug naar zijn eigen regeling."""
+        if not self.batteries:
+            return
+        try:
+            ha = ha_client(self.cfg)
+        except ValueError:
+            return
+        for b in self.batteries.values():
+            if b.action == "auto" and not (b._mode_set or b._script_set or b._switch_set or b._target_w):
+                continue
+            try:
+                b.release(ha)
+                log.info("%s: terug naar eigen regeling", b.cfg.name)
+            except (DeviceError, ValueError, OSError) as exc:
+                log.warning("%s loslaten: %s", b.cfg.name, exc)
 
     def _limit_inverter_release(self, mono: float) -> None:
         self.limiter._last = -1e9
@@ -1519,6 +1592,13 @@ class Engine:
             for bid, rt in self.batteries.items():
                 if bid in old_b:
                     rt.soc, rt.power_w, rt.online = old_b[bid].soc, old_b[bid].power_w, old_b[bid].online
+                    rt.last_full = old_b[bid].last_full
+            for bid, rt in old_b.items():
+                if bid not in self.batteries or rt.cfg.driver != self.batteries[bid].cfg.driver:
+                    try:
+                        rt.release(ha_client(new))         # niet meer gestuurd: terug naar eigen regeling
+                    except Exception as exc:
+                        log.warning("%s loslaten: %s", rt.cfg.name, exc)
             old_n, self.notifier = self.notifier, Notifier.from_config(new.notify)
             if old_n and self.notifier:
                 self.notifier.sent, self.notifier.history = old_n.sent, old_n.history
@@ -1661,8 +1741,16 @@ class Engine:
                             "full_at": st.full_at.isoformat() if st.full_at else None, "mode": st.mode,
                             "until": st.override_until.isoformat() if st.override_until else None}
         self.ledger.save_state("controller", data)
+        self.ledger.save_state("batteries", {k: {"last_full": b.last_full.isoformat() if b.last_full else None}
+                                             for k, b in self.batteries.items()})
 
     def _restore_state(self) -> None:
+        for k, v in (self.ledger.load_state("batteries") or {}).items():
+            if k in self.batteries and v.get("last_full"):
+                try:
+                    self.batteries[k].last_full = datetime.fromisoformat(v["last_full"])
+                except ValueError:
+                    pass
         data = self.ledger.load_state("controller") or {}
         today = datetime.now(self.tz).date()
         for dev_id, v in data.items():
@@ -1765,7 +1853,7 @@ class Engine:
         t_month = self.ledger.battery_totals(today.replace(day=1))
         out = []
         for b in self.batteries.values():
-            d = b.to_dict(self.tz)
+            d = b.to_dict(self.tz, datetime.now(self.tz))
             d["today"] = t_day.get(b.cfg.id, {"charged_kwh": 0, "grid_kwh": 0, "discharged_kwh": 0, "eur": 0})
             d["month"] = t_month.get(b.cfg.id, {"charged_kwh": 0, "grid_kwh": 0, "discharged_kwh": 0, "eur": 0})
             out.append(d)
@@ -2360,6 +2448,7 @@ def run(cfg: Config, config_path: Optional[str] = None) -> None:
         except Exception:  # de regellus mag nooit stoppen
             log.exception("Onverwachte fout in regelronde")
         stop.wait(max(0.5, engine.cfg.interval_s - (time.monotonic() - started)))
+    engine.release_batteries()                     # batterij nooit in 'laden' of 'vasthouden' achterlaten
     engine.ledger.flush()
     engine._save_state()
     server.shutdown()

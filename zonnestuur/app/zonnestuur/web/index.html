@@ -164,8 +164,7 @@
   .cmp-table th { font-size: 12px; color: var(--ink-3); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; border-top: 0; }
   .cmp-table td:last-child, .cmp-table th:last-child { text-align: right; }
   .cmp-table tr.me td { font-weight: 700; }
-  .c-devs { grid-column: span 8; } .c-batt { grid-column: span 4; align-self: start; }
-  .c-devs:has(+ .c-batt[hidden]) { grid-column: span 12; }
+  .c-devs { grid-column: span 12; }
   .sec-head { grid-column: span 12; margin: 26px 4px 2px; scroll-margin-top: 70px; }
   .sec-head h2 { font: 650 clamp(22px, 2.2vw, 28px)/1.15 "Inter Tight", Inter, sans-serif; letter-spacing: -.03em; margin: 0; }
   .sec-head p { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; }
@@ -205,7 +204,7 @@
   .explain { margin-top: 14px; font-size: 13px; color: var(--ink-2); }
   .explain summary { cursor: pointer; font-weight: 600; color: var(--ink); }
   @media (max-width: 860px) { .coach-grid { grid-template-columns: 1fr; } }
-  .c-devs { grid-column: span 8; } .c-side { grid-column: span 4; display: grid; gap: 14px; align-content: start; min-width: 0; }
+  .c-side { grid-column: span 4; display: grid; gap: 14px; align-content: start; min-width: 0; }
   .c-today { grid-column: span 7; } .c-month { grid-column: span 5; }
 
   .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
@@ -265,7 +264,7 @@
 
   /* apparaten */
   .devs-head { display: flex; align-items: baseline; justify-content: space-between; margin: 2px 4px 12px; }
-  .devs { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 14px; }
+  .devs { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; align-items: start; }
   .dev-head { display: flex; align-items: center; gap: 13px; }
   .dev-ico { width: 46px; height: 46px; border-radius: 16px; display: grid; place-items: center; background: var(--chip); flex: none; transition: background .4s, box-shadow .4s; }
   .dev-ico svg { width: 23px; height: 23px; stroke: var(--ink); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
@@ -291,7 +290,22 @@
   .seg button.active { background: var(--seg-on); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
   .seg button:focus-visible, .icon-btn:focus-visible, .btn-soft:focus-visible { outline: 2px solid var(--net); outline-offset: 2px; }
 
-  /* batterij */
+  /* batterij (kaart in het apparatenrooster) */
+  .dev.bat .dev-ico svg { stroke: var(--batt); }
+  .dev.bat.on .dev-ico { background: color-mix(in srgb, var(--batt) 14%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--batt) 35%, transparent); }
+  .soc { position: relative; height: 14px; border-radius: 7px; background: color-mix(in srgb, var(--ink) 8%, transparent); margin: 16px 0 6px; }
+  .soc .f { position: absolute; inset: 0 auto 0 0; border-radius: 7px; background: linear-gradient(90deg, color-mix(in srgb, var(--batt) 70%, #fff 30%), var(--batt)); transition: width .8s ease; }
+  .soc .m { position: absolute; top: -4px; bottom: -4px; width: 2px; border-radius: 1px; background: var(--ink-3); }
+  .soc .t { position: absolute; top: -5px; bottom: -5px; width: 3px; border-radius: 2px; background: var(--net); }
+  .soc-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); }
+  .bplan { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; height: 26px; margin: 14px 0 4px; }
+  .bplan i { border-radius: 4px; background: color-mix(in srgb, var(--batt) 22%, transparent); }
+  .bplan i.charge { background: var(--net); } .bplan i.save { background: repeating-linear-gradient(45deg, var(--mid) 0 3px, var(--chip) 3px 6px); }
+  .bplan i.now { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .bkeys { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: var(--ink-3); margin-bottom: 4px; }
+  .bkeys i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .kv4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 16px; margin: 4px 0 2px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  .kv4 .k { font-size: 12px; color: var(--ink-3); } .kv4 .v { font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
   .batt-top { display: flex; align-items: center; gap: 18px; }
   .cell { width: 58px; height: 98px; border-radius: 14px; border: 2px solid var(--rule); position: relative; flex: none; padding: 4px; }
   .cell::before { content: ""; position: absolute; top: -7px; left: 50%; width: 20px; height: 5px; margin-left: -10px; border-radius: 3px 3px 0 0; background: var(--rule); }
@@ -349,7 +363,7 @@
   @media (max-width: 1020px) {
     .hero-grid { grid-template-columns: 1fr; }
     .flow { max-width: 520px; margin: 0 auto; width: 100%; }
-    .c-devs, .c-side, .c-today, .c-month, .c-coach, .c-value, .c-batt { grid-column: span 12; }
+    .c-devs, .c-side, .c-today, .c-month, .c-coach, .c-value { grid-column: span 12; }
     .c-hero { order: -3; } .c-welcome { order: -2; } .c-value { order: -1; }
     .c-side { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
   }
@@ -458,7 +472,7 @@
       <div class="links-row"><a href="rapport">Weekrapport →</a><a href="kiosk">Wandscherm →</a></div>
       <svg class="spark" id="spark" viewBox="0 0 300 44" preserveAspectRatio="none" aria-hidden="true" hidden></svg>
     </section>
-    <div class="sec-head" id="s-planning"><h2>Planning</h2><p>Wanneer Zonnestuur wat laat draaien, op zon en de goedkoopste uren.</p></div>
+    <div class="sec-head" id="s-planning"><h2>Planning</h2><p>Vooruitkijken: wanneer je apparaten draaien en wat de batterij doet, op zon en de goedkoopste uren.</p></div>
     <!-- dagplan -->
     <section class="card c-plan" aria-labelledby="priceTitle">
       <div class="title-row"><div><div class="eyebrow">Stroomprijs en planning</div><h2 class="sec" id="priceTitle">Zo plant Zonnestuur je dag</h2></div><span class="small muted" id="priceNote"></span></div>
@@ -473,11 +487,26 @@
         <span><i class="sw" style="background:repeating-linear-gradient(45deg,var(--ink-3) 0 2px,var(--chip) 2px 5px)"></i>Door jou ingegrepen</span>
         <span class="bl" hidden><i class="sw" style="background:var(--batt)"></i>Batterij: zelf gebruiken</span>
         <span class="bl" hidden><i class="sw" style="background:var(--net)"></i>Batterij: laden van het net</span>
-        <span class="bl" hidden><i class="sw" style="background:var(--mid)"></i>Batterij: sparen</span>
+        <span class="bl" hidden><i class="sw" style="background:var(--mid)"></i>Batterij: vasthouden</span>
       </div>
       <details class="table" id="priceTableWrap"><summary>Toon als tabel</summary><table id="priceTable"></table></details>
     </section>
 
+    <div class="sec-head" id="s-apparaten"><h2>Apparaten</h2><p>Bedienen en bijsturen: wat elk apparaat nu doet, en waarom.</p></div>
+    <!-- apparaten -->
+    <section class="c-devs" aria-labelledby="devTitle">
+      <div class="devs-head" style="justify-content:flex-end;margin-top:-6px"><span id="devTitle" hidden>Apparaten</span><a class="small muted" href="instellingen">Apparaten beheren →</a></div>
+      <div class="devs" id="devices"></div>
+    </section>
+
+    <!-- logboek -->
+    <section class="card c-log" aria-labelledby="logTitle">
+      <div class="title-row"><div><div class="eyebrow">Logboek</div><h2 class="sec" id="logTitle">Wat Zonnestuur deed, en waarom</h2></div><span class="small muted" id="logNote"></span></div>
+      <div class="health" id="healthRow"></div>
+      <div id="logBody"><div class="empty">Laden…</div></div>
+    </section>
+
+    <div class="sec-head" id="s-inzicht"><h2>Inzicht</h2><p>Terugkijken: wat er gebruikt is, waar je stroom heen ging en wat Zonnestuur over je huis geleerd heeft.</p></div>
     <!-- vandaag -->
     <section class="card c-today" aria-labelledby="todayTitle">
       <div class="title-row"><span class="eyebrow" id="todayTitle">Vandaag · gestuurde apparaten</span><span class="small muted" id="todayNote"></span></div>
@@ -490,23 +519,6 @@
       </div>
     </section>
 
-    <!-- logboek -->
-    <section class="card c-log" aria-labelledby="logTitle">
-      <div class="title-row"><div><div class="eyebrow">Logboek</div><h2 class="sec" id="logTitle">Wat Zonnestuur deed, en waarom</h2></div><span class="small muted" id="logNote"></span></div>
-      <div class="health" id="healthRow"></div>
-      <div id="logBody"><div class="empty">Laden…</div></div>
-    </section>
-
-    <div class="sec-head" id="s-apparaten"><h2>Apparaten</h2><p>Wat Zonnestuur stuurt, en wat het deze maand opleverde.</p></div>
-    <!-- apparaten -->
-    <section class="c-devs" aria-labelledby="devTitle">
-      <div class="devs-head" style="justify-content:flex-end;margin-top:-6px"><span id="devTitle" hidden>Apparaten</span><a class="small muted" href="instellingen">Apparaten beheren →</a></div>
-      <div class="devs" id="devices"></div>
-    </section>
-
-    <!-- batterij -->
-    <section class="card c-batt" id="battCard" hidden aria-labelledby="battTitle"></section>
-    <div class="sec-head" id="s-inzicht"><h2>Inzicht</h2><p>Je hele huis: verbruik, teruglevering en wat Zonnestuur over je huis geleerd heeft.</p></div>
     <!-- verbruik -->
     <section class="card c-usage" aria-labelledby="useTitle">
       <div class="usage-head">
@@ -526,16 +538,16 @@
       <details class="table"><summary>Toon als tabel</summary><table id="useTable"></table></details>
     </section>
 
-    <!-- geleerd -->
-    <section class="card c-learn" aria-labelledby="learnTitle">
-      <div class="title-row"><div><div class="eyebrow">Zelflerend</div><h2 class="sec" id="learnTitle">Wat Zonnestuur over je huis weet</h2></div><span class="small muted" id="learnNote"></span></div>
-      <div id="learnBody"><div class="empty">Laden…</div></div>
-    </section>
-
     <!-- teruglevering -->
     <section class="card c-feed" aria-labelledby="feedTitle">
       <div class="title-row"><div><div class="eyebrow">Inzicht</div><h2 class="sec" id="feedTitle">Waar gaat je stroom heen?</h2></div><span class="small muted" id="feedNote"></span></div>
       <div id="feedBody"><div class="empty">Laden…</div></div>
+    </section>
+
+    <!-- geleerd -->
+    <section class="card c-learn" aria-labelledby="learnTitle">
+      <div class="title-row"><div><div class="eyebrow">Zelflerend</div><h2 class="sec" id="learnTitle">Wat Zonnestuur over je huis weet</h2></div><span class="small muted" id="learnNote"></span></div>
+      <div id="learnBody"><div class="empty">Laden…</div></div>
     </section>
 
     <!-- contractcheck -->
@@ -552,7 +564,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const nl = (v, d = 0) => (v ?? 0).toLocaleString("nl-NL", { minimumFractionDigits: d, maximumFractionDigits: d });
-const eur = (v) => "€ " + nl(v, 2);
+const eur = (v) => "€ " + nl(Math.abs(v || 0) < 0.005 ? 0 : v, 2);
 const kw = (w) => nl(Math.abs(w) / 1000, 2);
 const hhmm = (d) => d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -593,7 +605,7 @@ let STATUS = null, TODAY = null, MONTH = [], PRICES = null, USAGE = null, USE_P 
 const VERB = { boiler: "verwarmt", ev: "laadt", heatpump: "draait", generic: "draait" };
 const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 const pct = (v) => nl(v) + "%";
-const BACT = { auto: "zelf gebruiken", save: "sparen voor later", charge: "laden van het net", idle: "stand-by" };
+const BACT = { auto: "zelf gebruiken", save: "vasthouden voor later", charge: "laden van het net", idle: "stand-by" };
 
 function nextPlanned(s) {
   // Eerstvolgende geplande stap: uit de prijsplanning (dynamisch) of de zonnigste uren per apparaat
@@ -641,8 +653,8 @@ function heroState(s) {
     return ["s-net", `${cap(d.name)} ${VERB[d.kind] || "draait"} om op tijd klaar te zijn`, d.next_ready ? `Klaar om ${d.next_ready.slice(11, 16)}, zoals afgesproken. Zon of goedkope uren waren er niet genoeg.` : "Zon of goedkope uren waren er niet genoeg."];
   }
   if (bat && bat.online && bat.power_w != null && Math.abs(bat.power_w) > 50) {
-    if (bat.power_w > 0) return ["s-batt", bat.action === "charge" ? "Batterij laadt goedkope stroom" : "Batterij slaat je zonnestroom op",
-      bat.action === "charge" ? `Nu ${kw(bat.power_w)} kW voor ${eur3(s.price_now)}, voor de dure uren straks.` : `${kw(bat.power_w)} kW gaat de batterij in in plaats van het net op. Vanavond gebruik je het zelf.`];
+    if (bat.power_w > 0) return ["s-batt", bat.action === "charge" || !s.has_panels ? "Batterij laadt goedkope stroom" : "Batterij slaat je zonnestroom op",
+      bat.action === "charge" || !s.has_panels ? `Nu ${kw(bat.power_w)} kW${s.price_now != null ? " voor " + eur3(s.price_now) : ""}${bat.target_soc ? ", tot " + Math.round(bat.target_soc) + "%" : ""}, voor de dure uren straks.` : `${kw(bat.power_w)} kW gaat de batterij in in plaats van het net op. Vanavond gebruik je het zelf.`];
     return ["s-batt", "Batterij levert aan je huis", `Je koopt nu ${kw(bat.power_w)} kW minder in${s.price_now != null ? " tegen " + eur3(s.price_now) + " per kWh" : ""}.`];
   }
   if (g != null && g < -100) {
@@ -790,30 +802,62 @@ function renderFlow(s) {
 }
 
 // ---------- thuisbatterij ----------
-function renderBattery(s) {
-  const card = $("battCard"), b = (s.batteries || [])[0];
-  card.hidden = !b;
-  if (!b) return;
+const BAT_ICO = '<rect x="5" y="4" width="14" height="17" rx="3"/><path d="M9.5 2h5M12 8.5l-2.5 4h5l-2.5 4"/>';
+function batteryCard(s, b) {
+  const el = document.createElement("article");
   const pw = b.power_w || 0;
-  const now = pw > 30 ? (b.action === "charge" ? `Laadt ${kw(pw)} kW van het net` : `Laadt ${kw(pw)} kW van de zon`) : pw < -30 ? `Levert ${kw(pw)} kW aan je huis` : "Rust";
-  const t = b.today || {}, v = b.value || {};
+  el.className = "card dev bat" + (Math.abs(pw) > 30 ? " on" : "");
+  el.id = "battDev";
+  if (!b.online) {
+    el.innerHTML = `<div class="dev-head"><div class="dev-ico"><svg viewBox="0 0 24 24">${BAT_ICO}</svg></div><div><div class="dev-name">${esc(b.name)}</div>
+      <div class="dev-state">Niet bereikbaar${b.error ? ": " + esc(b.error) : ""}</div></div></div>
+      <p class="small muted" style="margin:14px 0 0">Zolang Zonnestuur de batterij niet kan lezen, regelt hij zichzelf (nul op de meter).</p>`;
+    return el;
+  }
   const soc = b.soc == null ? 0 : Math.max(0, Math.min(100, b.soc));
-  card.innerHTML = `<div class="title-row"><span class="eyebrow" id="battTitle">Thuisbatterij</span><span class="small muted">${esc(b.name)}</span></div>
-    ${b.online ? `<div class="batt-top">
-      <div class="cell" role="img" aria-label="Laadniveau ${nl(soc)} procent"><i style="height:calc((100% - 8px) * ${soc / 100})"></i><span class="minl" style="bottom:calc(4px + (100% - 8px) * ${b.min_soc / 100})"></span></div>
-      <div><div class="batt-big num">${nl(soc)}%</div><div class="small muted">${b.kwh != null ? nl(b.kwh, 1) + " van " + nl(b.capacity_kwh, 1) + " kWh" : ""}</div>
-        <div class="pills" style="margin-top:10px"><span class="pill batt">${esc(now)}</span></div></div>
+  const sunny = s.has_panels;
+  const state = pw > 30 ? (b.action === "charge" ? `Laadt ${kw(pw)} kW van het net` : sunny ? `Laadt ${kw(pw)} kW van de zon` : `Laadt ${kw(pw)} kW`)
+    : pw < -30 ? `Levert ${kw(pw)} kW aan je huis` : b.action === "save" ? "Houdt vast" : "Rust";
+  const v = b.value || {}, t = b.today || {};
+  const start = b.plan.length ? new Date(b.plan[0].start) : new Date();
+  const nowH = Math.floor((Date.now() - start.getTime()) / 3.6e6);
+  const cells = b.plan.slice(0, 24).map((p, i) => `<i class="${p.action}${i === nowH ? " now" : ""}" title="${new Date(p.start).getHours()}:00 · ${esc(BACT[p.action] || p.action)}${p.action === "charge" ? " tot " + Math.round(p.soc) + "%" : ""}${p.why ? " · " + esc(p.why) : ""}"></i>`).join("");
+  const lab = [0, 6, 12, 18, 23].map((i) => b.plan[i] ? `<span>${i === 0 ? "nu" : new Date(b.plan[i].start).getHours() + ":00"}</span>` : "").join("");
+  const nx = b.next;
+  const facts = [];
+  facts.push(`<div class="fact"><i class="dot" style="background:var(--batt)"></i><span><b>Nu: ${esc(BACT[b.action] || b.action)}</b>${b.reason && b.reason !== BACT[b.action] ? ` · ${esc(b.reason)}` : ""}</span></div>`);
+  if (nx && !(nx.action === b.action && b.plan[0] && b.plan[0].action === nx.action))
+    facts.push(`<div class="fact"><i class="dot" style="background:var(--net)"></i><span>Straks om <b>${esc(nx.start)}</b>: ${esc(BACT[nx.action])}${nx.action === "charge" ? ` tot <b>${Math.round(nx.soc)}%</b>` : ""}${nx.why ? ` · ${esc(nx.why)}` : ""}</span></div>`);
+  else if (!nx) facts.push(`<div class="fact"><i class="dot" style="background:var(--ink-3)"></i><span>Komende uren gewoon zelf gebruiken: laden of vasthouden levert nu te weinig op.</span></div>`);
+  if (b.can && b.can.charge && v.breakeven != null && s.contract === "dynamic")
+    facts.push(`<div class="fact"><i class="dot" style="background:var(--mid)"></i><span>Laden van het net loont nu onder <b>${eur3(v.breakeven)}</b> per kWh</span></div>`);
+  if (b.reserve && b.reserve.kwh > 0)
+    facts.push(`<div class="fact"><i class="dot" style="background:var(--mid)"></i><span>Reserve <b>${nl(b.reserve.kwh, 1)} kWh</b> van ${b.reserve.from}:00 tot ${b.reserve.until}:00${b.reserve.winter_only ? " (oktober–maart)" : ""}</span></div>`);
+  if (b.peak_limit_w > 0)
+    facts.push(`<div class="fact"><i class="dot" style="background:var(--mid)"></i><span>Netafname tijdens laden onder <b>${kw(b.peak_limit_w)} kW</b> (piekgrens)</span></div>`);
+  if (b.full_days >= 14)
+    facts.push(`<div class="fact"><i class="dot" style="background:var(--warn)"></i><span>Al ${b.full_days} dagen niet vol: laat hem op een zonnige dag een keer tot 100% laden, dan klopt zijn percentage weer.</span></div>`);
+  el.innerHTML = `<div class="dev-head">
+      <div class="dev-ico"><svg viewBox="0 0 24 24">${BAT_ICO}</svg></div>
+      <div><div class="dev-name">${esc(b.name)}</div><div class="dev-state">${esc(state)}</div></div>
+      <div class="dev-power"><div class="v num">${nl(soc)}<small style="font-size:15px">%</small></div><div class="small muted">${b.kwh != null ? nl(b.kwh, 1) + " / " + nl(b.capacity_kwh, 1) + " kWh" : ""}</div></div>
     </div>
-    <p class="small" style="margin:14px 0 0"><b>Nu: ${esc(BACT[b.action] || b.action)}</b>${b.reason && b.reason !== BACT[b.action] ? ` <span class="muted">· ${esc(b.reason)}</span>` : ""}</p>
-    <div class="kv">
+    <div class="soc" role="img" aria-label="Laadniveau ${nl(soc)} procent"><span class="f" style="width:${soc}%"></span>
+      <span class="m" style="left:${b.min_soc}%" title="Minimum ${b.min_soc}%"></span>${b.target_soc ? `<span class="t" style="left:${b.target_soc}%" title="Doel ${Math.round(b.target_soc)}%"></span>` : ""}</div>
+    <div class="soc-axis"><span>0%</span><span>minimum ${Math.round(b.min_soc)}%</span><span>100%</span></div>
+    ${b.plan.length ? `<div class="bplan" role="img" aria-label="Plan van de batterij, komende 24 uur">${cells}</div><div class="strip-axis">${lab}</div>
+    <div class="bkeys"><span><i style="background:color-mix(in srgb, var(--batt) 30%, transparent)"></i>Zelf gebruiken</span>${b.can && b.can.save ? `<span><i style="background:repeating-linear-gradient(45deg, var(--mid) 0 3px, var(--chip) 3px 6px)"></i>Vasthouden</span>` : ""}${b.can && b.can.charge ? `<span><i style="background:var(--net)"></i>Laden van het net</span>` : ""}</div>` : ""}
+    <div class="facts">${facts.join("")}</div>
+    <div class="kv4">
       <div><div class="k">Geladen vandaag</div><div class="v">${nl(t.charged_kwh, 1)} kWh</div></div>
       <div><div class="k">Waarvan van het net</div><div class="v">${nl(t.grid_kwh, 1)} kWh</div></div>
       <div><div class="k">Geleverd vandaag</div><div class="v">${nl(t.discharged_kwh, 1)} kWh</div></div>
       <div><div class="k">Opgeleverd vandaag</div><div class="v">${eur(t.eur)}</div></div>
     </div>
-    ${v.vs_none_eur != null ? `<p class="small muted" style="margin:14px 0 0">Plan komende ${b.plan.length} uur: <b style="color:var(--ink)">${eur(v.vs_none_eur)}</b> goedkoper dan zonder batterij${v.export_without_kwh > 0.2 ? `, en ${nl(v.export_without_kwh - v.export_kwh, 1)} kWh minder teruglevering` : ""}.</p>` : ""}`
-    : `<div class="empty">${esc(b.name)} is niet bereikbaar${b.error ? ": " + esc(b.error) : ""}.</div>`}`;
+    ${v.vs_none_eur != null && b.plan.length ? `<p class="small muted" style="margin:12px 0 0">Plan komende ${b.plan.length} uur: <b style="color:var(--ink)">${eur(v.vs_none_eur)}</b> goedkoper dan zonder batterij${v.vs_plain_eur > 0.01 ? `, waarvan <b style="color:var(--ink)">${eur(v.vs_plain_eur)}</b> door slim plannen` : ""}${v.export_without_kwh > 0.2 ? `, en ${nl(v.export_without_kwh - v.export_kwh, 1)} kWh minder teruglevering` : ""}.</p>` : ""}`;
+  return el;
 }
+function renderBattery(s) {}
 
 // ---------- apparaten ----------
 const DEV_ICONS = {
@@ -828,7 +872,7 @@ const READY_WORD = { boiler: "Warm water", ev: "Auto geladen", heatpump: "Klaar"
 function renderDevices(s) {
   const wrap = $("devices");
   const now = new Date(s.now);
-  $("devices").closest("section").hidden = !s.devices.length;
+  $("devices").closest("section").hidden = !s.devices.length && !(s.batteries || []).length;
   const openEv = new Set([...wrap.querySelectorAll("details.ev-edit[open]")].map((x) => x.closest("article").dataset.id));
   wrap.innerHTML = "";
   for (const d of s.devices) {
@@ -864,6 +908,7 @@ function renderDevices(s) {
         ${d.modulating ? `<div class="fact"><i class="dot" style="background:var(--sun)"></i><span>${d.on && d.setpoint_w
           ? (d.ev && d.ev.kw ? `Laadt met <b>${nl(Math.min(d.ev.kw, d.setpoint_w / 1000), 1)} kW</b>: zoveel kan de ${esc((d.ev.cars.find((c) => c.id === d.ev.active) || {}).name || "auto")} hier aan`
              : `Laadt traploos mee: nu <b>${Math.round(d.setpoint_w / d.w_per_step)} A</b> (${kw(d.setpoint_w)} kW)`)
+          : d.ev && d.ev.kw ? `Laadt traploos, tot <b>${nl(d.ev.kw, 1)} kW</b> voor de ${esc((d.ev.cars.find((c) => c.id === d.ev.active) || {}).name || "auto")}`
           : `Laadt traploos tussen <b>${kw(d.min_w)}</b> en <b>${kw(d.max_w)} kW</b>`}</span></div>` : ""}
         <div class="fact"><i class="dot" style="background:var(--sun)"></i><span>Deze maand <b>${nl(d.month.kwh, 1)} kWh</b>${PRICE ? " slim ingepland" : `, waarvan <b>${nl(d.month.kwh_solar, 1)}</b> uit zon`} · <b>${eur(d.month.eur_saved)}</b> bespaard</span></div>
       </div>
@@ -897,6 +942,7 @@ function renderDevices(s) {
     }));
     wrap.appendChild(el);
   }
+  for (const b of s.batteries || []) wrap.appendChild(batteryCard(s, b));
 }
 
 // ---------- auto laden: auto's aan de laadpaal ----------
@@ -998,7 +1044,7 @@ function drawLanes() {
   }
   const bat = (s.batteries || [])[0];
   if (bat && bat.plan && bat.plan.length) {
-    const map = { auto: ["var(--batt)", "zelf gebruiken"], charge: ["var(--net)", "laden van het net"], save: ["var(--mid)", "sparen voor later"] };
+    const map = { auto: ["var(--batt)", "zelf gebruiken"], charge: ["var(--net)", "laden van het net"], save: ["var(--mid)", "vasthouden voor later"] };
     lanes.push({ name: bat.name, kind: "batt", hours: bat.plan.map((p) => ({ i: Math.round((new Date(p.start).getTime() / 1000 - start) / 3600), c: map[p.action][0], w: map[p.action][1], soc: p.soc })), ready: [] });
   }
   document.querySelectorAll("#priceLegend .bl").forEach((e) => { e.hidden = !lanes.some((l) => l.kind === "batt"); });
@@ -1608,7 +1654,9 @@ async function loadEvOffer() {
     $("evOffer").hidden = !o.offer;
     if (!o.offer) return;
     const cars = o.cars || [];
-    $("evFound").textContent = `Gevonden in Home Assistant: laadpaal ${o.charger || ""} (tot ${nl(o.max_kw, 1)} kW)${cars.length ? ` en ${cars.length === 1 ? "je auto" : cars.length + " auto's"}. Vink aan welke hier laden en controleer het model: daarmee weet Zonnestuur hoe groot de accu is en hoe snel hij laadt.` : "."}`
+    $("evFound").textContent = (o.via_car
+      ? `Gevonden in Home Assistant: je ${o.car}. ${(o.readonly || []).length ? "Je laadpaal is daar alleen te lezen, maar" : "Er is geen laadpaal te sturen, maar"} de auto zelf wel: Zonnestuur start en stopt het laden via de auto (tot ${nl(o.max_kw, 1)} kW). Controleer het model: daarmee weet Zonnestuur hoe groot de accu is.`
+      : `Gevonden in Home Assistant: laadpaal ${o.charger || ""} (tot ${nl(o.max_kw, 1)} kW)${cars.length ? ` en ${cars.length === 1 ? "je auto" : cars.length + " auto's"}. Vink aan welke hier laden en controleer het model: daarmee weet Zonnestuur hoe groot de accu is en hoe snel hij laadt.` : "."}`)
       + (STATUS && !STATUS.has_panels ? " Zonder zonnepanelen kiest Zonnestuur de goedkoopste uren van de nacht." : " Bij zon laadt hij mee met je overschot; de rest in de goedkoopste uren.");
     $("evCars").innerHTML = cars.map((c) => `<label class="car"><input type="checkbox" value="${esc(c.id)}" checked>
       <span>${esc(c.name)} <small>${c.soc != null ? `· nu ${Math.round(c.soc)}%` : ""}</small></span>

@@ -21,20 +21,49 @@ MODELS = [
     {"key": "vw_eup2", "name": "Volkswagen e-up! (2020 en later)", "words": ["eup", "e_up"], "battery_kwh": 32.3, "ac_kw": 7.2, "ac_phases": 2, "kwh_km": 0.15},
     {"key": "vw_eup1", "name": "Volkswagen e-up! (2013–2019)", "words": [], "battery_kwh": 16.4, "ac_kw": 3.6, "ac_phases": 1, "kwh_km": 0.14},
     {"key": "skoda_citigo", "name": "Škoda Citigo e iV", "words": ["citigo"], "battery_kwh": 32.3, "ac_kw": 7.2, "ac_phases": 2, "kwh_km": 0.15},
+    {"key": "vw_id3", "name": "Volkswagen ID.3", "words": ["id3", "id_3"], "battery_kwh": 58.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.16},
+    {"key": "vw_id4", "name": "Volkswagen ID.4 / ID.5 / Škoda Enyaq", "words": ["id4", "id_4", "id5", "id_5", "enyaq"], "battery_kwh": 77.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.18},
+    {"key": "vw_id7", "name": "Volkswagen ID.7 / ID.Buzz", "words": ["id7", "id_7", "buzz"], "battery_kwh": 77.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.18},
+    {"key": "skoda_elroq", "name": "Škoda Elroq / Cupra Born / Tavascan", "words": ["elroq", "born", "tavascan"], "battery_kwh": 59.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.16},
+    {"key": "audi_q4", "name": "Audi Q4 e-tron", "words": ["q4"], "battery_kwh": 77.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.18},
+    {"key": "audi_etron", "name": "Audi e-tron / Q8 e-tron / Q6", "words": ["etron", "e_tron", "q8", "q6"], "battery_kwh": 95.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.22},
+    {"key": "porsche_taycan", "name": "Porsche Taycan / Macan Electric", "words": ["taycan", "macan"], "battery_kwh": 89.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.21},
     {"key": "citroen_ec4_54", "name": "Citroën ë-C4 (54 kWh, 2023 en later)", "words": ["ec4", "e_c4", "c4"], "battery_kwh": 50.8, "ac_kw": 7.4, "ac_phases": 1, "kwh_km": 0.16},
     {"key": "citroen_ec4_50", "name": "Citroën ë-C4 (50 kWh, 2021–2023)", "words": [], "battery_kwh": 46.3, "ac_kw": 7.4, "ac_phases": 1, "kwh_km": 0.16},
+    {"key": "citroen_ec3", "name": "Citroën ë-C3", "words": ["ec3", "e_c3"], "battery_kwh": 44.0, "ac_kw": 7.4, "ac_phases": 1, "kwh_km": 0.16},
     {"key": "peugeot_e208", "name": "Peugeot e-208 / Opel Corsa Electric", "words": ["e208", "e_208", "corsa"], "battery_kwh": 46.3, "ac_kw": 7.4, "ac_phases": 1, "kwh_km": 0.15},
-    {"key": "peugeot_e2008", "name": "Peugeot e-2008 / Opel Mokka Electric", "words": ["e2008", "e_2008", "mokka"], "battery_kwh": 50.8, "ac_kw": 7.4, "ac_phases": 1, "kwh_km": 0.17},
+    {"key": "peugeot_e2008", "name": "Peugeot e-2008 / Opel Mokka / Jeep Avenger", "words": ["e2008", "e_2008", "mokka", "avenger"], "battery_kwh": 50.8, "ac_kw": 7.4, "ac_phases": 1, "kwh_km": 0.17},
+    {"key": "peugeot_e3008", "name": "Peugeot e-3008 / e-5008 / Opel Grandland", "words": ["e3008", "e_3008", "e5008", "grandland"], "battery_kwh": 73.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.18},
+    {"key": "fiat_500e", "name": "Fiat 500e", "words": ["500e", "fiat"], "battery_kwh": 37.3, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.15},
     {"key": "tesla_m3", "name": "Tesla Model 3", "words": ["model_3", "model3"], "battery_kwh": 57.5, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.14},
     {"key": "tesla_my", "name": "Tesla Model Y", "words": ["model_y", "modely"], "battery_kwh": 75.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.16},
-    {"key": "vw_id3", "name": "Volkswagen ID.3", "words": ["id3", "id_3"], "battery_kwh": 58.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.16},
-    {"key": "vw_id4", "name": "Volkswagen ID.4 / Škoda Enyaq", "words": ["id4", "id_4", "enyaq"], "battery_kwh": 77.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.18},
+    {"key": "tesla_ms", "name": "Tesla Model S / X", "words": ["model_s", "models", "model_x", "modelx"], "battery_kwh": 95.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.19},
     {"key": "kia_niro", "name": "Kia Niro EV / e-Niro", "words": ["niro"], "battery_kwh": 64.8, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.16},
-    {"key": "hyundai_kona", "name": "Hyundai Kona Electric", "words": ["kona"], "battery_kwh": 64.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.16},
+    {"key": "kia_ev6", "name": "Kia EV6 / Hyundai Ioniq 5 / Ioniq 6", "words": ["ev6", "ioniq_5", "ioniq5", "ioniq_6", "ioniq6"], "battery_kwh": 74.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.18},
+    {"key": "kia_ev3", "name": "Kia EV3 / EV9", "words": ["ev3", "ev9"], "battery_kwh": 78.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.17},
+    {"key": "hyundai_kona", "name": "Hyundai Kona Electric / Inster", "words": ["kona", "inster"], "battery_kwh": 64.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.16},
+    {"key": "hyundai_ioniq", "name": "Hyundai Ioniq Electric (2016–2022)", "words": ["ioniq"], "battery_kwh": 38.3, "ac_kw": 7.2, "ac_phases": 1, "kwh_km": 0.14},
     {"key": "renault_zoe", "name": "Renault Zoe (52 kWh)", "words": ["zoe"], "battery_kwh": 52.0, "ac_kw": 22.0, "ac_phases": 3, "kwh_km": 0.16},
-    {"key": "mg4", "name": "MG4 Electric", "words": ["mg4"], "battery_kwh": 61.7, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.17},
+    {"key": "renault_megane", "name": "Renault Mégane / Scénic E-Tech", "words": ["megane", "scenic"], "battery_kwh": 60.0, "ac_kw": 22.0, "ac_phases": 3, "kwh_km": 0.17},
+    {"key": "renault_5", "name": "Renault 5 / 4 E-Tech", "words": ["r5", "renault_5", "renault_4"], "battery_kwh": 52.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.15},
+    {"key": "dacia_spring", "name": "Dacia Spring", "words": ["spring", "dacia"], "battery_kwh": 25.0, "ac_kw": 7.0, "ac_phases": 1, "kwh_km": 0.14},
     {"key": "nissan_leaf", "name": "Nissan Leaf (40 kWh)", "words": ["leaf"], "battery_kwh": 39.0, "ac_kw": 6.6, "ac_phases": 1, "kwh_km": 0.16},
-    {"key": "polestar2", "name": "Polestar 2", "words": ["polestar"], "battery_kwh": 75.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.18},
+    {"key": "nissan_ariya", "name": "Nissan Ariya", "words": ["ariya"], "battery_kwh": 63.0, "ac_kw": 7.4, "ac_phases": 1, "kwh_km": 0.18},
+    {"key": "bmw_i3", "name": "BMW i3", "words": ["i3"], "battery_kwh": 37.9, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.15},
+    {"key": "bmw_i4", "name": "BMW i4 / i5 / iX", "words": ["i4", "i5", "ix"], "battery_kwh": 81.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.18},
+    {"key": "bmw_ix1", "name": "BMW iX1 / iX2 / Mini Countryman E", "words": ["ix1", "ix2", "countryman"], "battery_kwh": 64.7, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.17},
+    {"key": "mini_se", "name": "Mini Cooper SE / Aceman", "words": ["mini", "aceman", "cooper"], "battery_kwh": 49.2, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.15},
+    {"key": "mercedes_eqa", "name": "Mercedes EQA / EQB", "words": ["eqa", "eqb"], "battery_kwh": 66.5, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.18},
+    {"key": "mercedes_eqe", "name": "Mercedes EQE / EQS / EQC", "words": ["eqe", "eqs", "eqc"], "battery_kwh": 90.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.20},
+    {"key": "volvo_ex30", "name": "Volvo EX30 / Smart #1 / #3", "words": ["ex30", "smart"], "battery_kwh": 64.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.17},
+    {"key": "volvo_xc40", "name": "Volvo EX40 / XC40 / C40 Recharge", "words": ["xc40", "c40", "ex40", "ec40"], "battery_kwh": 79.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.19},
+    {"key": "polestar2", "name": "Polestar 2 / 3 / 4", "words": ["polestar"], "battery_kwh": 75.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.18},
+    {"key": "byd_atto3", "name": "BYD Atto 3 / Dolphin / Seal", "words": ["atto", "dolphin", "seal", "byd"], "battery_kwh": 60.5, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.17},
+    {"key": "mg4", "name": "MG4 / MG5 / ZS EV", "words": ["mg4", "mg5", "zs_ev", "mg"], "battery_kwh": 61.7, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.17},
+    {"key": "toyota_bz4x", "name": "Toyota bZ4X / Subaru Solterra", "words": ["bz4x", "solterra"], "battery_kwh": 64.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.18},
+    {"key": "ford_mache", "name": "Ford Mustang Mach-E / Explorer / Capri", "words": ["mach_e", "mache", "explorer", "capri"], "battery_kwh": 75.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.19},
+    {"key": "xpeng", "name": "Xpeng / NIO / Zeekr / Lynk & Co", "words": ["xpeng", "nio", "zeekr", "lynk"], "battery_kwh": 75.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.18},
+    {"key": "phev", "name": "Plug-in hybride (klein accupakket)", "words": ["phev", "hybrid"], "battery_kwh": 13.0, "ac_kw": 3.7, "ac_phases": 1, "kwh_km": 0.20},
     {"key": "other", "name": "Andere auto", "words": [], "battery_kwh": 50.0, "ac_kw": 11.0, "ac_phases": 3, "kwh_km": 0.17},
 ]
 MODEL_BY_KEY = {m["key"]: m for m in MODELS}
@@ -42,12 +71,21 @@ MODEL_BY_KEY = {m["key"]: m for m in MODELS}
 AC_OPTIONS = [(3.6, 1), (6.6, 1), (7.2, 2), (7.4, 1), (11.0, 3), (22.0, 3)]
 
 _SOC_SUFFIX = ("_state_of_charge", "_battery_level", "_battery_state_of_charge", "_laadniveau", "_soc", "_accuniveau",
-               "_charge_level", "_batterijniveau", "_battery")
-_RANGE_WORDS = ("range", "actieradius", "bereik", "autonomy")
-_PLUG_WORDS = ("stekker", "plug", "plugged", "charging_cable", "charge_cable", "laadkabel", "cable_connected")
+               "_charge_level", "_batterijniveau", "_battery", "_remaining_battery_percent", "_battery_percent",
+               "_battery_percentage", "_battery_charge_level", "_ev_battery_level", "_hv_battery_level",
+               "_high_voltage_battery_level", "_ev_soc", "_battery_charge", "_soc_level", "_charging_level")
+_RANGE_WORDS = ("range", "actieradius", "bereik", "autonomy", "remaining_distance")
+_PLUG_WORDS = ("stekker", "plug", "plugged", "charging_cable", "charge_cable", "laadkabel", "cable_connected",
+               "connection_status", "charger_connected", "charge_port")
+# Laden sturen via de auto zelf (als de laadpaal niet te sturen is): schakelaar, laadstroom of start/stop-knoppen
+_CAR_SWITCH_SUFFIX = ("_charging", "_charge", "_opladen", "_laden", "_charger", "_charge_switch", "_ev_charging",
+                      "_charging_enabled", "_charge_control")
+_CAR_START_WORDS = ("start_charging", "start_charge", "charge_start", "laden_starten", "start_laden", "charge_now")
+_CAR_STOP_WORDS = ("stop_charging", "stop_charge", "charge_stop", "laden_stoppen", "stop_laden")
 _TARGET_SUFFIX = ("_target_state_of_charge", "_charge_limit", "_target_soc", "_charging_target", "_doel_laadniveau",
                   "_charge_limit_soc", "_target_charge_level")
-_NAME_TAIL = re.compile(r"\s*(state of charge|battery level|battery|laadniveau|accuniveau|batterijniveau|soc|charge level)\s*$", re.I)
+_NAME_TAIL = re.compile(r"\s*(state of charge|remaining battery percent|battery percentage|battery percent|battery charge level|"
+                        r"ev battery level|battery level|battery|laadniveau|accuniveau|batterijniveau|soc|charge level)\s*$", re.I)
 
 
 def _compact(s: str) -> str:
@@ -55,12 +93,21 @@ def _compact(s: str) -> str:
 
 
 def guess_model(name: str, entity: str = "") -> str:
-    """Modelsleutel bij een autonaam uit Home Assistant ('Mii' → Seat Mii electric, 'e-C4' → Citroën ë-C4)."""
+    """Modelsleutel bij een autonaam uit Home Assistant ('Mii' → Seat Mii electric, 'e-C4' → Citroën ë-C4).
+
+    Korte woorden (zoals 'i3' of 'mg') tellen alleen als los woord, zodat 'phoenix' geen BMW iX wordt."""
+    raw = (name + " " + entity).lower().replace("ë", "e").replace("é", "e")
+    tokens = set(re.split(r"[^a-z0-9]+", raw))
     c = _compact(name) + " " + _compact(entity)
-    raw = (name + " " + entity).lower()
     for m in MODELS:
         for w in m["words"]:
-            if _compact(w) and (_compact(w) in c or w in raw):
+            cw = _compact(w)
+            if not cw:
+                continue
+            if len(cw) <= 3 and "_" not in w:
+                if cw in tokens:
+                    return m["key"]
+            elif cw in c or w in raw:
                 return m["key"]
     return "other"
 
@@ -108,11 +155,41 @@ def discover_cars(states: list[dict]) -> list[dict]:
         except (TypeError, ValueError):
             soc = None
         model = guess_model(name, prefix)
+        ctl = car_control(by_id, prefix, plug, charging)
         out.append({"id": re.sub(r"[^a-z0-9]+", "-", prefix.lower()).strip("-")[:30] or "auto", "name": name[:40],
                     "soc_entity": eid, "plug_entity": plug, "range_entity": rng, "target_entity": target,
                     "conn_entity": conn, "charging_entity": charging, "soc": soc, "last_changed": s.get("last_changed"),
-                    "model": model, "model_name": MODEL_BY_KEY[model]["name"]})
+                    "model": model, "model_name": MODEL_BY_KEY[model]["name"], "control": ctl})
     out.sort(key=lambda c: c["name"].lower())
+    return out
+
+
+def car_control(by_id: dict, prefix: str, plug: str = "", charging: str = "") -> dict:
+    """Kan Home Assistant het laden via de auto zelf sturen? (Tesla, Volkswagen, BMW, Kia/Hyundai, Renault, …)"""
+    sib = {e: st for e, st in by_id.items() if e.split(".", 1)[-1].startswith(prefix + "_")}
+    out: dict = {}
+    for e, st in sib.items():
+        obj = e.split(".", 1)[1]
+        a = st.get("attributes") or {}
+        if e.startswith("switch.") and obj.endswith(_CAR_SWITCH_SUFFIX) and "climat" not in obj and "lock" not in obj:
+            out.setdefault("switch", e)
+        elif e.startswith("number.") and a.get("unit_of_measurement") == "A" and any(w in obj for w in ("amp", "current", "stroom")):
+            out.setdefault("current", e)
+            out["max_a"] = int(min(32, float(a.get("max") or 16)))
+            out["min_a"] = int(max(1, float(a.get("min") or 6)))
+        elif e.startswith("number.") and a.get("unit_of_measurement") == "%" and any(w in obj for w in ("limit", "target", "doel")):
+            out.setdefault("limit", e)
+        elif e.startswith("button.") and any(w in obj for w in _CAR_START_WORDS):
+            out.setdefault("start", e)
+        elif e.startswith("button.") and any(w in obj for w in _CAR_STOP_WORDS):
+            out.setdefault("stop", e)
+        elif e.startswith("sensor.") and (a.get("device_class") == "power" or a.get("unit_of_measurement") in ("W", "kW")) \
+                and any(w in obj for w in ("charg", "laad")):
+            out.setdefault("power", e)
+    if not (out.get("switch") or out.get("current") or out.get("start")):
+        return {"limit": out["limit"]} if out.get("limit") else {}
+    out["plug"], out["charging"] = plug, charging
+    out["driver"] = "ha_current" if out.get("current") else ("ha_switch" if out.get("switch") else "ha_charge_buttons")
     return out
 
 
@@ -120,7 +197,8 @@ def new_car(found: dict, target_pct: int = 80, min_pct: int = 20) -> dict:
     """Autoprofiel om op te slaan bij de laadpaal."""
     car = {"id": found["id"], "name": found["name"], "soc_entity": found.get("soc_entity", ""),
            "plug_entity": found.get("plug_entity", ""), "conn_entity": found.get("conn_entity", ""),
-           "charging_entity": found.get("charging_entity", ""), "target_entity": found.get("target_entity", ""),
+           "charging_entity": found.get("charging_entity", ""),
+           "target_entity": (found.get("control") or {}).get("limit") or found.get("target_entity", ""),
            "target_pct": int(target_pct), "min_pct": int(min_pct)}
     car.update(car_from_model(found.get("model") or "other"))
     return car

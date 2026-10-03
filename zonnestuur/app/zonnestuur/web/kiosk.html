@@ -313,7 +313,19 @@ function stateText(d) {
 }
 function drawDevices() {
   const box = $("devices"), devs = ((S && S.devices) || []).filter((d) => !PREF.hide.includes(d.id));
-  if (!devs.length) { box.innerHTML = `<div class="empty">Kies op het instellingenscherm welke apparaten je hier wilt zien.</div>`; return; }
+  const bats = ((S && S.batteries) || []).filter((b) => !PREF.hide.includes("bat:" + b.id));
+  if (!devs.length && !bats.length) { box.innerHTML = `<div class="empty">Kies op het instellingenscherm welke apparaten je hier wilt zien.</div>`; return; }
+  const BWORD = { auto: "Zelf gebruiken", save: "Houdt vast voor later", charge: "Laadt van het net", idle: "Stand-by" };
+  const batHtml = bats.map((b) => {
+    const soc = b.soc == null ? null : Math.round(b.soc), pw = b.power_w || 0;
+    const nx = b.next ? ` · om ${b.next.start} ${b.next.action === "charge" ? "laden tot " + Math.round(b.next.soc) + "%" : "vasthouden"}` : "";
+    return `<div class="dev ${Math.abs(pw) > 30 ? "on" : ""}">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="3"/><path d="M9.5 2h5M12 8.5l-2.5 4h5l-2.5 4"/></svg></div>
+      <div class="top"><span class="name">${esc(b.name)}</span><span class="kw num">${soc == null ? "–" : soc + "<small>%</small>"}</span></div>
+      <div class="state">${b.online ? esc((pw > 30 ? `Laadt ${nl(pw / 1000, 1)} kW` : pw < -30 ? `Levert ${nl(-pw / 1000, 1)} kW` : BWORD[b.action] || "") + nx) : "Niet bereikbaar"}</div>
+      ${soc != null ? `<div class="evk"><div class="bar"><span class="f" style="width:${soc}%"></span>${b.target_soc ? `<span class="t" style="left:${b.target_soc}%"></span>` : ""}</div></div>` : ""}
+    </div>`;
+  }).join("");
   box.innerHTML = devs.map((d) => {
     const running = d.on && d.power_w > 50, ready = (d.ready_times || [])[0];
     const midnight = Math.max(0.1, (new Date(new Date().setHours(24, 0, 0, 0)) - Date.now()) / 3.6e6);
@@ -332,7 +344,7 @@ function drawDevices() {
         ${d.kind === "ev" || ready ? `<div class="stepper"><span>${d.kind === "ev" ? "Vol om" : "Klaar om"}</span><button data-id="${esc(d.id)}" data-step="-30" aria-label="Eerder">−</button><b class="num">${esc(ready || "–")}</b><button data-id="${esc(d.id)}" data-step="30" aria-label="Later">+</button></div>` : ""}
         ${evCar(d) ? `<div class="stepper"><span>Tot</span><button data-id="${esc(d.id)}" data-evt="-10" aria-label="Minder">−</button><b class="num">${evCar(d).target_pct}%</b><button data-id="${esc(d.id)}" data-evt="10" aria-label="Meer">+</button></div>` : ""}
       </div></div>`;
-  }).join("");
+  }).join("") + batHtml;
   const evPost = (id, body) => api(`api/device/${encodeURIComponent(id)}/ev`, { method: "POST", body: JSON.stringify(body) });
   box.querySelectorAll("[data-evcar]").forEach((b) => b.onclick = async () => { await evPost(b.dataset.id, { car: b.dataset.evcar }); loadStatus(); });
   box.querySelectorAll("[data-evmode]").forEach((b) => b.onclick = async () => {
@@ -417,7 +429,8 @@ function sheet(open) {
   if (!open) return;
   const mark = (id, v) => $(id).querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
   mark("optMode", PREF.mode); mark("optDim", PREF.dim); mark("optDial", PREF.dial);
-  $("optDevs").innerHTML = ((S && S.devices) || []).map((d) => `<button data-id="${esc(d.id)}" class="${PREF.hide.includes(d.id) ? "" : "on"}">${esc(d.name)}</button>`).join("");
+  $("optDevs").innerHTML = ((S && S.devices) || []).map((d) => `<button data-id="${esc(d.id)}" class="${PREF.hide.includes(d.id) ? "" : "on"}">${esc(d.name)}</button>`).join("")
+    + ((S && S.batteries) || []).map((b) => `<button data-id="bat:${esc(b.id)}" class="${PREF.hide.includes("bat:" + b.id) ? "" : "on"}">${esc(b.name)}</button>`).join("");
   $("optDevs").querySelectorAll("button").forEach((b) => b.onclick = () => {
     b.classList.toggle("on");
     PREF.hide = [...$("optDevs").querySelectorAll("button:not(.on)")].map((x) => x.dataset.id); savePref(); drawDevices();

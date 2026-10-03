@@ -20,8 +20,11 @@ in plaats van die stroom voor bijna niets terug te leveren.
 
 ## Auto laden
 
-- Staat je laadpaal in Home Assistant, dan verschijnt op het dashboard de kaart **Auto laden**. Vink aan welke auto's
-  aan die laadpaal laden, kies hoe laat hij vol moet zijn en tik op **Laden instellen**.
+- Staat je laadpaal in Home Assistant, dan verschijnt op het dashboard de kaart **Auto laden**. Is de laadpaal niet
+  te sturen, dan stuurt Zonnestuur het laden via de auto zelf (laadschakelaar, laadstroom of start/stop-knoppen,
+  zoals bij Tesla, Volkswagen, BMW, Kia/Hyundai en Renault). Kan de auto een laadlimiet instellen, dan zet
+  Zonnestuur die op jouw doel.
+- Vink op die kaart aan welke auto's daar laden, kies hoe laat hij vol moet zijn en tik op **Laden instellen**.
 - Auto's met een accupercentage in Home Assistant (bijvoorbeeld via Tibber of de app van de fabrikant) laden precies
   tot het percentage dat je kiest. **Altijd minstens** laadt direct bij als de accu leger is dan dat.
 - Hangen er meer auto's aan één laadpaal, dan herkent Zonnestuur welke eraan hangt aan de stekker-sensor van de auto.
@@ -56,9 +59,25 @@ het dashboard).
 
 ## Thuisbatterij
 
-Onder **Instellingen > Thuisbatterij** kies je de batterij die Zonnestuur in Home Assistant vond (bijvoorbeeld de
-HomeWizard Plug-In Battery) en vul je capaciteit en vermogen in. Zonnestuur plant daarna elk uur of de batterij
-zelf gebruikt, spaart of goedkoop laadt. De planning staat op het dashboard onder de prijsgrafiek.
+Onder **Instellingen > Thuisbatterij** kies je de batterij die Zonnestuur in Home Assistant vond. Hij herkent onder
+meer HomeWizard, Marstek (ook via Modbus, met RS485), Zendure, Anker, EcoFlow, Sessy, Victron, Huawei, SolarEdge,
+GoodWe, Growatt, Sungrow, Fox ESS, Deye, Sigenergy en Tesla, en vult de standaardwaarden van dat merk in. Lukt
+herkennen niet, kies dan onder Geavanceerd **Eigen scripts**: dan werkt elk merk dat Home Assistant kan sturen.
+
+Hoe Zonnestuur beslist:
+
+- Elk kwartier rekent hij voor de komende uren (tot 48) uit wat het goedkoopst is: **zelf gebruiken** (de batterij
+  houdt de meter op nul), **vasthouden** voor een duurder uur, of **laden van het net** op 25, 50, 75 of 100%
+  vermogen. Verlies bij laden en ontladen, slijtage en schakelen tellen mee.
+- Het laadpercentage volgt uit het plan: zoveel als de dure uren nodig hebben, en van het net nooit boven 95%.
+  Levert slim plannen minder dan € 0,03 op, dan blijft hij gewoon zelf gebruiken.
+- Vasthouden alleen als er geen zon over is; gaat er toch zon naar het net, dan laat hij los.
+- Optioneel: een **winterreserve** (bijvoorbeeld 2 kWh vanaf 12 uur, te gebruiken vanaf 17 uur) en een
+  **piekgrens** voor een capaciteitstarief.
+- Stopt Zonnestuur, of valt Pro weg, dan gaat de batterij terug naar zijn eigen regeling.
+- Is de batterij 14 dagen niet vol geweest, dan krijg je een seintje: een keer vol laden houdt het percentage juist.
+
+De batterij staat als kaart tussen je apparaten, met het plan voor de komende 24 uur.
 
 ## Andere systemen
 

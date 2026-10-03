@@ -713,36 +713,62 @@ async function licenseCard() {
 }
 function batteryHtml(b) {
   const f = (id, label, val, type = "text", extra = "") => `<div class="field" ${extra}><label for="${id}">${label}</label><input id="${id}" type="${type}" ${type === "number" ? 'step="any"' : ""} value="${esc(val ?? "")}"></div>`;
-  const m = b.mode_map || {};
-  return `<p class="small muted" style="margin-top:-4px">Zonnestuur plant elk uur wanneer de batterij laadt, spaart of levert: op je eigen verbruik, de zonvoorspelling en de uurprijzen. Zon-overschot gaat eerst naar je apparaten, de batterij krijgt de rest.</p>
+  const m = b.mode_map || {}, fm = b.force_map || {}, R = b.reserve_kwh ?? 0;
+  const drv = b.driver || "mode";
+  const sel = (v) => drv === v ? "selected" : "";
+  return `<p class="small muted" style="margin-top:-4px">Zonnestuur rekent elk kwartier uit wat de batterij het beste doet: <b>zelf gebruiken</b>, <b>vasthouden</b> voor een duurder uur, of <b>laden van het net</b> als dat straks duidelijk meer oplevert. Het laadpercentage volgt daaruit: zoveel als de dure uren nodig hebben, niet meer. Werkt met elk merk dat Home Assistant kan sturen.</p>
     <div class="chips" id="b_found" style="margin:10px 0"></div>
     <label class="check-row"><input type="checkbox" id="b_on" ${b.soc_entity ? "checked" : ""}> Zonnestuur stuurt mijn thuisbatterij</label>
     <div id="b_form" ${b.soc_entity ? "" : "hidden"}>
       <div class="row">${f("b_name", "Naam", b.name || "Thuisbatterij")}${f("b_cap", "Capaciteit (kWh)", b.capacity_kwh ?? 5, "number")}${f("b_minsoc", "Altijd minimaal in batterij (%)", b.min_soc ?? 10, "number")}</div>
-      <div class="row">${f("b_ch", "Max. laden (W)", b.max_charge_w ?? 800, "number")}${f("b_dis", "Max. ontladen (W)", b.max_discharge_w ?? 800, "number")}</div>
-      <label class="check-row"><input type="checkbox" id="b_grid" ${b.grid_charge === false ? "" : "checked"}> Mag laden van het net als dat duidelijk goedkoper is (dynamisch contract, negatieve prijzen)</label>
-      <details style="margin-top:10px"><summary class="small">Geavanceerd: welke instellingen in Home Assistant</summary>
+      <div class="row">${f("b_ch", "Max. laden (W)", b.max_charge_w ?? 800, "number")}${f("b_dis", "Max. ontladen (W)", b.max_discharge_w ?? 800, "number")}${f("b_eff", "Rendement heen en terug (%)", Math.round((b.efficiency ?? 0.9) * 100), "number")}</div>
+      <h3 class="t" style="font-size:15px; margin:14px 0 4px">Laden van het net</h3>
+      <label class="check-row"><input type="checkbox" id="b_grid" ${b.grid_charge === false ? "" : "checked"}> Laden van het net als dat duidelijk loont (dynamisch contract, negatieve prijzen)</label>
+      <div class="row">${f("b_gmax", "Van het net hoogstens tot (%)", b.max_grid_soc ?? 95, "number")}${f("b_gw", "Laadvermogen van het net (W, leeg = max.)", b.max_grid_charge_w || "", "number")}</div>
+      <h3 class="t" style="font-size:15px; margin:14px 0 4px">Reserve en piek</h3>
+      <div class="row">${f("b_res", "Winterreserve (kWh, 0 = uit)", R, "number")}${f("b_rfrom", "Reserve vanaf (uur)", b.reserve_from ?? 12, "number")}${f("b_runtil", "Mag op vanaf (uur)", b.reserve_until ?? 17, "number")}</div>
+      <label class="check-row"><input type="checkbox" id="b_rwin" ${b.reserve_winter_only === false ? "" : "checked"}> Reserve alleen van oktober tot en met maart</label>
+      <div class="row">${f("b_peak", "Piekgrens netafname tijdens laden (W, 0 = uit)", b.peak_limit_w ?? 0, "number")}</div>
+      <p class="small muted" style="margin:0">De piekgrens is voor een capaciteitstarief (zoals in België): tijdens het laden blijft je netafname eronder.</p>
+      <details style="margin-top:12px"><summary class="small">Geavanceerd: hoe Zonnestuur de batterij stuurt</summary>
         <div class="row" style="margin-top:10px">
           <div class="field"><label for="b_drv">Sturing</label><select id="b_drv">
-            <option value="mode" ${b.driver === "mode" ? "selected" : ""}>Stand kiezen (batterij regelt zelf nul op de meter)</option>
-            <option value="setpoint" ${b.driver === "setpoint" ? "selected" : ""}>Eén vermogen-instelling (+/−)</option>
-            <option value="split" ${b.driver === "split" ? "selected" : ""}>Aparte laad- en ontlaadinstelling</option></select></div>
+            <option value="mode" ${sel("mode")}>Stand kiezen (batterij regelt zelf nul op de meter)</option>
+            <option value="setpoint" ${sel("setpoint")}>Eén vermogen-instelling (+/−)</option>
+            <option value="split" ${sel("split")}>Aparte laad- en ontlaadinstelling</option>
+            <option value="scripts" ${sel("scripts")}>Eigen scripts (voor elk merk)</option></select></div>
           ${f("b_soc", "Laadniveau (sensor, %)", b.soc_entity)}${f("b_pw", "Vermogen (sensor, optioneel)", b.power_entity)}</div>
-        <div class="row">${f("b_mode", "Stand (select.…)", b.mode_entity)}${f("m_auto", "Stand: nul op de meter", m.auto)}${f("m_save", "Stand: alleen laden", m.save)}${f("m_charge", "Stand: vol laden", m.charge)}</div>
-        <div class="row">${f("m_idle", "Stand: stand-by", m.idle)}${f("m_manual", "Stand: handmatig/API", m.manual)}${f("b_sp", "Vermogen-instelling (number.…)", b.setpoint_entity)}</div>
-        <div class="row">${f("b_ce", "Laadvermogen (number.…)", b.charge_entity)}${f("b_de", "Ontlaadvermogen (number.…)", b.discharge_entity)}</div>
-        <label class="check-row"><input type="checkbox" id="b_spp" ${b.setpoint_charge_positive === false ? "" : "checked"}> Positief vermogen = laden (uit bij o.a. Sessy)</label>
+        <div data-drv="mode">
+          <div class="row">${f("b_mode", "Stand (select.…)", b.mode_entity)}${f("m_auto", "Stand: nul op de meter", m.auto)}${f("m_save", "Stand: vasthouden (niet ontladen)", m.save)}${f("m_charge", "Stand: laden van het net", m.charge)}</div>
+          <div class="row">${f("m_idle", "Stand: stand-by", m.idle)}${f("m_manual", "Stand: handmatig/API", m.manual)}${f("b_cpw", "Laadvermogen bij laden (number.…, optioneel)", b.charge_power_entity)}</div>
+          <div class="row">${f("b_force", "Tweede stand voor laden/stilstaan (select.…, optioneel)", b.force_entity)}${f("f_charge", "Tweede stand: laden", fm.charge)}${f("f_idle", "Tweede stand: stilstaan", fm.idle)}</div>
+        </div>
+        <div data-drv="setpoint split"><div class="row">${f("b_sp", "Vermogen-instelling (number.…)", b.setpoint_entity)}${f("b_ce", "Laadvermogen (number.…)", b.charge_entity)}${f("b_de", "Ontlaadvermogen (number.…)", b.discharge_entity)}</div>
+          <label class="check-row"><input type="checkbox" id="b_spp" ${b.setpoint_charge_positive === false ? "" : "checked"}> Positief vermogen = laden (uit bij o.a. Sessy)</label></div>
+        <div data-drv="scripts"><div class="row">${f("s_auto", "Script: zelf gebruiken", b.script_auto)}${f("s_save", "Script: vasthouden", b.script_save)}${f("s_charge", "Script: laden (krijgt power_w mee)", b.script_charge)}</div>
+          <p class="small muted" style="margin:0">Elk merk dat je in Home Assistant met een script kunt sturen (ook via een dienst, zoals Huawei 'forcible charge'), werkt zo. Zonnestuur roept het script aan met de variabelen <code>action</code> en <code>power_w</code>.</p></div>
+        <div class="row">${f("b_sw", "Schakelaar die aan moet om te sturen (switch.…, optioneel, bv. RS485)", b.control_switch_entity)}</div>
       </details>
     </div>`;
+}
+function bindDrv() {
+  const upd = () => { const d = $("b_drv") ? $("b_drv").value : ""; document.querySelectorAll("[data-drv]").forEach((x) => { x.hidden = !x.dataset.drv.split(" ").includes(d); }); };
+  if ($("b_drv")) { $("b_drv").onchange = upd; upd(); }
 }
 function readBattery(prev) {
   if (!$("b_on") || !$("b_on").checked) return [];
   const v = (id) => $(id).value.trim(), n = (id) => Number($(id).value);
   const map = {}; for (const k of ["auto", "save", "charge", "idle", "manual"]) if (v("m_" + k)) map[k] = v("m_" + k);
+  const fmap = {}; for (const k of ["charge", "idle"]) if (v("f_" + k)) fmap[k] = v("f_" + k);
   const pos = $("b_spp").checked;
   return [Object.assign({}, prev || {}, { id: (prev && prev.id) || "batterij", name: v("b_name") || "Thuisbatterij", capacity_kwh: n("b_cap"),
-    min_soc: n("b_minsoc"), max_charge_w: n("b_ch"), max_discharge_w: n("b_dis"), grid_charge: $("b_grid").checked,
+    min_soc: n("b_minsoc"), max_charge_w: n("b_ch"), max_discharge_w: n("b_dis"), efficiency: Math.min(1, Math.max(0.5, n("b_eff") / 100 || 0.9)),
+    grid_charge: $("b_grid").checked, max_grid_soc: Math.min(100, Math.max(20, n("b_gmax") || 95)), max_grid_charge_w: n("b_gw") || 0,
+    reserve_kwh: Math.max(0, n("b_res") || 0), reserve_from: n("b_rfrom") || 0, reserve_until: n("b_runtil") || 0, reserve_winter_only: $("b_rwin").checked,
+    peak_limit_w: Math.max(0, n("b_peak") || 0),
     driver: v("b_drv"), soc_entity: v("b_soc"), power_entity: v("b_pw"), mode_entity: v("b_mode"), mode_map: map,
+    charge_power_entity: v("b_cpw"), force_entity: v("b_force"), force_map: fmap, control_switch_entity: v("b_sw"),
+    script_auto: v("s_auto"), script_save: v("s_save"), script_charge: v("s_charge"),
     setpoint_entity: v("b_sp"), charge_entity: v("b_ce"), discharge_entity: v("b_de"),
     setpoint_charge_positive: pos, power_charge_positive: (prev && prev.power_charge_positive !== undefined) ? prev.power_charge_positive : pos })];
 }
@@ -779,7 +805,7 @@ async function settings() {
         ${CFG.has_ha ? `<div class="field"><label for="s_pv">Opwek-sensor (optioneel)</label><input id="s_pv" list="s_pvl" placeholder="sensor.…" value="${esc(s.pv_entity || "")}"><datalist id="s_pvl"></datalist><span class="hint">Met je echte opwek stelt Zonnestuur de zonvoorspelling bij voor jouw dak.</span></div>` : ""}</div>
     </section>
     <section class="card" id="batCard"><h2 class="t">Thuisbatterij</h2>
-      ${CFG.has_ha ? batteryHtml(B) : `<p class="small muted" style="margin-top:-4px">Koppel Home Assistant om een thuisbatterij (HomeWizard, Zendure, Marstek, Sessy, Victron…) slim te laten laden en ontladen.</p>`}
+      ${CFG.has_ha ? batteryHtml(B) : `<p class="small muted" style="margin-top:-4px">Koppel Home Assistant om een thuisbatterij slim te laten laden en ontladen: HomeWizard, Marstek, Zendure, Anker, EcoFlow, Sessy, Victron, Huawei, SolarEdge, GoodWe, Growatt, Sungrow, Tesla en elk ander merk dat Home Assistant kan sturen.</p>`}
     </section>
     <section class="card" id="feedCard"><h2 class="t">Minder terugleveren</h2>
       ${CFG.has_ha ? `<p class="small muted" style="margin-top:-4px">Zonnestuur laat je apparaten al op je eigen zonnestroom draaien. Hiermee gaat hij nog een stap verder.</p>
@@ -1010,7 +1036,7 @@ async function settings() {
     } catch (e) { $("s_hares").textContent = e.message; }
   };
   licenseCard();
-  const bindBattery = () => { if ($("b_on")) $("b_on").onchange = () => { $("b_form").hidden = !$("b_on").checked; }; };
+  const bindBattery = () => { if ($("b_on")) $("b_on").onchange = () => { $("b_form").hidden = !$("b_on").checked; }; bindDrv(); };
   bindBattery();
   if (CFG.has_ha) {
     (async () => {
@@ -1026,12 +1052,12 @@ async function settings() {
           .map((x) => `<option value="${esc(x.entity)}">${esc(x.name)}</option>`).join("");
         const bats = r.batteries || [];
         $("b_found").innerHTML = bats.length ? bats.map((b, i) => `<button type="button" data-bi="${i}">🔋 ${esc(b.name)}</button>`).join("")
-          : `<span class="small muted">Geen thuisbatterij gevonden in Home Assistant. Vul de instellingen hieronder zelf in.</span>`;
+          : `<span class="small muted">Geen thuisbatterij gevonden in Home Assistant. Vul de instellingen hieronder zelf in, of kies onder Geavanceerd &quot;Eigen scripts&quot;: dan werkt elk merk.</span>`;
         document.querySelectorAll("[data-bi]").forEach((btn) => btn.onclick = () => {
           const b = bats[Number(btn.dataset.bi)];
           $("batCard").innerHTML = `<h2 class="t">Thuisbatterij</h2>` + batteryHtml(Object.assign({}, b, { soc_entity: b.soc_entity || " " }));
           $("b_on").checked = true; $("b_form").hidden = false; bindBattery();
-          $("b_found").innerHTML = `<span class="small muted">Overgenomen: ${esc(b.name)}. Controleer capaciteit en vermogen en sla op.</span>`;
+          $("b_found").innerHTML = `<span class="small muted">Overgenomen: ${esc(b.name)}${b.brand ? ` (${esc(b.brand)})` : ""}. Capaciteit, vermogen en rendement zijn de standaard van dit merk: controleer ze en sla op.</span>`;
           B.power_charge_positive = b.power_charge_positive;
         });
         const cur = CFG.notify?.service || "";

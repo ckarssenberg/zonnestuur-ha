@@ -220,7 +220,8 @@ def effective_mqtt(cfg: "Config") -> dict:
 
 
 DRIVERS = ("shelly", "shelly_gen1", "homewizard_socket", "tasmota", "ha_switch", "ha_setpoint", "ha_current",
-           "ha_start_button", "esphome", "mqtt_switch", "homey_switch", "homey_setpoint", "sg_ready", "ocpp", "ha_power")
+           "ha_start_button", "esphome", "mqtt_switch", "homey_switch", "homey_setpoint", "sg_ready", "ocpp", "ha_power",
+           "ha_charge_buttons")
 METER_DRIVERS = ("p1_serial", "homewizard", "shelly_em", "ha", "youless", "dsmr_reader", "esphome", "mqtt", "homey")
 HOST_DRIVERS = ("shelly", "shelly_gen1", "homewizard_socket", "tasmota", "esphome")
 SERVER_KEYS = ("interval_s", "web_host", "web_port", "web_token", "db_path", "timezone", "scan_extra")

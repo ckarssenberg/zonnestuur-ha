@@ -17,6 +17,7 @@ Traploze drivers kennen ook: set_power(watt) en de eigenschappen min_w, max_w, s
 from __future__ import annotations
 
 import json
+import re
 import math
 import time
 import urllib.parse
@@ -215,6 +216,40 @@ class HASwitch:
     def set(self, on: bool) -> None:
         domain = self.domain if self.domain in ("switch", "input_boolean", "light", "fan") else "homeassistant"
         self.ha.call(domain, "turn_on" if on else "turn_off", {"entity_id": self.entity})
+
+
+class HAChargeButtons:
+    """Auto zonder laadschakelaar maar met knoppen 'start laden' en 'stop laden' (bijv. BMW, Kia/Hyundai, Renault, Mercedes).
+
+    Of hij laadt, lezen we uit een 'laadt'-sensor of de vermogensmeting; anders geldt de laatste opdracht."""
+
+    def __init__(self, ha: HomeAssistant, start_entity: str, stop_entity: str, charging_entity: str = "",
+                 power_entity: str = "", plug_entity: str = ""):
+        self.ha, self.start, self.stop = ha, start_entity, stop_entity
+        self.charging, self.power_entity, self.plug = charging_entity, power_entity, plug_entity
+        self._last: Optional[bool] = None
+
+    def status(self) -> SwitchStatus:
+        if self.plug and self.ha.state(self.plug).get("state") == "off":
+            raise NotReady("wacht tot de auto is aangesloten")
+        power = self.ha.number(self.power_entity) if self.power_entity else None
+        on = self._last
+        if self.charging:
+            v = self.ha.state(self.charging).get("state")
+            if v in ("on", "off"):
+                on = v == "on"
+            elif isinstance(v, str) and v:
+                on = v.lower() in ("charging", "laden", "laadt", "in_progress", "active")
+        elif power is not None:
+            on = power > 300
+        return SwitchStatus(bool(on), float(power or 0.0), None)
+
+    def set(self, on: bool) -> None:
+        ent = self.start if on else self.stop
+        if not ent:
+            return
+        self.ha.call(ent.split(".", 1)[0], "press", {"entity_id": ent})
+        self._last = on
 
 
 class HASetpointBoost:
@@ -430,6 +465,9 @@ def make_switch(cfg, d):
         return HACurrentControl(ha, p["current_entity"], p.get("switch_entity", ""), p.get("power_entity", ""),
                                 int(p.get("phases", 1)), float(p.get("volts", 230)), float(p.get("min_a", 6)),
                                 float(p.get("max_a", 16)), p.get("plug_entity", ""))
+    if drv == "ha_charge_buttons":
+        return HAChargeButtons(ha, p["start_entity"], p.get("stop_entity", ""), p.get("charging_entity", ""),
+                               p.get("power_entity", ""), p.get("plug_entity", ""))
     if drv == "ha_power":
         return HAPowerControl(ha, p["entity"], p.get("unit", "W"), float(d.power_w), float(p.get("min_w", 100)),
                               p.get("switch_entity", ""), p.get("power_entity", ""))
@@ -631,24 +669,55 @@ def ha_candidates(states: list[dict]) -> dict:
 # ---------------------------------------------------------------- thuisbatterijen herkennen
 _SOC_WORDS = ("state_of_charge", "soc", "battery_level", "electric_level", "laadniveau", "battery_percentage",
               "charge_level", "batterijniveau")
-_MODE_KEYS = [  # volgorde telt: 'zero_charge_only' is sparen, geen laden
-    ("save", ("zero_charge_only", "charge_only", "smart_charging", "alleen laden")),
-    ("idle", ("standby", "idle", "stop", "stand-by")),
-    ("charge", ("to_full", "force_charge", "forcible_charge", "charge", "laden", "full")),
-    ("manual", ("manual", "api", "remote", "handmatig", "custom")),
-    ("auto", ("zero", "anti_feed", "self_consumption", "self-consumption", "nom", "smart", "auto", "nul op de meter", "eigen verbruik")),
+_MODE_KEYS = [  # volgorde telt: 'zero_charge_only' is vasthouden, geen laden
+    ("save", ("zero_charge_only", "charge_only", "smart_charging", "alleen laden", "keep_batteries_charged", "backup",
+              "no_discharge", "disable_discharge", "hold")),
+    ("idle", ("standby", "idle", "stop", "stand-by", "stand_by", "pause", "none")),
+    ("charge", ("to_full", "force_charge", "forcible_charge", "forced_charge", "grid_charge", "charge_from_grid",
+                "battery_first", "eco_charge", "charge", "laden", "full")),
+    ("manual", ("manual", "api", "remote", "remote_control", "handmatig", "custom", "forced", "command", "passive")),
+    ("auto", ("zero", "anti_feed", "self_consumption", "self-consumption", "maximise_self_consumption",
+              "maximize_self_consumption", "self_use", "selfuse", "load_first", "general", "nom", "smart", "auto",
+              "nul op de meter", "eigen verbruik", "optimized", "autonomous", "default", "normal")),
 ]
 _BATTERY_BRANDS = ("homewizard", "zendure", "solarflow", "hyper", "marstek", "venus", "sessy", "victron", "anker", "solix",
                    "ecoflow", "growatt", "huawei", "luna", "sungrow", "byd", "pylontech", "sonnen", "tesla powerwall",
-                   "powerwall", "battery", "batterij", "accu", "plug_in", "plug-in", "ess")
+                   "powerwall", "goodwe", "solaredge", "foxess", "fox_ess", "alpha", "deye", "sunsynk", "sigen", "enphase",
+                   "solax", "solis", "sofar", "sma ", "fronius", "bluetti", "jackery", "hoymiles", "indevolt", "lg_ess",
+                   "kostal", "battery", "batterij", "accu", "plug_in", "plug-in", "ess", "storage", "thuisaccu")
+# Standaardwaarden per merk: capaciteit (kWh), laden/ontladen (W), rendement heen en terug. Aan te passen in de app.
+BATTERY_DEFAULTS = {
+    "homewizard": (2.7, 800, 800, 0.80), "marstek": (5.12, 2500, 2500, 0.75), "venus": (5.12, 2500, 2500, 0.75),
+    "zendure": (1.92, 1200, 1200, 0.85), "solarflow": (1.92, 1200, 1200, 0.85), "hyper": (1.92, 1200, 1200, 0.85),
+    "anker": (1.6, 1200, 800, 0.85), "solix": (1.6, 1200, 800, 0.85), "ecoflow": (1.92, 800, 800, 0.85),
+    "sessy": (5.0, 2200, 1700, 0.85), "victron": (10.0, 5000, 5000, 0.90), "huawei": (5.0, 2500, 2500, 0.92),
+    "luna": (5.0, 2500, 2500, 0.92), "growatt": (5.0, 2500, 2500, 0.90), "sungrow": (9.6, 5000, 5000, 0.92),
+    "goodwe": (8.0, 5000, 5000, 0.92), "solaredge": (9.7, 5000, 5000, 0.92), "powerwall": (13.5, 5000, 5000, 0.90),
+    "sonnen": (10.0, 3300, 3300, 0.90), "byd": (10.2, 5000, 5000, 0.92), "foxess": (10.4, 5000, 5000, 0.92),
+    "deye": (10.0, 5000, 5000, 0.92), "sunsynk": (10.0, 5000, 5000, 0.92), "sigen": (8.0, 5000, 5000, 0.93),
+    "enphase": (5.0, 1280, 1280, 0.90), "alpha": (10.1, 5000, 5000, 0.92), "solax": (6.3, 5000, 5000, 0.92),
+    "bluetti": (2.0, 1200, 1200, 0.85), "jackery": (2.0, 1200, 800, 0.85), "hoymiles": (2.2, 800, 800, 0.85),
+    "indevolt": (2.2, 800, 800, 0.85),
+}
+_SWITCH_WORDS = ("rs485", "remote_control", "modbus_control", "external_control", "control_mode", "remote control")
+
+
+def _norm(o: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(o).lower()).strip("_")
 
 
 def _map_modes(options: list) -> dict:
     out: dict[str, str] = {}
     for opt in options or []:
-        o = str(opt).lower()
+        o = _norm(opt)
+        parts = o.split("_")
+        if any(x in o for x in ("fed_to_grid", "feed_in", "export", "sell", "discharge", "off_grid", "peak_shav", "time_of_use", "trade")):
+            continue                              # terugleveren, eiland of tijdschema: nooit door Zonnestuur gekozen
         for key, words in _MODE_KEYS:
-            if key not in out and any(o == w or o.startswith(w) or w in o.split("_") or w == o.replace(" ", "_") for w in words):
+            if key in out:
+                continue
+            if any(o == _norm(w) or o.startswith(_norm(w)) or _norm(w) in parts or ("_" in _norm(w) and f"_{_norm(w)}_" in f"_{o}_")
+                   for w in words):
                 out[key] = opt
                 break
     return out
@@ -692,13 +761,17 @@ def battery_candidates(states: list[dict]) -> list[dict]:
                     "power_entity": pw[0] if pw else "", "capacity_kwh": round(2.7 * n, 1),
                     "max_charge_w": 800 * n, "max_discharge_w": 800 * n, "options": opts})
         used.add(e)
-    # 2. Andere merken: stand-select of vermogens-instellingen naast een laadniveau-sensor
+    # 2. Andere merken: stand-select(s), schakelaar en vermogens-instellingen naast een laadniveau-sensor
+    caps = [e for e, st in by_id.items() if e.startswith("sensor.") and (st.get("attributes") or {}).get("unit_of_measurement") in ("kWh", "Wh")
+            and any(w in e for w in ("capacity", "capaciteit", "rated_energy", "battery_energy_total"))]
     for e, s in by_id.items():
-        if e in used or not e.startswith(("select.", "number.", "input_select.")):
+        if e in used or not e.startswith(("select.", "number.", "input_select.", "switch.")):
             continue
         a = s.get("attributes") or {}
         t = _text(e, a.get("friendly_name") or "")
         if not any(b in t for b in _BATTERY_BRANDS):
+            continue
+        if e.startswith("switch.") and not any(w in t for w in _SWITCH_WORDS):
             continue
         soc = near(e, [x for x in socs if x not in used], 1)
         if not soc:
@@ -709,18 +782,32 @@ def battery_candidates(states: list[dict]) -> list[dict]:
         if cand is None:
             name = (by_id[soc].get("attributes") or {}).get("friendly_name") or soc
             for w in (" State of charge", " state of charge", " Laadniveau", " laadniveau", " SOC", " Soc", " Battery level",
-                      " Electric level", " Battery Level"):
+                      " Electric level", " Battery Level", " Batterij SOC", " batterij soc"):
                 name = name.replace(w, "")
             pw = near(e, powers)
             cand = {"_key": key, "name": name.strip() or "Thuisbatterij", "brand": next((b for b in _BATTERY_BRANDS if b in t), ""),
                     "driver": "", "soc_entity": soc, "power_entity": pw[0] if pw else "", "mode_entity": "", "mode_map": {},
-                    "setpoint_entity": "", "charge_entity": "", "discharge_entity": "", "capacity_kwh": 5.0,
-                    "max_charge_w": 2500, "max_discharge_w": 2500}
+                    "force_entity": "", "force_map": {}, "control_switch_entity": "", "charge_power_entity": "",
+                    "setpoint_entity": "", "charge_entity": "", "discharge_entity": "", "capacity_kwh": 0.0,
+                    "max_charge_w": 0, "max_discharge_w": 0}
+            cap = near(soc, caps, 1)
+            if cap:
+                try:
+                    v = float(by_id[cap[0]].get("state"))
+                    v = v / 1000 if (by_id[cap[0]].get("attributes") or {}).get("unit_of_measurement") == "Wh" else v
+                    if 0.5 <= v <= 200:
+                        cand["capacity_kwh"] = round(v, 2)
+                except (TypeError, ValueError):
+                    pass
             out.append(cand)
-        if e.startswith(("select.", "input_select.")):
+        if e.startswith("switch."):
+            cand["control_switch_entity"] = cand["control_switch_entity"] or e
+        elif e.startswith(("select.", "input_select.")):
             m = _map_modes(a.get("options") or [])
-            if m.get("auto") or m.get("manual"):
+            if (m.get("auto") or m.get("manual")) and not cand["mode_entity"]:
                 cand["mode_entity"], cand["mode_map"], cand["options"] = e, m, a.get("options") or []
+            elif m.get("charge") and m.get("idle") and not m.get("auto"):
+                cand["force_entity"], cand["force_map"] = e, {k: v for k, v in m.items() if k in ("charge", "idle")}
         elif "discharge" in t or "output_limit" in e or "ontla" in t:
             cand["discharge_entity"] = cand["discharge_entity"] or e
             cand["max_discharge_w"] = _max_w(a) or cand["max_discharge_w"]
@@ -731,12 +818,20 @@ def battery_candidates(states: list[dict]) -> list[dict]:
             cand["charge_entity"] = cand["charge_entity"] or e
             cand["max_charge_w"] = _max_w(a) or cand["max_charge_w"]
     for c in out:
+        brand = next((b for b in BATTERY_DEFAULTS if b in (c.get("brand") or "") or b in _text(c.get("soc_entity", ""), c.get("name", ""))), "")
+        cap, ch, dis, eff = BATTERY_DEFAULTS.get(brand, (5.0, 2500, 2500, 0.90))
+        c["capacity_kwh"] = c.get("capacity_kwh") or cap
+        c["max_charge_w"] = c.get("max_charge_w") or ch
+        c["max_discharge_w"] = c.get("max_discharge_w") or dis
+        c.setdefault("efficiency", eff)
+        if brand:
+            c["brand"] = brand
         if c.get("brand") == "sessy":           # Sessy: positief = ontladen (setpoint = batterij + net)
             c["setpoint_charge_positive"] = c["power_charge_positive"] = False
         if c.get("driver"):
             continue
         m = c.get("mode_map") or {}
-        if m.get("auto") and (m.get("save") or m.get("charge")):
+        if m.get("auto") and (c.get("force_entity") or m.get("save") or m.get("charge") or m.get("idle")):
             c["driver"] = "mode"
         elif c.get("setpoint_entity"):
             c["driver"] = "setpoint"
@@ -744,6 +839,8 @@ def battery_candidates(states: list[dict]) -> list[dict]:
             c["driver"] = "split"
         elif m.get("auto"):
             c["driver"] = "mode"
+        if c["driver"] == "mode" and c.get("charge_entity") and (c.get("force_entity") or m.get("charge")):
+            c["charge_power_entity"] = c["charge_entity"]
     return [{k: v for k, v in c.items() if k != "_key"} for c in out if c.get("driver")]
 
 

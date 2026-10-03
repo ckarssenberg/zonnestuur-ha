@@ -1,5 +1,5 @@
 name: Zonnestuur
-version: "0.23.0"
+version: "0.24.0"
 slug: zonnestuur
 description: Laat boiler, warmtepomp en auto draaien op je eigen zonnestroom
 url: https://github.com/ckarssenberg/zonnestuur-ha
