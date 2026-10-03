@@ -192,6 +192,7 @@
   .roi { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--good-soft); color: var(--ink); }
   .card { animation: rise .5s ease both; }
   @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .card.again { animation: none; }
   @media (prefers-reduced-motion: reduce) { .card { animation: none; } }
   .coach-grid { display: grid; grid-template-columns: minmax(250px, 340px) minmax(0, 1fr); gap: 26px; align-items: start; }
   .score { display: flex; gap: 18px; align-items: center; }
@@ -885,6 +886,12 @@ function renderDevices(s) {
   // Niet opnieuw tekenen terwijl je een keuzelijst of veld op een kaart gebruikt (anders klapt hij dicht)
   const act = document.activeElement;
   if (act && wrap.contains(act) && /^(SELECT|INPUT)$/.test(act.tagName)) return;
+  // Alleen opnieuw tekenen als er echt iets veranderd is, en dan zonder de 'verschijn'-animatie:
+  // anders lijkt het alsof de pagina elke paar seconden opnieuw laadt.
+  const sig = JSON.stringify([s.devices, s.batteries, s.has_panels, s.contract, Object.keys(PROGS).map((k) => [k, (PROGS[k].programs || []).length, PROGS[k].selected])]);
+  if (sig === wrap.dataset.sig) return;
+  const again = wrap.dataset.sig !== undefined;
+  wrap.dataset.sig = sig;
   const now = new Date(s.now);
   $("devices").closest("section").hidden = !s.devices.length && !(s.batteries || []).length;
   const openEv = new Set([...wrap.querySelectorAll("details.ev-edit[open]")].map((x) => x.closest("article").dataset.id));
@@ -956,9 +963,10 @@ function renderDevices(s) {
       });
       refresh();
     }));
+    if (again) el.classList.add("again");
     wrap.appendChild(el);
   }
-  for (const b of s.batteries || []) wrap.appendChild(batteryCard(s, b));
+  for (const b of s.batteries || []) { const bc = batteryCard(s, b); if (again) bc.classList.add("again"); wrap.appendChild(bc); }
 }
 
 // ---------- witgoed: programma kiezen ----------

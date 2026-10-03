@@ -1,5 +1,8 @@
 # Wijzigingen
 
+## 0.25.2 – Dashboard rustig
+- Opgelost: de apparaatkaarten werden elke 4 seconden opnieuw opgebouwd, met de verschijn-animatie erbij. Daardoor leek het dashboard steeds opnieuw te laden. Nu alleen bijwerken als er iets verandert, en zonder animatie.
+
 ## 0.25.1 – Geen haperingen meer, TwinDos-niveau
 - Opgelost: tussen 12:00 en het verschijnen van de prijzen van morgen haalde Zonnestuur elke 10 seconden de prijzen opnieuw op. Dat liet de regeling en het dashboard haperen. Nu hoogstens eens per kwartier, en altijd op de achtergrond.
 - Reageert Home Assistant even niet, dan wacht Zonnestuur niet meer per apparaat 5 seconden, maar probeert het na 30 seconden opnieuw.
