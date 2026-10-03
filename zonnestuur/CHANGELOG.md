@@ -1,5 +1,11 @@
 # Wijzigingen
 
+## 0.25.1 – Geen haperingen meer, TwinDos-niveau
+- Opgelost: tussen 12:00 en het verschijnen van de prijzen van morgen haalde Zonnestuur elke 10 seconden de prijzen opnieuw op. Dat liet de regeling en het dashboard haperen. Nu hoogstens eens per kwartier, en altijd op de achtergrond.
+- Reageert Home Assistant even niet, dan wacht Zonnestuur niet meer per apparaat 5 seconden, maar probeert het na 30 seconden opnieuw.
+- Het dashboard blijft altijd reageren: is een regelronde nog bezig, dan toont het de vorige stand. Keuzelijsten op een kaart klappen niet meer dicht tijdens het kiezen.
+- Wasmachine: het niveau van de TwinDos-reservoirs op de kaart, en een waarschuwing in de 'staat klaar'-melding als er een leeg is.
+
 ## 0.25.0 – Programma kiezen in Zonnestuur
 - Kies het wasprogramma op de kaart van de machine (Miele en Home Connect): Zonnestuur zet het programma op het goedkoopste moment en start hem. Alleen voor deze wasbeurt, of 'altijd dit programma'.
 - Programmanamen in het Nederlands; de meldingen noemen het programma.

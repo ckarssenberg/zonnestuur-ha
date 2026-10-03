@@ -1091,9 +1091,8 @@ class Engine:
 
             # 3. leren, prijzen en zonvoorspelling bijwerken, garantie-planning maken
             self.relearn(now)
-            self.prices.refresh(now)
+            self._refresh_external(now)
             self._read_live_price(now, mono)
-            self.forecast.refresh()
             cheapest = self._plan_guarantee(now)
             sunny = self._plan_sunny(now)
 
@@ -1184,6 +1183,32 @@ class Engine:
                 self.ledger.flush()
                 self._save_state()
                 self._last_save = mono
+
+    def _refresh_external(self, now: datetime) -> None:
+        """Prijzen en zonvoorspelling ophalen. Het eerste keer meteen; daarna op de achtergrond, zodat een trage
+        website de regeling en het dashboard nooit laat haperen."""
+        p_due, f_due = self.prices.due(now), self.forecast.due()
+        if not (p_due or f_due):
+            return
+        first = (p_due and not self.prices.slots and self.prices._last_fetch == 0) or \
+                (f_due and getattr(self.forecast, "_last_fetch", 1) == 0)
+        if first or getattr(self, "_testing", False):
+            self.prices.refresh(now)
+            self.forecast.refresh()
+            return
+        t = getattr(self, "_fetch_thread", None)
+        if t is not None and t.is_alive():
+            return
+        prices, forecast = self.prices, self.forecast
+
+        def _go():
+            try:
+                prices.refresh(now)
+                forecast.refresh()
+            except Exception as exc:            # nooit de regeling laten vallen
+                log.warning("Ophalen prijzen/zon: %s", exc)
+        self._fetch_thread = threading.Thread(target=_go, daemon=True, name="ophalen")
+        self._fetch_thread.start()
 
     def _grid_for_controller(self, now: datetime) -> Optional[float]:
         """Is de omvormer afgeknepen, dan ziet de meter geen overschot meer. Voor de apparaten tellen we het
@@ -1413,7 +1438,11 @@ class Engine:
             if armed and not s["armed"]:
                 s["since"], s["told"] = now, False
             if armed and not s["told"] and not quiet:
-                out.append((f"klaar:{d.id}:{s['since']:%Y%m%d%H%M}", "appliance", f"{d.name} staat klaar", self._start_text(d, now)))
+                msg = self._start_text(d, now)
+                empty = [t["name"] for t in getattr((self.switches or {}).get(d.id), "twindos", []) or [] if t["pct"] <= 5]
+                if empty:
+                    msg += f" Let op: {' en '.join(empty)} {'is' if len(empty) == 1 else 'zijn'} leeg; vul bij of doe wasmiddel in het bakje."
+                out.append((f"klaar:{d.id}:{s['since']:%Y%m%d%H%M}", "appliance", f"{d.name} staat klaar", msg))
                 s["told"] = True
             # 2. gestart door Zonnestuur
             if st.on and not s["on"] and s["armed"]:
@@ -1892,6 +1921,21 @@ class Engine:
                 st.run_seconds_today = float(v.get("run", 0))
 
     # ---- voor het dashboard ------------------------------------------------
+    def status_fast(self) -> dict:
+        """Status voor het dashboard zonder te wachten op een trage regelronde: is die nog bezig (bijv. omdat een
+        apparaat traag antwoordt), dan de vorige status, zodat het scherm nooit blijft hangen."""
+        if self.lock.acquire(timeout=1.5):
+            try:
+                st = self.status()
+            finally:
+                self.lock.release()
+            self._last_status = st
+            return st
+        prev = getattr(self, "_last_status", None)
+        if prev is None:
+            return self.status()
+        return dict(prev, stale=True)
+
     def status(self) -> dict:
         now = datetime.now(self.tz)
         with self.lock:
@@ -1914,6 +1958,7 @@ class Engine:
                                 "best_hours": self._best_hours(d.id, now),
                                 "program": self._program_label(d) if d.driver == "ha_start_button" else None,
                                 "program_keep": bool((d.params or {}).get("program_keep")),
+                                "twindos": list(getattr((self.switches or {}).get(d.id), "twindos", []) or []),
                                 "last_event": next(iter(self.events.view_device(d.id, int((now - timedelta(days=2)).timestamp()))), None),
                                 "ev": self.ev_view(d, now),
                                 **st.to_dict(), "month": per_dev.get(d.id, {"kwh": 0, "kwh_solar": 0, "eur_saved": 0})})
@@ -2292,7 +2337,7 @@ def make_handler(engine: Engine):
             if not self._authorized(q):
                 return self._json(401, {"error": "token vereist"})
             if url.path == "/api/status":
-                return self._json(200, engine.status())
+                return self._json(200, engine.status_fast())
             if url.path == "/api/today":
                 return self._json(200, engine.today())
             if url.path == "/api/history":

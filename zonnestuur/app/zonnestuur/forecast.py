@@ -31,10 +31,13 @@ class SolarForecast:
         self.base_load: Callable[[datetime], float] = lambda when: self.solar.base_load_w
         self.calibration: Callable[[datetime], float] = lambda when: 1.0
 
+    def due(self) -> bool:
+        return self.enabled and time.time() - self._last_fetch >= 3 * 3600
+
     def refresh(self, force: bool = False) -> None:
         if not self.enabled:
             return
-        if not force and time.time() - self._last_fetch < 3 * 3600:
+        if not force and not self.due():
             return
         s = self.solar
         url = (f"{s.forecast_url or OPEN_METEO_URL}?latitude={s.latitude}&longitude={s.longitude}"

@@ -135,6 +135,11 @@
   .prog-row label { display: flex; align-items: center; gap: 8px; }
   .prog-row select { font: inherit; font-size: 14px; font-weight: 600; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--card-line); background: var(--card-solid); color: var(--ink); max-width: 230px; }
   .prog-row .keep { font-size: 12.5px; }
+  .tw-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+  .tw { position: relative; overflow: hidden; font-size: 12.5px; color: var(--ink-2); padding: 5px 10px; border-radius: 999px; background: var(--chip); min-width: 120px; }
+  .tw i { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--net) 16%, transparent); }
+  .tw b, .tw { z-index: 1; } .tw b { position: relative; color: var(--ink); font-weight: 650; margin-right: 4px; }
+  .tw.low { color: var(--sun-ink); } .tw.empty { background: var(--warn-soft); color: var(--warn); }
   .ready-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13.5px; }
   .ready-row button { font: inherit; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--card-line); background: var(--card-solid); color: var(--ink); cursor: pointer; font-size: 17px; }
   .c-welcome .opts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -594,7 +599,9 @@ try { token = localStorage.getItem("zs_token") || ""; } catch (e) {}
 
 async function api(path, opts = {}) {
   opts.headers = Object.assign({ "X-Token": token }, opts.headers || {});
-  const r = await fetch(path, opts);
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 15000);   // nooit eindeloos wachten
+  let r;
+  try { r = await fetch(path, Object.assign({ signal: ctl.signal }, opts)); } finally { clearTimeout(tm); }
   if (r.status === 401) {
     token = prompt("Wachtwoord voor het dashboard") || "";
     try { localStorage.setItem("zs_token", token); } catch (e) {}
@@ -875,6 +882,9 @@ const READY_WORD = { boiler: "Warm water", ev: "Auto geladen", heatpump: "Klaar"
 
 function renderDevices(s) {
   const wrap = $("devices");
+  // Niet opnieuw tekenen terwijl je een keuzelijst of veld op een kaart gebruikt (anders klapt hij dicht)
+  const act = document.activeElement;
+  if (act && wrap.contains(act) && /^(SELECT|INPUT)$/.test(act.tagName)) return;
   const now = new Date(s.now);
   $("devices").closest("section").hidden = !s.devices.length && !(s.batteries || []).length;
   const openEv = new Set([...wrap.querySelectorAll("details.ev-edit[open]")].map((x) => x.closest("article").dataset.id));
@@ -961,6 +971,8 @@ function progRow(d) {
   return `<div class="prog-row"><label><span>Programma</span><select data-prog aria-label="Programma van ${esc(d.name)}">
       <option value="">${P && !P.programs.length ? "Kies op de machine (geen lijst beschikbaar)" : "Kies op de machine"}</option>${opts}</select></label>
     ${d.program || sel ? `<label class="keep"><input type="checkbox" data-keep ${d.program_keep ? "checked" : ""}> altijd dit programma</label>` : ""}</div>
+    ${(d.twindos || []).length ? `<div class="tw-row">${d.twindos.map((t) => `<span class="tw ${t.pct <= 5 ? "empty" : t.pct <= 15 ? "low" : ""}" title="${esc(t.name)}: ${t.pct}%">
+      <i style="width:${Math.max(0, Math.min(100, t.pct))}%"></i><b>${esc(t.name)}</b> ${t.pct <= 5 ? "leeg" : t.pct + "%"}</span>`).join("")}</div>` : ""}
     <div class="small muted" style="margin:-4px 0 10px">${d.program ? `Zonnestuur start de ${esc(d.name.toLowerCase())} met <b style="color:var(--ink)">${esc(d.program)}</b>${d.program_keep ? "" : " (alleen voor deze keer)"}. Vul de machine en zet start op afstand aan.`
       : "Vul de machine, zet start op afstand aan en kies hier of op de machine het programma."}</div>`;
 }
@@ -1753,9 +1765,13 @@ $("cmpBtn").addEventListener("click", loadCompare);
 
 function drawCharts() { drawCoach(); drawToday(); drawMonth(); drawPrices(); drawUsage(); drawInsight(); drawLanes(); drawLearned(); drawLog(); }
 
+let BUSY = false;
 async function refresh() {
+  if (BUSY) return;                          // vorige vraag loopt nog: niet opstapelen
+  BUSY = true;
   try { renderStatus(await api("api/status")); }
   catch (e) { $("clock").textContent = "Geen verbinding"; $("live").classList.add("off"); }
+  finally { BUSY = false; }
 }
 async function refreshCharts() {
   try {

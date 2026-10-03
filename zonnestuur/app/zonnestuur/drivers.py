@@ -140,41 +140,53 @@ class TasmotaSwitch:
 class HomeAssistant:
     """Verbinding met Home Assistant via de REST-API en een langlevend toegangstoken."""
 
+    _down_until: dict = {}                 # url -> monotone tijd: na een time-out even niet opnieuw wachten
+
     def __init__(self, url: str, token: str, timeout: float = 5.0):
         self.url, self.token, self.timeout = url.rstrip("/"), token, timeout
 
     def _h(self) -> dict:
         return {"Authorization": f"Bearer {self.token}"}
 
+    def _req(self, path: str, method: str = "GET", body: Optional[dict] = None, timeout: Optional[float] = None):
+        """Verzoek aan Home Assistant. Reageert HA niet (time-out), dan 30 seconden meteen een fout geven in plaats
+        van per apparaat 5 seconden te wachten: zo hapert de regeling niet als HA even druk is of herstart."""
+        until = HomeAssistant._down_until.get(self.url, 0.0)
+        if time.monotonic() < until:
+            raise DeviceError(f"{self.url}{path}: Home Assistant reageert even niet")
+        try:
+            return _request(f"{self.url}{path}", method, body, headers=self._h(), timeout=timeout or self.timeout)
+        except DeviceError as exc:
+            if "timed out" in str(exc) or "Connection refused" in str(exc):
+                HomeAssistant._down_until[self.url] = time.monotonic() + 30
+            raise
+
     def ping(self) -> bool:
         r = _request(f"{self.url}/api/", headers=self._h(), timeout=self.timeout)
         return "message" in r
 
     def states(self) -> list[dict]:
-        r = _request(f"{self.url}/api/states", headers=self._h(), timeout=self.timeout)
+        r = self._req("/api/states")
         return r if isinstance(r, list) else []
 
     def state(self, entity_id: str) -> dict:
-        return _request(f"{self.url}/api/states/{entity_id}", headers=self._h(), timeout=self.timeout)
+        return self._req(f"/api/states/{entity_id}")
 
     def call(self, domain: str, service: str, data: dict) -> None:
-        _request(f"{self.url}/api/services/{domain}/{service}", "POST", data, headers=self._h(), timeout=self.timeout)
+        self._req(f"/api/services/{domain}/{service}", "POST", data)
 
     def call_response(self, domain: str, service: str, data: dict) -> dict:
         """Dienst met antwoord (bijv. miele.get_programs)."""
-        r = _request(f"{self.url}/api/services/{domain}/{service}?return_response", "POST", data, headers=self._h(),
-                     timeout=max(self.timeout, 15))
+        r = self._req(f"/api/services/{domain}/{service}?return_response", "POST", data, timeout=max(self.timeout, 15))
         return (r or {}).get("service_response") or {}
 
     def template(self, tpl: str):
         """Een Home Assistant-sjabloon uitrekenen (als JSON)."""
-        return _request(f"{self.url}/api/template", "POST", {"template": "{{ (" + tpl + ") | tojson }}"},
-                        headers=self._h(), timeout=self.timeout)
+        return self._req("/api/template", "POST", {"template": "{{ (" + tpl + ") | tojson }}"})
 
     def set_state(self, entity_id: str, state, attributes: dict) -> None:
         """Eigen sensor in Home Assistant zetten (verdwijnt bij een herstart van HA; Zonnestuur zet hem opnieuw)."""
-        _request(f"{self.url}/api/states/{entity_id}", "POST", {"state": state, "attributes": attributes},
-                 headers=self._h(), timeout=self.timeout)
+        self._req(f"/api/states/{entity_id}", "POST", {"state": state, "attributes": attributes})
 
     def notify_services(self) -> list[str]:
         """Alle notify-diensten, bijvoorbeeld notify.mobile_app_telefoon (voor meldingen op je telefoon)."""
@@ -334,6 +346,33 @@ class HAStartButton:
         self.program_id, self.program_entity = program_id, program_entity
         self.started_at: Optional[float] = None
         self._device_id: Optional[str] = None
+        self.twindos: list = []                  # [{'name': 'TwinDos 1', 'pct': 44}] (Miele automatisch doseren)
+        self._tw_entities: Optional[list] = None
+        self._tw_read = -1e9
+
+    def _read_twindos(self) -> None:
+        """Niveau van de wasmiddelreservoirs (Miele TwinDos), eens per 5 minuten."""
+        if time.monotonic() - self._tw_read < 300:
+            return
+        self._tw_read = time.monotonic()
+        try:
+            if self._tw_entities is None:
+                stem = self.button.split(".", 1)[-1].rsplit("_", 1)[0]
+                self._tw_entities = self.ha.template(
+                    f"states.sensor | map(attribute='entity_id') | select('search', '{stem}_twindos_[0-9]+_level') | list")
+                if not isinstance(self._tw_entities, list):
+                    self._tw_entities = []
+            out = []
+            for e in self._tw_entities:
+                try:
+                    v = float(self.ha.state(e).get("state"))
+                except (TypeError, ValueError):
+                    continue
+                n = "".join(ch for ch in e.split("twindos_", 1)[-1].split("_")[0] if ch.isdigit()) or "1"
+                out.append({"name": f"TwinDos {n}", "pct": round(v)})
+            self.twindos = out
+        except Exception:                          # niveau is extra informatie: nooit de sturing laten falen
+            pass
 
     def _button_ok(self) -> bool:
         return self.ha.state(self.button).get("state") not in ("unavailable", "unknown", None)
@@ -370,6 +409,7 @@ class HAStartButton:
                 if p.get("program_id") is not None]
 
     def status(self) -> SwitchStatus:
+        self._read_twindos()
         armed = self._armed()
         power = self.ha.number(self.power_entity) if self.power_entity else None
         running = self.started_at is not None and time.monotonic() - self.started_at < self.RUN_HOURS * 3600 and not armed

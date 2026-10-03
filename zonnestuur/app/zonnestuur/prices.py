@@ -84,10 +84,24 @@ class PriceProvider:
                 out.append((max(s.start, start), min(s.end, end), self.import_price(s.start, live=False)))
         return out
 
+    def due(self, now: datetime) -> bool:
+        """Moeten de prijzen opnieuw worden opgehaald?
+
+        Elk uur, of eerder als de komende 12 uur nog niet bekend zijn. De prijzen van morgen verschijnen pas
+        in de loop van de middag: dan hoogstens eens per kwartier opnieuw proberen (niet elke regelronde)."""
+        if not self.enabled:
+            return False
+        age = time.time() - self._last_fetch
+        if age >= 3600:
+            return True
+        if not self.slots:
+            return age >= 600
+        return age >= 900 and not self._covers(now + timedelta(hours=12))
+
     def refresh(self, now: datetime, force: bool = False) -> None:
         if not self.enabled:
             return
-        if not force and time.time() - self._last_fetch < 3600 and self._covers(now + timedelta(hours=12)):
+        if not force and not self.due(now):
             return
         day_start = now.astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=2)
         day_end = day_start + timedelta(days=2, hours=2)
@@ -106,6 +120,8 @@ class PriceProvider:
         except Exception as exc:
             log.warning("Prijzen ophalen mislukt, gebruik vaste waarden: %s", exc)
             self._last_fetch = time.time() - 3000  # over 10 minuten opnieuw proberen
+            if not self.slots:
+                self._last_fetch = time.time()     # nog niets: over 10 minuten (due: age >= 600)
 
     # ---- intern ---------------------------------------------------------
     def _slot_at(self, when: datetime) -> Optional[PriceSlot]:
