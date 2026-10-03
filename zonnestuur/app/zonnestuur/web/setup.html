@@ -588,6 +588,18 @@ function contractHtml(c) {
       <div class="field"><label for="cp_gm">Netbeheerkosten per maand</label><input id="cp_gm" type="number" step="0.01" min="0" max="200" value="${c.grid_monthly || ""}" placeholder="bijv. 40"><span class="hint">Staat op je jaarafrekening; in 2027 ± 20% hoger dan in 2026.</span></div>
       <div class="field"><label for="cp_tc">Vermindering energiebelasting per jaar</label><input id="cp_tc" type="number" step="0.01" min="0" max="2000" value="${c.tax_credit_year ?? ""}" placeholder="automatisch: € ${String(SUP.tax_credit_2027 || 628.69).replace(".", ",")}"><span class="hint">Leeg = automatisch (Belastingplan 2027). Krijg je hem niet (bijv. geen woonadres)? Vul 0 in.</span></div>
     </div></details>
+    <details style="margin-top:10px" ${c.return_cost_mode && c.return_cost_mode !== "per_kwh" || (c.grid_tou || []).length ? "open" : ""}><summary>Terugleverkosten en nettarief (2027–2028)</summary><div class="row" style="margin-top:12px">
+      <div class="field"><label for="cp_rm">Terugleverkosten</label><select id="cp_rm">
+        <option value="per_kwh" ${(c.return_cost_mode || "per_kwh") === "per_kwh" ? "selected" : ""}>Per kWh</option>
+        <option value="staffel" ${c.return_cost_mode === "staffel" ? "selected" : ""}>Staffel per jaar (vast bedrag per maand)</option>
+        <option value="vast" ${c.return_cost_mode === "vast" ? "selected" : ""}>Vast bedrag, hoe veel je ook teruglevert</option></select>
+        <span class="hint">Bij een staffel telt elke kWh die je in de buurt van de volgende grens teruglevert extra; Zonnestuur rekent daarmee.</span></div>
+      <div class="field"><label for="cp_rt">Staffel (kWh per jaar: € per maand)</label><input id="cp_rt" value="${esc((c.return_cost_tiers || []).map(([a, b]) => `${a}: ${String(b).replace(".", ",")}`).join("; "))}" placeholder="0: 0; 1000: 5; 2500: 12,50"></div>
+      <div class="field"><label for="cp_ey">Teruglevering per jaar (kWh)</label><input id="cp_ey" type="number" min="0" step="100" value="${c.export_kwh_year || ""}" placeholder="automatisch"><span class="hint">Leeg = Zonnestuur schat het uit je meter.</span></div>
+    </div><div class="row">
+      <div class="field"><label for="cp_tou">Nettarief per tijdvak (€ per kWh)</label><input id="cp_tou" value="${esc((c.grid_tou || []).map((b) => `${b.from}-${b.to} ${String(b.eur_kwh).replace(".", ",")}`).join("; "))}" placeholder="07:00-11:00 0,03; 17:00-21:00 0,05"><span class="hint">Het nieuwe nettarief met dure en goedkope tijdvakken (verwacht 2028). De planning ontwijkt dure tijdvakken.</span></div>
+      <div class="field" style="flex:0 1 200px"><label for="cp_tf">Geldt vanaf</label><input id="cp_tf" type="date" value="${esc(c.grid_tou_from || "2028-01-01")}"></div>
+    </div></details>
     ${ps.length ? `<div class="field" style="margin-top:12px"><label for="cp_pe">Actuele prijs uit Home Assistant (optioneel)</label><select id="cp_pe">
       <option value="">Niet gebruiken</option>${ps.map((x) => `<option value="${esc(x.entity)}" ${x.entity === c.price_entity ? "selected" : ""}>${esc(x.name)} (nu ${esc(x.state)} ${esc(x.unit)})</option>`).join("")}</select>
       <span class="hint">De prijs die je leverancier zelf doorgeeft, bijvoorbeeld via de Tibber-koppeling. Dan klopt de besparing precies.</span></div>` : ""}`;
@@ -596,6 +608,15 @@ function readContract(c) {
   if ($("cp_ip")) { c.import_price = Number($("cp_ip").value) || 0.29; c.feed_in_price = Number($("cp_fp").value) || 0; c.return_cost = Number($("cp_rc").value) || 0; }
   if ($("cp_sm")) { c.supplier_markup = Number($("cp_sm").value) || 0; c.feed_in_adjust = Number($("cp_fa").value); c.energy_tax = $("cp_et").value === "" ? null : Number($("cp_et").value); }
   if ($("cp_pe")) c.price_entity = $("cp_pe").value;
+  if ($("cp_rm")) {
+    const n = (x) => Number(String(x).trim().replace(",", "."));
+    c.return_cost_mode = $("cp_rm").value;
+    c.return_cost_tiers = $("cp_rt").value.split(";").map((x) => x.split(":")).filter((x) => x.length === 2 && !isNaN(n(x[0])) && !isNaN(n(x[1]))).map(([a, b]) => [n(a), n(b)]);
+    c.export_kwh_year = Number($("cp_ey").value) || 0;
+    c.grid_tou = $("cp_tou").value.split(";").map((x) => x.trim().match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s+([\d.,]+)$/)).filter(Boolean)
+      .map((m) => ({ from: m[1].padStart(5, "0"), to: m[2].padStart(5, "0"), eur_kwh: n(m[3]) }));
+    c.grid_tou_from = $("cp_tf").value || "2028-01-01";
+  }
   if ($("cp_fm")) { c.fixed_monthly = Number($("cp_fm").value) || 0; c.grid_monthly = Number($("cp_gm").value) || 0; c.tax_credit_year = $("cp_tc").value === "" ? null : Number($("cp_tc").value); }
 }
 function bindContract(c, rerender) {
@@ -844,6 +865,8 @@ async function settings() {
     <section class="card" id="goalCard"><h2 class="t">Jouw doel</h2>
       <p class="small muted" style="margin-top:-4px">Een doel werkt beter dan vergelijken met de buren. Het doel telt het seizoen niet mee: het is altijd "zoveel beter dan zonder Zonnestuur".</p>
       <div class="row"><div class="field"><label for="g_mot">Wat vind je het belangrijkst?</label><select id="g_mot">${[["", "Kies…"], ["geld", "Geld besparen"], ["milieu", "Zo veel mogelijk eigen groene stroom"], ["allebei", "Allebei"]].map(([v, l]) => `<option value="${v}" ${CFG.motivation === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div class="field"><label for="g_prof">Sturing</label><select id="g_prof">${[["", "Zelfconsumptie: zo veel mogelijk eigen zon"], ["prijs", "Prijs: zo goedkoop mogelijk, ook van het net"], ["netvriendelijk", "Netvriendelijk: niet in de avondpiek"]].map(([v, l]) => `<option value="${v}" ${(CFG.profile || "") === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+          <span class="hint">Netvriendelijk helpt het net (minder pieken tussen 17 en 21 uur) en scheelt straks nettarief.</span></div>
         <div class="field"><label for="g_type">Doel</label><select id="g_type"><option value="pct" ${(CFG.goal?.type || "pct") === "pct" ? "selected" : ""}>Procentpunten meer zelf gebruikt</option><option value="eur" ${CFG.goal?.type === "eur" ? "selected" : ""}>Euro's per maand</option></select></div>
         <div class="field" style="flex:0 1 150px"><label for="g_pp">Punten boven zonder</label><input id="g_pp" type="number" min="1" max="40" value="${CFG.goal?.extra_pp || 10}"></div>
         <div class="field" style="flex:0 1 150px"><label for="g_eur">€ per maand</label><input id="g_eur" type="number" min="1" max="500" value="${CFG.goal?.eur_month || 25}"></div></div>
@@ -1108,6 +1131,7 @@ async function settings() {
     }
     next.notify = readNotify();
     next.motivation = $("g_mot").value;
+    next.profile = $("g_prof").value;
     next.goal = { type: $("g_type").value, extra_pp: Number($("g_pp").value) || 10, eur_month: Number($("g_eur").value) || 25 };
     const tdev = [...document.querySelectorAll("#t_devs button.on")].map((b) => b.dataset.id);
     next.trial = { enabled: $("t_on").checked, every: Number($("t_every").value) || 7, devices: tdev.length === CFG.devices.length ? [] : tdev };
@@ -1140,12 +1164,21 @@ async function editDevice(i) {
     </div>
     ${d.driver === "ha_setpoint" ? `<div class="row">
       <div class="field"><label for="e_tn">Normale temperatuur (°C)</label><input id="e_tn" type="number" step="0.5" value="${P.normal_temp}"></div>
-      <div class="field"><label for="e_tb">Temperatuur bij zon of goedkope stroom (°C)</label><input id="e_tb" type="number" step="0.5" value="${P.boost_temp}"></div></div>` : ""}
+      <div class="field"><label for="e_tb">Temperatuur bij zon of goedkope stroom (°C)</label><input id="e_tb" type="number" step="0.5" value="${P.boost_temp}"></div></div>
+    <div class="row">
+      <div class="field"><label for="e_eco">Lager tijdens dure stroom (°C)</label><input id="e_eco" type="number" step="0.5" min="0" max="3" value="${P.eco_delta || 0}"><span class="hint">Bijv. 1: in de duurste uren van de dag staat hij zoveel lager. 0 = uit.</span></div>
+      <div class="field"><label class="check"><input type="checkbox" id="e_leg" ${P.legionella ? "checked" : ""}> Wekelijks heet (legionella)</label>
+        <input id="e_legt" type="number" step="1" min="55" max="70" value="${P.legionella_temp || 60}" aria-label="Temperatuur legionellaronde"><span class="hint">Eén keer per week naar deze temperatuur, op het zonnigste of goedkoopste uur. Doet je warmtepomp dit zelf? Laat het uit.</span></div></div>` : ""}
     ${d.driver === "ha_current" ? `<div class="row">
       <div class="field"><label for="e_ph">Fasen</label><select id="e_ph"><option ${P.phases == 1 ? "selected" : ""}>1</option><option ${P.phases == 3 ? "selected" : ""}>3</option></select></div>
       <div class="field"><label for="e_mina">Minimaal (A)</label><input id="e_mina" type="number" min="6" max="32" value="${P.min_a}"></div>
       <div class="field"><label for="e_maxa">Maximaal (A)</label><input id="e_maxa" type="number" min="6" max="32" value="${P.max_a}"></div>
-      <div class="field"><label for="e_int">Niet vaker bijsturen dan (min)</label><input id="e_int" type="number" min="0" max="60" value="${Math.round((P.min_interval_s || 0) / 60)}"></div></div>` : ""}
+      <div class="field"><label for="e_int">Niet vaker bijsturen dan (min)</label><input id="e_int" type="number" min="0" max="60" value="${Math.round((P.min_interval_s || 0) / 60)}"></div></div>
+    ${d.kind === "ev" ? `<div class="row">
+      <div class="field"><label for="e_ss">Minimaal aandeel zon (%)</label><input id="e_ss" type="number" min="0" max="100" step="10" value="${P.solar_share ?? 100}"><span class="hint">100 = alleen op zon. 50 = mag ook laden als de helft uit het net komt (start eerder bij wisselend weer).</span></div>
+      <div class="field"><label for="e_pse">Fasewissel in Home Assistant (optioneel)</label><input id="e_pse" value="${esc(P.phase_switch_entity || "")}" placeholder="bijv. select.laadpaal_fasen"><span class="hint">Bij weinig zon laadt hij op 1 fase (vanaf ± 1,4 kW), bij veel zon op 3.</span></div>
+      <div class="field"><label for="e_p1">Optie voor 1 fase</label><input id="e_p1" value="${esc(P.phase_1 || "")}" placeholder="bijv. 1"></div>
+      <div class="field"><label for="e_p3">Optie voor 3 fasen</label><input id="e_p3" value="${esc(P.phase_3 || "")}" placeholder="bijv. 3"></div></div>` : ""}` : ""}
 
     ${oneShot ? "" : `<h3 class="sub-t">${d.kind === "ev" ? "Vertrektijd" : "Klaar om"}</h3>
     <p class="hint" style="margin:-4px 0 8px">Op deze tijd moet ${d.kind === "ev" ? "de auto geladen" : d.kind === "boiler" ? "het water warm" : "het apparaat klaar"} zijn. Lukt dat niet met zon of goedkope uren, dan haalt Zonnestuur het laatste stuk van het net.</p>
@@ -1213,6 +1246,9 @@ async function editDevice(i) {
     if ($("e_nb").value) n.params.not_before = $("e_nb").value; else delete n.params.not_before;
     if ($("e_fs")) { n.params = n.params || {}; n.params.failsafe = $("e_fs").checked; n.params.failsafe_window = $("e_fsw").value; }
     if ($("e_tn")) { n.params.normal_temp = num("e_tn", n.params.normal_temp); n.params.boost_temp = num("e_tb", n.params.boost_temp); }
+    if ($("e_eco")) { n.params.eco_delta = Math.max(0, Math.min(3, num("e_eco", 0))); n.params.legionella = $("e_leg").checked; n.params.legionella_temp = num("e_legt", 60); }
+    if ($("e_ss")) { n.params.solar_share = Math.max(0, Math.min(100, num("e_ss", 100)));
+      for (const [id, k] of [["e_pse", "phase_switch_entity"], ["e_p1", "phase_1"], ["e_p3", "phase_3"]]) { const v = $(id).value.trim(); if (v) n.params[k] = v; else delete n.params[k]; } }
     if ($("e_ph")) {
       Object.assign(n.params, { phases: Number($("e_ph").value), min_a: Math.max(6, num("e_mina", 6)), max_a: Math.min(32, num("e_maxa", 16)),
         min_interval_s: Math.max(0, num("e_int", 0)) * 60 });

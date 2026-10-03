@@ -238,3 +238,58 @@ def morning_message(window: Optional[dict]) -> Optional[tuple[str, str]]:
         return None
     return ("Vandaag zon over", f"Tussen {window['from']} en {window['to']} verwacht Zonnestuur ± {_nl(window['kwh'])} kWh over. "
             "Tijd voor de was, de vaatwasser of de auto: dan gebruik je je eigen stroom.")
+
+
+# ------------------------------------------------------------------------------------------ weer: vandaag of later?
+WEATHER_WORD = {0: "zonnig", 1: "vrijwel onbewolkt", 2: "half bewolkt", 3: "bewolkt", 45: "mist", 48: "mist",
+                51: "motregen", 53: "motregen", 55: "motregen", 61: "regen", 63: "regen", 65: "zware regen",
+                71: "sneeuw", 73: "sneeuw", 75: "sneeuw", 80: "buien", 81: "buien", 82: "zware buien", 95: "onweer"}
+
+
+def weather_word(code) -> str:
+    try:
+        return WEATHER_WORD.get(int(code), "wisselvallig")
+    except (TypeError, ValueError):
+        return ""
+
+
+def weather_tip(now: datetime, daily: dict, has_panels: bool, today_left_kwh: Optional[float],
+                window: Optional[dict], to_do: list, has_ev: bool,
+                cheap_today: Optional[tuple] = None, cheap_tomorrow: Optional[tuple] = None) -> Optional[dict]:
+    """Tip als vandaag duidelijk beter is dan de komende dagen: 'doe vandaag de was, laad vandaag de auto'.
+
+    Met zonnepanelen op de weersverwachting (zon vandaag tegenover morgen en overmorgen), zonder op de prijzen
+    (het goedkoopste blok van vandaag tegenover dat van morgen). to_do: wat je zelf aanzet (wasmachine, droger…)."""
+    things = list(to_do)
+    if has_ev:
+        things.append("laat de auto vandaag laden")
+    if not things:
+        things = ["doe vandaag de was"]
+    act = ", ".join(things[:-1]) + (" en " if len(things) > 1 else "") + things[-1]
+    if has_panels and daily:
+        d0 = now.date()
+        days = [daily.get((d0 + timedelta(days=i)).isoformat()) for i in range(3)]
+        if days[0] and days[1] and today_left_kwh is not None and today_left_kwh >= 3:
+            later = [d for d in days[1:] if d]
+            best_later = max(d["kwh"] for d in later)
+            if best_later <= 0.5 * max(today_left_kwh, 0.1) and (today_left_kwh - best_later) >= 2.5:
+                desc = []
+                for name, d in zip(("morgen", "overmorgen"), days[1:]):
+                    if d:
+                        w = weather_word(d.get("code"))
+                        rain = f", {d['rain_mm']:.0f} mm regen" if (d.get("rain_mm") or 0) >= 1 else ""
+                        desc.append(f"{name} {w} (± {d['kwh']:.0f} kWh zon{rain})")
+                when = f" tussen {window['from']} en {window['to']}" if window and not window.get("tomorrow") else ""
+                return {"id": "weer-vandaag", "group": "nu", "title": "Vandaag nog zon, daarna minder",
+                        "text": f"Vandaag verwacht Zonnestuur nog ± {today_left_kwh:.0f} kWh zon; " + " en ".join(desc) + ". "
+                                f"Gebruik de zon nu: {act}{when}.",
+                        "kind": "weer", "kwh_today": round(today_left_kwh, 1), "kwh_later": round(best_later, 1),
+                        "eur_year": None, "steps": []}
+    if not has_panels and cheap_today and cheap_tomorrow:
+        (t_from, t_price), (m_from, m_price) = cheap_today, cheap_tomorrow
+        if m_price - t_price >= 0.03:
+            return {"id": "prijs-vandaag", "group": "nu", "title": "Vandaag goedkoper dan morgen",
+                    "text": f"Het goedkoopste blok van vandaag (vanaf {t_from}, gemiddeld € {t_price:.2f}) is "
+                            f"{100 * (m_price - t_price):.0f} ct per kWh goedkoper dan het beste van morgen. Plan het vandaag: {act}.",
+                    "kind": "prijs", "eur_year": None, "steps": []}
+    return None

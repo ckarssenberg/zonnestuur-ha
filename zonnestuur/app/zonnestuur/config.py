@@ -54,7 +54,7 @@ class DeviceConfig:
         p = self.params or {}
         if self.driver == "ha_power":
             return float(p.get("step_w", 50))
-        return float(p.get("volts", 230)) * int(p.get("phases", 1))
+        return float(p.get("volts", 230)) * int(p.get("phases_active") or p.get("phases", 1))
 
     @property
     def min_w(self) -> float:
@@ -69,10 +69,23 @@ class DeviceConfig:
         return float((self.params or {}).get("max_a", 16)) * self.w_per_step if self.modulating else self.power_w
 
     @property
+    def solar_share(self) -> float:
+        """Deel van het minimale laadvermogen dat uit zon moet komen (1 = alleen zon; 0,5 = de helft mag van het net)."""
+        try:
+            return max(0.0, min(1.0, float((self.params or {}).get("solar_share", getattr(self, "profile_share", 100))) / 100))
+        except (TypeError, ValueError):
+            return 1.0
+
+    @property
+    def grid_allowance_w(self) -> float:
+        """Zoveel mag een traploos apparaat op zon van het net bijnemen (zon-aandeel onder 100%)."""
+        return (1 - self.solar_share) * self.min_w if self.modulating else 0.0
+
+    @property
     def start_threshold_w(self) -> float:
         if self.start_surplus_w is not None:
             return self.start_surplus_w
-        return self.min_w if self.modulating else 0.9 * self.power_w
+        return self.min_w * self.solar_share if self.modulating else 0.9 * self.power_w
 
 
 @dataclass
@@ -92,6 +105,13 @@ class ContractConfig:
     fixed_monthly: float = 0.0          # vaste leveringskosten €/maand (incl. btw)
     grid_monthly: float = 0.0           # netbeheerkosten €/maand (incl. btw)
     tax_credit_year: Optional[float] = None  # vermindering energiebelasting €/jaar incl. btw; leeg = automatisch
+    # Terugleverkosten vanaf 2027: per kWh (return_cost), een staffel per jaarteruglevering, of een vast bedrag
+    return_cost_mode: str = "per_kwh"   # per_kwh | staffel | vast
+    return_cost_tiers: list = field(default_factory=list)   # [[vanaf kWh per jaar, € per maand], ...]
+    export_kwh_year: float = 0.0        # verwachte teruglevering per jaar (0 = Zonnestuur schat zelf)
+    # Tijdsafhankelijk nettarief (verwacht vanaf 2028): [{"from": "07:00", "to": "11:00", "eur_kwh": 0.03}, ...]
+    grid_tou: list = field(default_factory=list)
+    grid_tou_from: str = "2028-01-01"
 
 
 @dataclass
@@ -136,6 +156,7 @@ class Config:
     trial: dict = field(default_factory=dict)              # meetdagen: {"enabled": bool, "every": 7, "devices": []}
     goal: dict = field(default_factory=dict)               # {"type": "pct"|"eur", "extra_pp": 10, "eur_month": 25}
     motivation: str = ""                                   # "geld" | "milieu" | "allebei" (bepaalt het hoofdcijfer)
+    profile: str = ""                                      # sturing: "" (zelfconsumptie) | "prijs" | "netvriendelijk"
     kiosk: dict = field(default_factory=dict)              # {"ha_sensors": true}
 
     @property

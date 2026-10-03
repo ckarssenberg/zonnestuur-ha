@@ -86,8 +86,8 @@ COOLDOWN = {"surplus": timedelta(hours=20), "negative_tomorrow": timedelta(hours
             "expensive_evening": timedelta(hours=20), "offline": timedelta(hours=12), "meter": timedelta(hours=6),
             "inverter": timedelta(hours=6), "morning": timedelta(hours=20), "fail": timedelta(hours=6),
             "guarantee": timedelta(hours=6), "resolved": timedelta(0), "week": timedelta(days=6),
-            "appliance": timedelta(0)}
-TIP_KINDS = ("surplus", "negative_tomorrow", "sunny_tomorrow", "expensive_evening", "morning")
+            "appliance": timedelta(0), "weather_today": timedelta(hours=20)}
+TIP_KINDS = ("surplus", "negative_tomorrow", "sunny_tomorrow", "expensive_evening", "morning", "weather_today")
 ALERT_KINDS = ("offline", "meter", "fail", "guarantee", "resolved")
 
 
@@ -165,7 +165,8 @@ class Notifier:
     def evaluate(self, now: datetime, mono: float, *, grid_w: Optional[float], meter_online: bool,
                  has_panels: bool, devices: list, states: dict, tomorrow_negative: Optional[tuple],
                  tomorrow_sunny: Optional[dict] = None, evening_expensive: Optional[tuple] = None,
-                 guarantee_risk: Optional[list] = None, value_kwh: float = 0.22) -> list[tuple]:
+                 guarantee_risk: Optional[list] = None, value_kwh: float = 0.22,
+                 today_tip: Optional[dict] = None) -> list[tuple]:
         """Geeft [(sleutel, soort, titel, tekst)] terug van meldingen die nu verstuurd moeten worden."""
         out: list[tuple] = []
         # ---- storingen
@@ -204,6 +205,10 @@ class Notifier:
                     tip = (key, "negative_tomorrow", "Morgen is stroom gratis of negatief",
                            f"Tussen {s:%H:%M} en {e:%H:%M} krijg je geld toe voor stroom (laagste {low * 100:.0f} ct/kWh). "
                            f"Zonnestuur plant je apparaten daar al op. Plan je was of vaat in dat venster: ≈ € {gain:.2f} voordeel per wasbeurt.")
+            if tip is None and today_tip and 8 <= now.hour < 12:
+                key = f"weer:{now:%Y-%m-%d}"
+                if self._may(key, "weather_today", now):
+                    tip = (key, "weather_today", today_tip["title"], today_tip["text"])
             if tip is None and evening_expensive and now.hour >= 15:
                 s, e, p = evening_expensive
                 key = f"duur:{s:%Y-%m-%d}"

@@ -32,6 +32,16 @@ in plaats van die stroom voor bijna niets terug te leveren.
 - Met **Nu vol laden** laadt hij meteen tot je doel. Met een **maximumprijs** laadt hij nooit duurder dan dat,
   ook niet voor de vertrektijd. Alleen onder je minimum laadt hij altijd.
 
+## Weer en tips
+
+- Is vandaag duidelijk zonniger dan morgen en overmorgen, dan krijg je 's ochtends een tip: zet vandaag de was aan,
+  laat de auto vandaag laden. Zonder panelen krijg je een tip als vandaag goedkoper is dan morgen.
+- **Instellingen > Jouw doel > Sturing**: *zelfconsumptie* (zo veel mogelijk eigen zon), *prijs* (de auto mag ook
+  laden als 30% uit het net komt) of *netvriendelijk* (niets inplannen in de avondpiek of in dure nettarief-tijdvakken).
+- Per apparaat (tik op het apparaat bij Instellingen): bij een laadpaal het minimale aandeel zon en een fasewissel;
+  bij warm water en verwarming een wekelijkse legionellaronde en hoeveel graden lager tijdens dure stroom.
+- **Instellingen > Contract > Terugleverkosten en nettarief**: per kWh, staffel of vast bedrag, en het nettarief per tijdvak.
+
 ## Waarom deed Zonnestuur dat?
 
 - Het **Logboek** op het dashboard toont bij elke schakeling waarom (zon over, goedkoop uur, klaar-tijd, jij) en,

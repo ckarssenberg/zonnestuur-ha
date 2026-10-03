@@ -44,6 +44,7 @@ class HouseModel:
     pv_factor: Optional[list] = None                   # per uur van de dag: echte opwek / voorspelling
     pv_factor_all: Optional[float] = None
     pv_days: int = 0
+    pv_p10: Optional[float] = None                     # voorzichtige verhouding (10% slechtste uren t.o.v. de mediaan)
     device_run_min: dict = field(default_factory=dict)  # {id: {"min": minuten per dag, "kwh": kWh per dag, "days": n}}
 
     def base_w(self, when: datetime) -> float:
@@ -81,6 +82,7 @@ class HouseModel:
                 "day_kwh": {k: round(sum(x or 0 for x in v) / 1000, 1) for k, v in self.profile.items() if v},
                 "pv_factor": [None if v is None else round(v, 2) for v in self.pv_factor] if self.pv_factor else None,
                 "pv_factor_all": None if self.pv_factor_all is None else round(self.pv_factor_all, 2), "pv_days": self.pv_days,
+                "pv_p10": None if self.pv_p10 is None else round(self.pv_p10, 2),
                 "device_run_min": {k: {"min": round(v["min"]), "kwh": round(v["kwh"], 1), "days": v["days"]}
                                    for k, v in self.device_run_min.items()}}
 
@@ -131,6 +133,12 @@ def learn(rows: list[dict], tz, has_panels: bool, fallback_w: float, device_days
             fc_h[h] += r["fc_kwh"]
             pv_days.add(datetime.fromtimestamp(r["ts"], tz).date())
     m.pv_days = len(pv_days)
+    ratios = [(r.get("pv_kwh") or 0.0) / r["fc_kwh"] for r in rows
+              if (r.get("pv_src") or 0) == 2 and (r.get("fc_kwh") or 0) > 0.1]
+    if len(ratios) >= 40:
+        med = median(ratios)
+        if med > 0.05:
+            m.pv_p10 = max(0.2, min(1.0, _q(ratios, 0.1) / med))
     if m.pv_days >= 5 and sum(fc_h) > 2:
         clamp = lambda x: max(0.2, min(1.6, x))  # noqa: E731
         m.pv_factor_all = clamp(sum(pv_h) / sum(fc_h))

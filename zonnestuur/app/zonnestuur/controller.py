@@ -83,6 +83,8 @@ class Context:
     price_now: Optional[float] = None                             # huidige afnameprijs €/kWh (dynamisch contract)
     baseline: set = field(default_factory=set)                    # meetdag: deze apparaten vandaag niet sturen
     ev: dict = field(default_factory=dict)                        # laadpaal-id -> auto, percentage, doel, minimum, modus
+    start_at: dict = field(default_factory=dict)                  # witgoed: goedkoopste kwartier binnen het geplande uur
+    legionella: set = field(default_factory=set)                  # warm water: nu de wekelijkse ronde naar 60 °C
 
 
 class Controller:
@@ -190,7 +192,8 @@ class Controller:
             target = d.max_w
         else:
             current = st.power_w if st.power_w > 0 else (st.setpoint_w or 0.0)   # net gestart: nog niets
-            target = current - ctx.grid_w - 100          # 100 W marge zodat we net niet van het net halen
+            # 100 W marge zodat we net niet van het net halen; met een zon-aandeel onder 100% mag er wat bij
+            target = current - ctx.grid_w - 100 + d.grid_allowance_w
         step = d.w_per_step
         target = max(d.min_w, min(d.max_w, math.floor(target / step) * step))
         interval = float((d.params or {}).get("min_interval_s", 30))
@@ -239,6 +242,8 @@ class Controller:
             # thermostaat of lader beslist); warmtepomp en thermostaat: geen extra opwarmen.
             plain_on = d.driver not in ("ha_setpoint", "homey_setpoint", "sg_ready") and d.kind != "heatpump"
             return plain_on, "meetdag: zonder sturing"
+        if d.id in ctx.legionella:
+            return True, "legionella: wekelijks één keer heet, op het goedkoopste moment"
         e = ctx.ev.get(d.id)
         if e:
             if e.get("below_min"):
@@ -255,6 +260,9 @@ class Controller:
         hour = ctx.now.replace(minute=0, second=0, microsecond=0)
         cheap = ctx.cheapest_hours.get(d.id) or set()
         ready = self.next_unsatisfied(d, st, ctx.now) if d.ready_times and d.guarantee_min > 0 else None
+        sa = ctx.start_at.get(d.id)
+        if hour in cheap and sa is not None and sa.replace(minute=0) == hour and ctx.now < sa and not st.on:
+            return False, f"wacht op het goedkoopste kwartier ({sa:%H:%M})"
         if hour in cheap:
             # Zon + goedkoop: in een gepland goedkoop uur draait hij, ook zonder zon
             return True, f"goedkoop uur, klaar om {ready:%H:%M}" if ready else "goedkoop uur (te weinig zon verwacht)"
@@ -284,7 +292,7 @@ class Controller:
                 st.import_since = None
                 continue
             in_best = self._in_best(d, ctx)
-            stop_w = d.power_w * 0.6 if in_best else d.stop_import_w
+            stop_w = d.power_w * 0.6 if in_best else d.stop_import_w + d.grid_allowance_w
             if grid > stop_w:
                 if st.import_since is None:
                     st.import_since = ctx.mono
@@ -305,7 +313,7 @@ class Controller:
             in_best = self._in_best(d, ctx)
             if st.on:
                 label = "beste zonuren" if in_best else "zonne-overschot"
-                stop_w = d.power_w * 0.6 if in_best else d.stop_import_w
+                stop_w = d.power_w * 0.6 if in_best else d.stop_import_w + d.grid_allowance_w
                 out[d.id] = (True, label if grid <= stop_w else "aan, wacht op meer zon")
                 continue
             threshold = d.power_w * 0.25 if in_best else d.start_threshold_w
@@ -334,6 +342,9 @@ class Controller:
             planned = ctx.price_hours.get(d.id, set())
             if ctx.price_now is not None and ctx.price_now < 0:
                 out[d.id] = (True, "goedkoop: negatieve stroomprijs")
+            elif hour in planned and (sa := ctx.start_at.get(d.id)) is not None and sa.replace(minute=0) == hour \
+                    and ctx.now < sa and not st.on:
+                out[d.id] = (False, f"wacht op het goedkoopste kwartier ({sa:%H:%M})")
             elif hour in planned:
                 out[d.id] = (True, "goedkoop uur")
             elif st.on and ctx.mono - st.last_switch < d.min_on_s:

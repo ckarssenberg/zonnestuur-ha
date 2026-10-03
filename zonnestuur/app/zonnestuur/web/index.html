@@ -18,7 +18,7 @@
     --bg: #f4f3ee; --aura-1: rgba(255, 170, 30, .20); --aura-2: rgba(47, 91, 219, .12); --aura-3: rgba(13, 148, 136, .10);
     --card: rgba(255, 255, 255, .72); --card-hi: rgba(255, 255, 255, .95); --card-solid: #ffffff; --card-line: rgba(14, 17, 22, .07);
     --shadow: 0 1px 2px rgba(14,17,22,.04), 0 12px 40px -18px rgba(14,17,22,.18);
-    --ink: #0d1015; --ink-2: #555d69; --ink-3: #868d98; --rule: rgba(14, 17, 22, .08);
+    --ink: #0d1015; --ink-2: #555d69; --ink-3: #6b727d; --rule: rgba(14, 17, 22, .08);
     --sun: #b86e00; --net: #2f5bdb; --batt: #0d9488;          /* dataseries (gevalideerd op licht vlak) */
     --cheap: #2a78d6; --dear: #e34948; --mid: #aeb4bc;         /* prijs: goedkoop / duur / normaal (gevalideerd) */
     --glow: #ffb224; --glow-soft: rgba(255, 178, 36, .18);
@@ -32,7 +32,7 @@
       --bg: #05070a; --aura-1: rgba(255, 170, 30, .12); --aura-2: rgba(91, 140, 255, .13); --aura-3: rgba(25, 158, 112, .10);
       --card: rgba(255, 255, 255, .04); --card-hi: rgba(255, 255, 255, .075); --card-solid: #10141a; --card-line: rgba(255, 255, 255, .075);
       --shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 24px 60px -30px rgba(0,0,0,.85);
-      --ink: #f3f5f8; --ink-2: #a2abb7; --ink-3: #6c7582; --rule: rgba(255, 255, 255, .07);
+      --ink: #f3f5f8; --ink-2: #a2abb7; --ink-3: #8a93a0; --rule: rgba(255, 255, 255, .07);
       --sun: #c98500; --net: #5b8cff; --batt: #199e70;
       --cheap: #3987e5; --dear: #e66767; --mid: #4b525c;
       --glow: #ffb224; --glow-soft: rgba(255, 178, 36, .14);
@@ -46,7 +46,7 @@
     --bg: #05070a; --aura-1: rgba(255, 170, 30, .12); --aura-2: rgba(91, 140, 255, .13); --aura-3: rgba(25, 158, 112, .10);
     --card: rgba(255, 255, 255, .04); --card-hi: rgba(255, 255, 255, .075); --card-solid: #10141a; --card-line: rgba(255, 255, 255, .075);
     --shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 24px 60px -30px rgba(0,0,0,.85);
-    --ink: #f3f5f8; --ink-2: #a2abb7; --ink-3: #6c7582; --rule: rgba(255, 255, 255, .07);
+    --ink: #f3f5f8; --ink-2: #a2abb7; --ink-3: #8a93a0; --rule: rgba(255, 255, 255, .07);
     --sun: #c98500; --net: #5b8cff; --batt: #199e70;
     --cheap: #3987e5; --dear: #e66767; --mid: #4b525c;
     --glow: #ffb224; --glow-soft: rgba(255, 178, 36, .14);
@@ -182,6 +182,18 @@
             padding: 4px; border-radius: 14px; background: color-mix(in srgb, var(--card-solid) 70%, transparent); border: 1px solid var(--card-line);
             backdrop-filter: blur(16px) saturate(150%); -webkit-backdrop-filter: blur(16px) saturate(150%); scrollbar-width: none; }
   .secnav a { text-decoration: none; color: var(--ink-2); font-size: 13.5px; font-weight: 600; padding: 7px 16px; border-radius: 10px; white-space: nowrap; transition: background .2s, color .2s; }
+  .secnav .viewbtn { border: 0; background: none; color: var(--ink-2); font: inherit; font-size: 13.5px; font-weight: 600; padding: 7px 14px; border-radius: 10px; cursor: pointer; border-left: 1px solid var(--card-line); border-radius: 0 10px 10px 0; white-space: nowrap; }
+  .secnav .viewbtn:hover { color: var(--ink); }
+  body.simple .adv, body.simple .dev .strip, body.simple .dev .strip-axis, body.simple .dev .facts .fact.more { display: none !important; }
+  .flow { position: relative; }
+  .flowpause { position: absolute; right: 4px; top: 4px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--card-line); background: var(--card-solid);
+               color: var(--ink-2); display: grid; place-items: center; cursor: pointer; opacity: .55; transition: opacity .2s; z-index: 2; }
+  .flowpause:hover, .flowpause:focus-visible, .flowpause[aria-pressed="true"] { opacity: 1; }
+  .flowpause svg { width: 14px; height: 14px; }
+  .flow.paused .pulse { animation-play-state: paused; }
+  .runrep { margin-top: 8px; font-size: 13px; color: var(--ink-2); display: flex; gap: 6px; align-items: baseline; }
+  .runrep b { color: var(--ink); }
+  .devtip { margin-top: 8px; font-size: 13px; padding: 8px 10px; border-radius: 10px; background: var(--good-soft); color: var(--ink); }
   .secnav a.on { background: var(--seg-on); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
   .save .sub.three { grid-template-columns: repeat(3, 1fr); }
   .split { display: grid; gap: 6px; margin-top: 14px; }
@@ -238,6 +250,12 @@
   .verdict.wachten { background: var(--warn-soft); color: var(--warn); }
   .verdict small { font: 550 13.5px/1.2 Inter, sans-serif; color: var(--ink-2); letter-spacing: 0; }
   .nextwin { margin: 10px 0 0; font-size: 14px; color: var(--ink-2); } .nextwin b { color: var(--ink); font-weight: 650; }
+  .daytip { margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: var(--glow-soft); font-size: 14px; line-height: 1.45; max-width: 60ch; }
+  .daytip b { display: block; font-size: 14.5px; margin-bottom: 2px; }
+  .daytip.prijs { background: color-mix(in srgb, var(--net) 12%, transparent); }
+  .wx { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 12px; }
+  .wx span { font-size: 12.5px; color: var(--ink-2); padding: 5px 10px; border-radius: 999px; background: var(--chip); }
+  .wx span b { color: var(--ink); font-weight: 650; margin-right: 4px; }
   .plan24 { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
   .plan24 li { display: grid; grid-template-columns: 116px 22px 1fr auto; gap: 4px 12px; align-items: baseline; padding: 11px 6px; border-top: 1px solid var(--rule); }
   .plan24 li:first-child { border-top: 0; }
@@ -436,7 +454,7 @@
   </header>
 
   <nav class="secnav" aria-label="Onderdelen" id="secnav">
-    <a href="#hero" data-s="hero">Nu</a><a href="#s-planning" data-s="s-planning">Planning</a><a href="#s-apparaten" data-s="s-apparaten">Apparaten</a><a href="#s-inzicht" data-s="s-inzicht">Inzicht</a>
+    <a href="#hero" data-s="hero">Nu</a><a href="#s-planning" data-s="s-planning">Planning</a><a href="#s-apparaten" data-s="s-apparaten">Apparaten</a><a href="#s-inzicht" data-s="s-inzicht" class="adv">Inzicht</a><button type="button" class="viewbtn" id="viewBtn" aria-pressed="false">Eenvoudig</button>
   </nav>
   <div class="grid">
     <!-- nu -->
@@ -448,10 +466,11 @@
           <h1 class="headline" id="headline">Even kijken…</h1>
           <p class="subline" id="subline">&nbsp;</p>
           <p class="nextwin" id="nextWin" hidden></p>
+          <div class="daytip" id="dayTip" hidden role="note"></div>
           <div class="pills" id="pills"></div>
           <div class="kpis" id="kpis"></div>
         </div>
-        <div class="flow"><svg id="flowSvg" viewBox="0 0 440 300" role="img" aria-label="Energiestroom tussen zon, net, huis, batterij en apparaten"></svg></div>
+        <div class="flow"><button type="button" class="flowpause" id="flowPause" aria-pressed="false" aria-label="Animatie pauzeren" title="Animatie pauzeren"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button><svg id="flowSvg" viewBox="0 0 440 300" role="img" aria-label="Energiestroom tussen zon, net, huis, batterij en apparaten"></svg></div>
       </div>
     </section>
 
@@ -481,6 +500,7 @@
     <!-- plan komende 24 uur -->
     <section class="card c-plan24" id="planCard" hidden aria-labelledby="planTitle">
       <div class="title-row"><div><div class="eyebrow">Plan</div><h2 class="sec" id="planTitle">Wat Zonnestuur de komende 24 uur doet</h2></div><span class="small muted" id="planNote"></span></div>
+      <div class="wx" id="wxRow"></div>
       <ol class="plan24" id="planList"></ol>
       <button class="btn-line" id="planMore" hidden style="margin-top:10px">Toon alles</button>
     </section>
@@ -543,15 +563,15 @@
     </section>
 
     <!-- logboek -->
-    <section class="card c-log" aria-labelledby="logTitle">
+    <section class="card c-log adv" aria-labelledby="logTitle">
       <div class="title-row"><div><div class="eyebrow">Logboek</div><h2 class="sec" id="logTitle">Wat Zonnestuur deed, en waarom</h2></div><span class="small muted" id="logNote"></span></div>
       <div class="health" id="healthRow"></div>
       <div id="logBody"><div class="empty">Laden…</div></div>
     </section>
 
-    <div class="sec-head" id="s-inzicht"><h2>Inzicht</h2><p>Terugkijken: wat er gebruikt is, waar je stroom heen ging en wat Zonnestuur over je huis geleerd heeft.</p></div>
+    <div class="sec-head adv" id="s-inzicht"><h2>Inzicht</h2><p>Terugkijken: wat er gebruikt is, waar je stroom heen ging en wat Zonnestuur over je huis geleerd heeft.</p></div>
     <!-- vandaag -->
-    <section class="card c-today" aria-labelledby="todayTitle">
+    <section class="card c-today adv" aria-labelledby="todayTitle">
       <div class="title-row"><span class="eyebrow" id="todayTitle">Vandaag · gestuurde apparaten</span><span class="small muted" id="todayNote"></span></div>
       <div class="chart" id="todayChart"><svg id="todaySvg" role="img" aria-label="Verbruik van gestuurde apparaten vandaag, per vijf minuten"></svg><div class="tip" id="todayTip"></div></div>
       <div class="legend">
@@ -563,7 +583,7 @@
     </section>
 
     <!-- verbruik -->
-    <section class="card c-usage" aria-labelledby="useTitle">
+    <section class="card c-usage adv" aria-labelledby="useTitle">
       <div class="usage-head">
         <div><div class="eyebrow">Hele huis</div><h2 class="sec" id="useTitle">Verbruik en teruglevering</h2></div>
         <div class="seg four" role="group" aria-label="Periode" id="useSeg">
@@ -582,19 +602,19 @@
     </section>
 
     <!-- teruglevering -->
-    <section class="card c-feed" aria-labelledby="feedTitle">
+    <section class="card c-feed adv" aria-labelledby="feedTitle">
       <div class="title-row"><div><div class="eyebrow">Inzicht</div><h2 class="sec" id="feedTitle">Waar gaat je stroom heen?</h2></div><span class="small muted" id="feedNote"></span></div>
       <div id="feedBody"><div class="empty">Laden…</div></div>
     </section>
 
     <!-- geleerd -->
-    <section class="card c-learn" aria-labelledby="learnTitle">
+    <section class="card c-learn adv" aria-labelledby="learnTitle">
       <div class="title-row"><div><div class="eyebrow">Zelflerend</div><h2 class="sec" id="learnTitle">Wat Zonnestuur over je huis weet</h2></div><span class="small muted" id="learnNote"></span></div>
       <div id="learnBody"><div class="empty">Laden…</div></div>
     </section>
 
     <!-- contractcheck -->
-    <section class="card c-compare" aria-labelledby="cmpTitle">
+    <section class="card c-compare adv" aria-labelledby="cmpTitle">
       <div class="title-row"><div><div class="eyebrow">2027</div><h2 class="sec" id="cmpTitle">Welk contract past bij jouw huis?</h2></div><span class="small muted" id="cmpNote"></span></div>
       <p class="small muted" style="margin:4px 0 0">Zonnestuur rekent je echte afname en teruglevering per uur door met de tarieven van leveranciers voor 2027, inclusief terugleverkosten. Je slimme sturing gaat mee als je overstapt.</p>
       <div id="cmpBody"><button class="btn-line" id="cmpBtn" style="margin-top:12px">Uitrekenen</button></div>
@@ -614,6 +634,25 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const NS = "http://www.w3.org/2000/svg";
 let token = "";
 try { token = localStorage.getItem("zs_token") || ""; } catch (e) {}
+
+// eenvoudig / uitgebreid, en animatie pauzeren
+(function () {
+  const vb = $("viewBtn"), fp = $("flowPause"), flow = fp.parentElement;
+  let simple = false, paused = false;
+  try { simple = localStorage.getItem("zs_simple") === "1"; paused = localStorage.getItem("zs_flowpause") === "1"; } catch (e) {}
+  const show = () => {
+    document.body.classList.toggle("simple", simple);
+    vb.textContent = simple ? "Uitgebreid" : "Eenvoudig"; vb.setAttribute("aria-pressed", String(simple));
+    vb.title = simple ? "Toon alles: grafieken, logboek en inzicht" : "Toon alleen wat nu belangrijk is";
+    flow.classList.toggle("paused", paused); fp.setAttribute("aria-pressed", String(paused));
+    fp.setAttribute("aria-label", paused ? "Animatie hervatten" : "Animatie pauzeren"); fp.title = fp.getAttribute("aria-label");
+    fp.innerHTML = paused ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z" fill="currentColor"/></svg>'
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
+  };
+  vb.addEventListener("click", () => { simple = !simple; try { localStorage.setItem("zs_simple", simple ? "1" : "0"); } catch (e) {} show(); if (!simple) drawCharts(); });
+  fp.addEventListener("click", () => { paused = !paused; try { localStorage.setItem("zs_flowpause", paused ? "1" : "0"); } catch (e) {} show(); });
+  show();
+})();
 
 // thema
 (function () {
@@ -741,11 +780,20 @@ function renderVerdict(s) {
     nw.innerHTML = `Nu loopt het goedkoopste blok van de komende 24 uur, tot <b>${esc(w.to)}</b>.`;
   } else nw.hidden = true;
 }
+function renderDayTip(s) {
+  const t = s.today_tip, el = $("dayTip");
+  el.hidden = !t;
+  if (t) { el.className = "daytip " + (t.kind || ""); el.innerHTML = `<b>${esc(t.title)}</b>${esc(t.text)}`; }
+  const W = s.weather || [];
+  const names = ["Vandaag", "Morgen", "Overmorgen"];
+  $("wxRow").innerHTML = W.slice(0, 3).map((d, i) => `<span><b>${names[i]}</b>${esc(d.word || "")}${d.kwh != null ? ` · ${nl(d.kwh)} kWh zon` : ""}${d.rain_mm >= 1 ? ` · ${nl(d.rain_mm)} mm` : ""}</span>`).join("");
+}
 let PLAN_ALL = false;
 function renderPlan(s) {
   const P = s.plan, card = $("planCard");
-  if (!P || !s.configured || !(P.items || []).length) { card.hidden = true; return; }
+  if (!P || !s.configured || (!(P.items || []).length && !(s.weather || []).length)) { card.hidden = true; return; }
   card.hidden = false;
+  if (!(P.items || []).length) { $("planList").innerHTML = `<li><span class="w" style="grid-column:1/-1">Voorlopig niets gepland. Zonnestuur kijkt elk kwartier opnieuw.</span></li>`; $("planMore").hidden = true; $("planNote").textContent = ""; return; }
   const today = new Date(s.now).getDate();
   const items = PLAN_ALL ? P.items : P.items.slice(0, 6);
   $("planList").innerHTML = items.map((it) => {
@@ -783,6 +831,7 @@ function renderStatus(s) {
   $("subline").textContent = sub;
   renderVerdict(s);
   renderPlan(s);
+  renderDayTip(s);
   const Lc = s.license || {};
   const licPill = Lc.plan === "trial" && Lc.days_left <= 10 ? `<a class="pill sun" href="instellingen">Proef: nog ${Lc.days_left} ${Lc.days_left === 1 ? "dag" : "dagen"} alles · Pro ${esc(Lc.price)}</a>`
     : Lc.plan === "basic" ? `<a class="pill" href="instellingen">Zonnestuur Basis · alles slim sturen met Pro →</a>` : "";
@@ -823,10 +872,11 @@ function renderStatus(s) {
   $("sYear").textContent = eur(V.year.eur);
   $("sTotal").textContent = eur(V.total.eur);
   $("sTotalL").textContent = V.since ? "Sinds " + new Date(V.since).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }) : "Sinds start";
-  const md = V.month.devices || 0, mb = V.month.battery || 0, tot = Math.max(0.01, Math.abs(md) + Math.abs(mb));
-  $("vSplit").innerHTML = mb ? `<div class="bar"><i style="width:${100 * Math.abs(md) / tot}%;background:var(--sun)"></i><i style="width:${100 * Math.abs(mb) / tot}%;background:var(--batt)"></i></div>
+  const md = V.month.devices || 0, mb = V.month.battery || 0, mc = V.month.curtail || 0, tot = Math.max(0.01, Math.abs(md) + Math.abs(mb) + mc);
+  $("vSplit").innerHTML = (mb || mc) ? `<div class="bar"><i style="width:${100 * Math.abs(md) / tot}%;background:var(--sun)"></i><i style="width:${100 * Math.abs(mb) / tot}%;background:var(--batt)"></i></div>
       <div class="row2"><span><i class="sw" style="background:var(--sun)"></i> ${s.strategy === "price" ? "Apparaten in goedkope uren" : "Apparaten op zon"}</span><b>${eur(md)}</b></div>
-      <div class="row2"><span><i class="sw" style="background:var(--batt)"></i> Thuisbatterij</span><b>${eur(mb)}</b></div>` : "";
+      ${mb ? `<div class="row2"><span><i class="sw" style="background:var(--batt)"></i> Thuisbatterij</span><b>${eur(mb)}</b></div>` : ""}
+      ${mc ? `<div class="row2"><span><i class="sw" style="background:var(--ink-3)"></i> Panelen begrensd bij negatieve prijs</span><b>${eur(mc)}</b></div>` : ""}` : "";
   const L0 = s.license || {};
   const roi = $("roi");
   if (V.year.eur > 1 && L0.plan !== "basic") {
@@ -964,6 +1014,19 @@ const DEV_ICONS = {
 const RUNNING_WORD = { boiler: "Verwarmt", ev: "Laadt", heatpump: "Draait extra", generic: "Aan" };
 const READY_WORD = { boiler: "Warm water", ev: "Auto geladen", heatpump: "Klaar", generic: "Klaar" };
 
+function runReport(r) {
+  const t = new Date(r.end_ts * 1000), today = new Date().toDateString() === t.toDateString();
+  const when = (today ? "vandaag " : t.toLocaleDateString("nl-NL", { weekday: "short" }) + " ") + t.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+  const sun = r.kwh > 0 ? Math.round(100 * r.kwh_solar / r.kwh) : 0;
+  return `<div class="runrep"><span class="muted">Laatste keer</span><span>klaar ${esc(when)}: <b>${nl(r.kwh, 1)} kWh</b>${PRICE ? "" : `, ${sun}% zon`}${r.eur ? ` · <b>${eur(r.eur)}</b> ${r.eur >= 0 ? "bespaard" : "duurder"}` : ""}</span></div>`;
+}
+function devTip(s, d) {
+  const t = s.today_tip;
+  if (!t || !["weer-vandaag", "prijs-vandaag"].includes(t.id) || d.mode !== "auto") return "";
+  const fits = d.kind === "ev" ? true : d.driver === "ha_start_button" || (d.kind === "generic" && d.one_shot);
+  if (!fits) return "";
+  return `<div class="devtip">${t.id === "weer-vandaag" ? "Vandaag is de beste dag van de komende dagen" : "Vandaag is goedkoper dan morgen"}: ${d.kind === "ev" ? "laat de auto vandaag laden" : "zet hem vandaag aan"}.</div>`;
+}
 function renderDevices(s) {
   const wrap = $("devices");
   // Niet opnieuw tekenen terwijl je een keuzelijst of veld op een kaart gebruikt (anders klapt hij dicht)
@@ -1014,8 +1077,10 @@ function renderDevices(s) {
              : `Laadt traploos mee: nu <b>${Math.round(d.setpoint_w / d.w_per_step)} A</b> (${kw(d.setpoint_w)} kW)`)
           : d.ev && d.ev.kw ? `Laadt traploos, tot <b>${nl(d.ev.kw, 1)} kW</b> voor de ${esc((d.ev.cars.find((c) => c.id === d.ev.active) || {}).name || "auto")}`
           : `Laadt traploos tussen <b>${kw(d.min_w)}</b> en <b>${kw(d.max_w)} kW</b>`}</span></div>` : ""}
-        <div class="fact"><i class="dot" style="background:var(--sun)"></i><span>Deze maand <b>${nl(d.month.kwh, 1)} kWh</b>${PRICE ? " slim ingepland" : `, waarvan <b>${nl(d.month.kwh_solar, 1)}</b> uit zon`} · <b>${eur(d.month.eur_saved)}</b> bespaard</span></div>
+        <div class="fact more"><i class="dot" style="background:var(--sun)"></i><span>Deze maand <b>${nl(d.month.kwh, 1)} kWh</b>${PRICE ? " slim ingepland" : `, waarvan <b>${nl(d.month.kwh_solar, 1)}</b> uit zon`} · <b>${eur(d.month.eur_saved)}</b> bespaard</span></div>
       </div>
+      ${d.last_run ? runReport(d.last_run) : ""}
+      ${devTip(s, d)}
       ${d.ev ? evPanel(d) : ""}
       ${(d.kind === "ev" && !(d.ev && d.ev.cars.length)) || (d.kind !== "ev" && (d.ready_times || []).length) ? `<div class="ready-row"><span class="muted">${d.kind === "ev" ? "Vol om" : "Klaar om"}</span><button data-rd="-30" aria-label="Eerder">−</button><b class="num">${esc((d.ready_times || [])[0] || "geen")}</b><button data-rd="30" aria-label="Later">+</button></div>` : ""}
       ${d.driver === "ha_start_button" ? progRow(d) : ""}
@@ -1416,7 +1481,7 @@ function drawPrices() {
   const minT = today.reduce((a, r) => (r.all_in < a.all_in ? r : a), today[0]);
   const maxT = today.reduce((a, r) => (r.all_in > a.all_in ? r : a), today[0]);
   const hh = (ts) => new Date(ts * 1000).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
-  $("priceNote").textContent = `${P.supplier ? P.supplier + " · " : ""}all-in per kWh, incl. belastingen`;
+  $("priceNote").textContent = `${P.supplier ? P.supplier + " · " : ""}all-in per kWh, incl. belastingen${(P.quarters || []).length ? " · per kwartier" : ""}`;
   stats.innerHTML = `${cur ? `<div><b>${eur3(P.live_now ?? cur.all_in)}</b><span>nu (${CLASS_WORD[priceClass(cur.all_in, avgT)]})</span></div>` : ""}
     <div><b>${eur3(avgT)}</b><span>gemiddeld vandaag</span></div>
     <div><b>${eur3(minT.all_in)}</b><span>goedkoopst vandaag, ${hh(minT.ts)}</span></div>
@@ -1442,7 +1507,30 @@ function drawPrices() {
     el("text", { x: X(dayEnd) + 2, y: 12, class: "axis", "font-weight": 600 }, svg).textContent = "Morgen";
     el("line", { x1: X(dayEnd) - 1, x2: X(dayEnd) - 1, y1: T - 6, y2: H - B, stroke: "var(--rule)", "stroke-width": 1 }, svg);
   }
-  for (const r of rows) {
+  // zonverwachting als zacht vlak achter de prijzen (verleden doorgetrokken, toekomst gestippeld)
+  const pv = rows.filter((r) => r.pv_w != null);
+  if (pv.length) {
+    const maxPv = Math.max(500, ...pv.map((r) => r.pv_w)), PY = (w) => H - B - (w / maxPv) * (H - T - B) * 0.9;
+    const pts = pv.map((r) => [X(r.ts) + slot / 2, PY(r.pv_w)]);
+    const area = `M${pts[0][0]},${H - B} ` + pts.map(([x, y]) => `L${x},${y}`).join(" ") + ` L${pts[pts.length - 1][0]},${H - B} Z`;
+    el("path", { d: area, fill: "var(--glow-soft)", stroke: "none" }, svg);
+    const xNow = X(now);
+    const past = pts.filter(([x]) => x <= xNow), fut = pts.filter(([x]) => x >= xNow - slot);
+    if (past.length > 1) el("path", { d: "M" + past.map((p) => p.join(",")).join(" L"), fill: "none", stroke: "var(--sun)", "stroke-width": 1.5 }, svg);
+    if (fut.length > 1) el("path", { d: "M" + fut.map((p) => p.join(",")).join(" L"), fill: "none", stroke: "var(--sun)", "stroke-width": 1.5, "stroke-dasharray": "4 4" }, svg);
+  }
+  const Q = P.quarters || [];
+  if (Q.length) {
+    // kwartierprijzen: vier smalle balken per uur
+    const qw = Math.max(1, slot / 4 - 1);
+    for (const q of Q) {
+      const avg = q.ts < dayEnd ? avgT : avgM, cls = priceClass(q.all_in, avg);
+      const x = X(q.ts) + 0.5, y0 = Y(0), y1 = Y(q.all_in);
+      el("rect", { x, y: Math.min(y0, y1), width: qw, height: Math.max(1, Math.abs(y0 - y1)), rx: Math.min(2, qw / 2), fill: `var(--${cls})`, opacity: q.end <= now ? 0.4 : 1 }, svg);
+      if (now >= q.ts && now < q.end) el("rect", { x: x - 1.5, y: Math.min(y0, y1) - 2, width: qw + 3, height: Math.abs(y0 - y1) + 4, rx: 3, fill: "none", stroke: "var(--ink)", "stroke-width": 1.6 }, svg);
+    }
+  }
+  for (const r of (Q.length ? [] : rows)) {
     const avg = r.ts < dayEnd ? avgT : avgM, cls = priceClass(r.all_in, avg);
     const x = X(r.ts) + (slot - bw) / 2, y0 = Y(0), y1 = Y(r.all_in);
     const d = r.all_in >= 0 ? roundedTop(x, y1, bw, y0 - y1, 3)
@@ -1464,7 +1552,8 @@ function drawPrices() {
       const avg = r.ts < dayEnd ? avgT : avgM, cls = priceClass(r.all_in, avg), t = new Date(r.ts * 1000);
       showTip(tip, box, (X(r.ts) + slot / 2) * (box.clientWidth / W), `<b>${t.toLocaleDateString("nl-NL", { weekday: "short" })} ${hh(r.ts)}–${hh(r.end)}</b>
         <div class="row"><i class="sw" style="background:var(--${cls})"></i>All-in (${CLASS_WORD[cls]})<em>${eur3(r.all_in)}</em></div>
-        <div class="row">Kale marktprijs<em>${eur3(r.market)}</em></div>
+        ${(P.quarters || []).length ? (P.quarters.filter((q) => q.ts >= r.ts && q.ts < r.end).map((q) => `<div class="row">Kwartier ${hh(q.ts)}<em>${eur3(q.all_in)}</em></div>`).join("")) : `<div class="row">Kale marktprijs<em>${eur3(r.market)}</em></div>`}
+        ${r.pv_w != null ? `<div class="row"><i class="sw" style="background:var(--sun)"></i>Zon verwacht<em>${kw(r.pv_w)} kW</em></div>` : ""}
         <div class="row">Teruglevering levert op<em>${eur3(r.feed_in)}</em></div>
         ${r.planned.length ? `<div class="row"><i class="sw" style="background:var(--glow)"></i>Gepland<em>${esc(r.planned.join(", "))}</em></div>` : ""}`);
     });

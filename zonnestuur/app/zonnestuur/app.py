@@ -57,6 +57,7 @@ class Engine:
                  prices: Optional[PriceProvider] = None, forecast: Optional[SolarForecast] = None,
                  ledger: Optional[Ledger] = None, config_path: Optional[str] = None):
         self.cfg = cfg
+        self._apply_profile(cfg)
         self.config_path = config_path
         self.tz = ZoneInfo(cfg.timezone)
         self.meter = meter or self._safe_meter(cfg)
@@ -202,6 +203,7 @@ class Engine:
         """De planning rekent met het geleerde huis in plaats van met vaste aannames."""
         self.forecast.base_load = lambda when: self.model.base_w(when.astimezone(self.tz))
         self.forecast.calibration = lambda when: self.model.pv_calibration(when.astimezone(self.tz))
+        self.forecast.p10_ratio = lambda: self.model.pv_p10 or 0.6
 
     def relearn(self, now: datetime, force: bool = False) -> None:
         key = f"{now:%Y%m%d%H}"
@@ -213,6 +215,13 @@ class Engine:
         power = {d.id: (d.max_w if d.modulating else d.power_w) for d in self.cfg.devices}
         self.model = learn_house(rows, self.tz, self.cfg.solar.has_panels, self.cfg.solar.base_load_w,
                                  self.ledger.device_daily((now - timedelta(days=RUN_DAYS)).date()), power)
+        if now.hour == 3 or not getattr(self.prices, "export_estimate", 0):
+            # Teruglevering per jaar (voor staffel-terugleverkosten): het afgelopen jaar, of wat er is, opgeschaald
+            yr = self.ledger.house_hours(int((now - timedelta(days=365)).timestamp()), int(now.timestamp()))
+            if yr:
+                span = max(1.0, (max(r["ts"] for r in yr) - min(r["ts"] for r in yr)) / 86400)
+                if span >= 14:
+                    self.prices.export_estimate = sum(r["export_kwh"] for r in yr) * 365 / span
 
     def run_min(self, d) -> float:
         """Hoe lang dit apparaat per dag nodig heeft: geleerd als dat kan, anders de instelling.
@@ -240,6 +249,13 @@ class Engine:
             except (DeviceError, ValueError, TypeError, OSError):
                 self.pv_w = None
         if ent and self.pv_w is not None:
+            # nowcast: zit de voorspelling er nu naast (wolken), schuif de komende 2 uur mee
+            now = datetime.now(self.tz)
+            fc = self.forecast.raw_production_w(now)
+            if fc and fc > 200:
+                r = max(0.1, min(2.0, self.pv_w / max(1.0, fc * self.forecast.calibration(now))))
+                prev = self.forecast.nowcast[0] if self.forecast.nowcast else r
+                self.forecast.nowcast = (0.8 * prev + 0.2 * r, now)
             return self.pv_w, 2
         if self.cfg.solar.has_panels:
             est = self.forecast.production_w(datetime.now(self.tz))
@@ -579,9 +595,25 @@ class Engine:
                          "max_price": float((d.params or {}).get("max_price") or 0)}
         return out
 
+    @staticmethod
+    def _apply_profile(cfg: Config) -> None:
+        """Sturingsprofiel. Zelfconsumptie (standaard): zo veel mogelijk eigen zon. Prijs: de auto mag ook laden als
+        30% uit het net komt. Netvriendelijk: niets inplannen in de avondpiek
+        (17–21 uur) of in dure nettarief-tijdvakken."""
+        prof = getattr(cfg, "profile", "") or ""
+        for d in cfg.devices:
+            d.profile_share = 70 if prof == "prijs" and d.kind == "ev" else 100
+
     def _under_max(self, d, candidates: list) -> list:
         mp = float((d.params or {}).get("max_price") or 0) if d.kind == "ev" else 0.0
-        return [c for c in candidates if c[2] <= mp] if mp > 0 else candidates
+        out = [c for c in candidates if c[2] <= mp] if mp > 0 else candidates
+        if getattr(self.cfg, "profile", "") == "netvriendelijk" and out:
+            tou = [self.prices.grid_tou(c[0].astimezone(self.tz)) for c in out]
+            low = min(tou)
+            quiet = [c for c, t in zip(out, tou) if not 17 <= c[0].astimezone(self.tz).hour < 21 and t <= low + 1e-9]
+            if len(quiet) >= max(1, len(out) // 3):
+                out = quiet
+        return out
 
     def _planned_hours(self, d) -> list:
         plan = getattr(self, "_price_plans", {}).get(d.id) if self.cfg.strategy == "price" else getattr(self, "_combo_plans", {}).get(d.id)
@@ -1221,7 +1253,11 @@ class Engine:
             if not pro:                     # Basis: alleen zon-overschot en de klaar-tijd-garantie
                 cheapest, sunny, price_hours, price_now = {}, {}, {}, None
             basic_id = None if pro else self._basic_device()
+            if pro:
+                self._phase_switch(now, mono)
+                self._eco_hours(now)
             ctx = Context(now=now, mono=mono, grid_w=self._grid_for_controller(now), dt=dt, cheapest_hours=cheapest, sunny_hours=sunny,
+                          start_at=self._quarter_starts(now), legionella=self._legionella(now) if pro else set(),
                           price_hours=price_hours, price_now=price_now, baseline=self.baseline_ids(now),
                           ev=self._ev_context())
             for dec in self.controller.step(ctx):
@@ -1459,6 +1495,16 @@ class Engine:
     def _limit_inverter(self, now: datetime, mono: float) -> None:
         if not self.limiter:
             return
+        last = getattr(self, "_cut_mono", None)
+        self._cut_mono = mono
+        if self.limiter.active and last is not None and 0 < mono - last < 300:
+            # Wat begrenzen scheelde: de panelen hadden (voorspeld) meer geleverd dan het huis gebruikte, tegen een negatieve prijs
+            fp = self.prices.feed_in_price(now)
+            pv = self.forecast.production_w(now) if self.forecast.hours else None
+            if fp < 0 and pv:
+                spare = max(0.0, pv - self.model.base_w(now) - sum(st.power_w for st in self.controller.states.values() if st.on))
+                if spare > 0:
+                    self.ledger.inc(now.date().isoformat(), "afknijp_eur", spare / 1000 * (mono - last) / 3600 * -fp)
         was = self.limiter.active
         value = self.limiter.decide(mono, self.grid_w, self.prices.feed_in_price(now))
         if value is None:
@@ -1510,7 +1556,8 @@ class Engine:
                                        has_panels=self.cfg.solar.has_panels, devices=self.cfg.devices,
                                        states=self.controller.states, tomorrow_negative=neg, tomorrow_sunny=sunny,
                                        evening_expensive=expensive, guarantee_risk=risk,
-                                       value_kwh=max(0.05, self.baseline_price(now) - self.prices.feed_in_price(now)))
+                                       value_kwh=max(0.05, self.baseline_price(now) - self.prices.feed_in_price(now)),
+                                       today_tip=self._cached("today_tip", 600, self.today_tip))
         if self.notifier.morning and self.notifier.tip_allowed(now) and self.cfg.solar.has_panels and 8 <= now.hour < 10 and not any(
                 i[1] in ("surplus", "negative_tomorrow", "sunny_tomorrow", "expensive_evening") for i in items):
             key = f"zon:{now:%Y-%m-%d}"
@@ -1729,8 +1776,9 @@ class Engine:
             if old and old["end"] == end.isoformat() and (old["key"] == key or any(h <= hour for h in old["hours"])):
                 out[d.id] = old["hours"]
                 continue
-            sun_s = self.forecast.expected_surplus_seconds(now, end, d.start_threshold_w) or 0.0
-            remaining = need_s - 0.8 * sun_s
+            # voorzichtige zonvoorspelling (P10) voor iets dat op tijd klaar moet: liever een goedkoop uur extra
+            sun_s = self.forecast.expected_surplus_seconds(now, end, d.start_threshold_w, "p10") or 0.0
+            remaining = need_s - sun_s
             if remaining <= 0:
                 plans[d.id] = {"end": end.isoformat(), "key": key, "hours": set()}
                 continue
@@ -1792,10 +1840,231 @@ class Engine:
                 hours = {start} if start else set()
             else:
                 hours = plan_cheapest_hours(run_s, candidates)
+            if d.kind in ("heatpump", "boiler") and d.driver == "ha_setpoint" and hours and not d.ready_times and candidates:
+                # Warmer stoken kost rendement (± 5%): alleen verschuiven als het prijsverschil dat ruim dekt
+                avg = sum(c[2] for c in candidates) / len(candidates)
+                chosen = [c[2] for c in candidates if c[0] in hours]
+                if chosen and avg > 0 and (avg - sum(chosen) / len(chosen)) / avg < 0.08:
+                    hours = set()
             hours = {h.astimezone(self.tz).replace(minute=0, second=0, microsecond=0) for h in hours}
             plans[d.id] = {"end": end.isoformat(), "key": key, "hours": hours}
             out[d.id] = hours
         self._price_plans = plans
+        return out
+
+    # ---- warmte slim ---------------------------------------------------------
+    def _legionella(self, now: datetime) -> set:
+        """Warm water: één keer per week naar 60 °C (als je dat aanzet), in het goedkoopste of zonnigste uur van de dag.
+
+        Veel warmtepompen doen dit zelf; daarom staat het standaard uit."""
+        out = set()
+        state = self.ledger.load_state("legionella") or {}
+        changed = False
+        for d in self.cfg.devices:
+            p = d.params or {}
+            if d.driver != "ha_setpoint" or not p.get("legionella"):
+                continue
+            last = state.get(d.id, {}).get("done")
+            if last and (now.date() - datetime.fromisoformat(last).date()).days < 7:
+                continue
+            plan = state.setdefault(d.id, {})
+            if plan.get("day") != now.date().isoformat():
+                plan["day"] = now.date().isoformat()
+                plan["hour"] = self._best_hour_today(now, 10, 18)
+                changed = True
+            h = plan.get("hour")
+            if h is not None and now.hour == h:
+                out.add(d.id)
+                if plan.get("ran") != plan["day"]:
+                    plan["ran"] = plan["day"]
+                    changed = True
+                sw = (self.switches or {}).get(d.id)
+                temp = float(p.get("legionella_temp", 60))
+                if sw is not None and hasattr(sw, "boost") and sw.boost < temp:
+                    plan["boost_was"] = sw.boost
+                    sw.boost = temp
+                    changed = True
+            elif h is not None and now.hour > h and plan.get("ran") == plan["day"]:
+                sw = (self.switches or {}).get(d.id)
+                if sw is not None and hasattr(sw, "boost") and plan.get("boost_was") is not None:
+                    sw.boost = plan["boost_was"]
+                plan.pop("boost_was", None)
+                plan.pop("ran", None)
+                plan["done"] = now.isoformat()
+                self.events.note(now, d.id, d.name, "PROGRAMMA", f"{d.name}: wekelijkse legionellaronde gedaan ({now:%d-%m}).")
+                changed = True
+        if changed:
+            self.ledger.save_state("legionella", state)
+        return out
+
+    def _best_hour_today(self, now: datetime, h_from: int, h_to: int) -> Optional[int]:
+        """Het zonnigste (met panelen) of goedkoopste uur van vandaag tussen h_from en h_to."""
+        best, score = None, None
+        for h in range(max(h_from, now.hour), h_to):
+            t = now.replace(hour=h, minute=0, second=0, microsecond=0)
+            if self.cfg.solar.has_panels and self.forecast.hours:
+                v = -(self.forecast.production_w(t + timedelta(minutes=30)) or 0)
+            else:
+                v = self.prices.import_price(t, live=False)
+            if score is None or v < score:
+                best, score = h, v
+        return best
+
+    def _eco_hours(self, now: datetime) -> None:
+        """Comfortmarge: in de duurste uren van de dag de verwarming iets lager (bijv. 1 °C), daarna weer normaal."""
+        eco = getattr(self, "_eco", {})
+        rank = None
+        if self.cfg.contract.type == "dynamic" and self.prices.slots:
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            day = [p for _, _, p in self.prices.upcoming(start.astimezone(timezone.utc), (start + timedelta(days=1)).astimezone(timezone.utc))]
+            rank = price_rank(self.prices.import_price(now), day) if day else None
+        for d in self.cfg.devices:
+            p = d.params or {}
+            delta = float(p.get("eco_delta") or 0)
+            sw = (self.switches or {}).get(d.id)
+            st = self.controller.states.get(d.id)
+            if delta <= 0 or d.driver != "ha_setpoint" or sw is None or not hasattr(sw, "normal") or not st:
+                continue
+            want = rank is not None and rank >= 0.8 and not st.on and st.mode == "auto" and (self.grid_w or 0) > -200
+            if want and d.id not in eco:
+                eco[d.id] = sw.normal
+                sw.normal = float(p.get("normal_temp", sw.normal)) - delta
+                try:
+                    sw.set(False)                       # schrijft de (verlaagde) normale temperatuur
+                    self.events.note(now, d.id, d.name, "PRIJS_LAAG", f"{d.name} {delta:.1f} °C lager tijdens dure stroom (vanaf {now:%H:%M}).".replace(".", ",", 1))
+                except Exception as exc:
+                    log.warning("eco %s: %s", d.name, exc)
+            elif not want and d.id in eco:
+                sw.normal = eco.pop(d.id)
+                if not st.on:
+                    try:
+                        sw.set(False)
+                    except Exception as exc:
+                        log.warning("eco terug %s: %s", d.name, exc)
+        self._eco = eco
+
+    # ---- auto op zon: 1 of 3 fasen ------------------------------------------
+    def _phase_switch(self, now: datetime, mono: float) -> None:
+        """Laden op zon: bij weinig overschot op 1 fase (vanaf ± 1,4 kW), bij veel op 3 (vanaf ± 4,1 kW).
+
+        Hoogstens eens per 10 minuten wisselen. Werkt als de laadpaal een fasewissel heeft in Home Assistant."""
+        for d in self.cfg.devices:
+            p = d.params or {}
+            ent = p.get("phase_switch_entity")
+            if d.kind != "ev" or not ent or not d.modulating:
+                continue
+            st = self.controller.states.get(d.id)
+            if not st:
+                continue
+            cur = int(p.get("phases_active") or p.get("phases", 3))
+            last = getattr(self, "_phase_at", {}).get(d.id, -1e9)
+            if mono - last < 600:
+                continue
+            forced = st.reason.startswith(("garantie", "handmatig", "goedkoop", "onder ", "nu vol", "meetdag"))
+            if forced or self.grid_w is None:
+                want = int(p.get("phases", 3))
+            else:
+                avail = -self.grid_w + (st.power_w if st.on else 0)
+                v, amin = float(p.get("volts", 230)), float(p.get("min_a", 6))
+                want = 3 if avail >= 3 * v * amin + 300 else 1
+            if want == cur:
+                continue
+            opt = p.get("phase_3" if want == 3 else "phase_1")
+            try:
+                ha = ha_client(self.cfg)
+                dom = ent.split(".", 1)[0]
+                if dom in ("select", "input_select"):
+                    ha.call(dom, "select_option", {"entity_id": ent, "option": opt or ("3" if want == 3 else "1")})
+                elif dom == "number":
+                    ha.call("number", "set_value", {"entity_id": ent, "value": want})
+                else:                                       # schakelaar: aan = 1 fase (bijv. go-e '1-fase forceren')
+                    on1 = str(p.get("phase_switch_on", "1")) == "1"
+                    ha.call(dom if dom in ("switch", "input_boolean") else "homeassistant",
+                            "turn_on" if (want == 1) == on1 else "turn_off", {"entity_id": ent})
+            except Exception as exc:
+                log.warning("fasewissel %s: %s", d.name, exc)
+                continue
+            d.params = dict(p, phases_active=want)
+            sw = (self.switches or {}).get(d.id)
+            if sw is not None and hasattr(sw, "phases"):
+                sw.phases = want
+            self._phase_at = dict(getattr(self, "_phase_at", {}), **{d.id: mono})
+            self.events.note(now, d.id, d.name, "ZON_OVERSCHOT", f"{d.name} laadt vanaf {now:%H:%M} op {want} {'fase' if want == 1 else 'fasen'}.")
+
+    def _quarter_starts(self, now: datetime) -> dict:
+        """Witgoed (één programma): start op het goedkoopste kwartier van het geplande uur (kwartierprijzen)."""
+        if not self.prices.quarter:
+            return {}
+        out = {}
+        for d in self.cfg.devices:
+            if not d.one_shot:
+                continue
+            hours = sorted(h for h in self._planned_hours(d) if h + timedelta(hours=1) > now)
+            if not hours:
+                continue
+            h = hours[0]
+            run = max(15, int(self.run_min(d) or 90))
+            q = self.prices.upcoming(h.astimezone(timezone.utc), (h + timedelta(hours=1, minutes=run)).astimezone(timezone.utc), hourly=False)
+            n = max(1, round(run / 15))
+            best, cost = None, float("inf")
+            for i in range(len(q)):
+                if q[i][0] >= (h + timedelta(hours=1)).astimezone(timezone.utc):
+                    break
+                win = q[i:i + n]
+                if len(win) < n:
+                    break
+                c = sum(p for _, _, p in win)
+                if c < cost - 1e-6:
+                    best, cost = q[i][0], c
+            if best is not None:
+                out[d.id] = best.astimezone(self.tz)
+        return out
+
+    def today_tip(self, now: Optional[datetime] = None) -> Optional[dict]:
+        """Is vandaag duidelijk beter dan de komende dagen (zon of prijs)? Dan een tip om het vandaag te doen."""
+        from . import coach
+        now = now or datetime.now(self.tz)
+        to_do = []
+        for d in self.cfg.devices:
+            if d.driver == "ha_start_button" or (d.one_shot and d.kind == "generic"):
+                to_do.append(f"zet de {d.name.lower()} aan")
+        if not to_do:
+            to_do = ["doe vandaag de was"]
+        has_ev = any(d.kind == "ev" for d in self.cfg.devices)
+        left = None
+        window = None
+        if self.cfg.solar.has_panels and self.forecast.hours:
+            t, left = now.replace(minute=0, second=0, microsecond=0), 0.0
+            while t.date() == now.date():
+                p = self.forecast.production_w(t + timedelta(minutes=30))
+                if p is not None and t + timedelta(hours=1) > now:
+                    left += max(0.0, p - self.model.base_w(t)) / 1000
+                t += timedelta(hours=1)
+            try:
+                window = next((w for w in self.coach_view().get("windows") or [] if not w.get("tomorrow")), None)
+            except Exception:
+                window = None
+        cheap_t = cheap_m = None
+        if not self.cfg.solar.has_panels and self.cfg.contract.type == "dynamic" and self.prices.slots:
+            def best3(a, b):
+                hrs = self.prices.upcoming(a.astimezone(timezone.utc), b.astimezone(timezone.utc))
+                if len(hrs) < 3:
+                    return None
+                i = min(range(len(hrs) - 2), key=lambda k: sum(hrs[k + j][2] for j in range(3)))
+                return (hrs[i][0].astimezone(self.tz).strftime("%H:%M"), sum(hrs[i + j][2] for j in range(3)) / 3)
+            midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+            cheap_t = best3(now.replace(minute=0, second=0, microsecond=0), midnight)
+            cheap_m = best3(midnight, midnight + timedelta(days=1))
+        return coach.weather_tip(now, self.forecast.daily, self.cfg.solar.has_panels, left, window, to_do, has_ev,
+                                 cheap_t, cheap_m)
+
+    def weather_view(self) -> list:
+        """Weer en zon voor vandaag en de komende dagen (voor het dashboard)."""
+        from .coach import weather_word
+        out = []
+        for day, d in sorted(self.forecast.daily.items())[:4]:
+            out.append({"day": day, "kwh": d.get("kwh") if self.cfg.solar.has_panels else None, "rain_mm": d.get("rain_mm"),
+                        "sun_h": d.get("sun_h"), "word": weather_word(d.get("code")), "code": d.get("code")})
         return out
 
     def _plan_sunny(self, now: datetime) -> dict[str, set]:
@@ -1836,6 +2105,7 @@ class Engine:
         """Nieuwe instellingen opslaan en meteen gebruiken, zonder herstart en zonder data te verliezen."""
         with self.lock:
             old_states = self.controller.states
+            self._apply_profile(new)
             self.cfg = new
             self.meter = self._safe_meter(new)
             self.switches = self._make_switches(new)
@@ -2068,6 +2338,13 @@ class Engine:
             return self.status()
         return dict(prev, stale=True)
 
+    def _last_run(self, device_id: str, now: datetime) -> Optional[dict]:
+        """Verslag van de laatste afgeronde keer: hoeveel stroom, hoeveel zon, wat het scheelde."""
+        for e in self.ledger.events(int((now - timedelta(days=3)).timestamp()), 40, device_id):
+            if e.get("end_ts") and (e.get("kwh") or 0) >= 0.05:
+                return {"end_ts": e["end_ts"], "kwh": e["kwh"], "kwh_solar": e.get("kwh_solar") or 0, "eur": e.get("eur")}
+        return None
+
     def status(self) -> dict:
         now = datetime.now(self.tz)
         with self.lock:
@@ -2081,7 +2358,7 @@ class Engine:
                 ready = self.controller.ready_datetimes(d, now)
                 devices.append({"id": d.id, "name": d.name, "kind": d.kind, "power_nominal_w": d.power_w,
                                 "ready_times": d.ready_times, "ready_days": d.ready_days, "guarantee_min": d.guarantee_min, "driver": d.driver,
-                                "modulating": d.modulating, "min_w": round(d.min_w), "max_w": round(d.max_w),
+                                "modulating": d.modulating, "one_shot": d.one_shot, "min_w": round(d.min_w), "max_w": round(d.max_w),
                                 "w_per_step": round(d.w_per_step),
                                 "failsafe": (self.failsafe.status.get(d.id, "") if self.failsafe else ""),
                                 "next_ready": ready[0].isoformat(timespec="minutes") if ready else None,
@@ -2092,6 +2369,7 @@ class Engine:
                                 "program_keep": bool((d.params or {}).get("program_keep")),
                                 "twindos": list(getattr((self.switches or {}).get(d.id), "twindos", []) or []),
                                 "last_event": next(iter(self.events.view_device(d.id, int((now - timedelta(days=2)).timestamp()))), None),
+                                "last_run": self._last_run(d.id, now),
                                 "ev": self.ev_view(d, now),
                                 **st.to_dict(), "month": per_dev.get(d.id, {"kwh": 0, "kwh_solar": 0, "eur_saved": 0})})
             return {
@@ -2129,6 +2407,8 @@ class Engine:
                 "goal": self.goal_view(now),
                 "moment": self._cached("moment", 60, self.moment_view),
                 "plan": self._cached("plan", 60, self.plan_view),
+                "today_tip": self._cached("today_tip", 600, self.today_tip),
+                "weather": self._cached("weather", 600, self.weather_view),
             }
 
     def _value_view(self, today, month_start, year_start) -> dict:
@@ -2138,7 +2418,8 @@ class Engine:
         for key, since in (("today", today), ("month", month_start), ("year", year_start), ("total", _d(2000, 1, 1))):
             dev = self.ledger.totals(since)["eur_saved"]
             bat = sum(v["eur"] for v in self.ledger.battery_totals(since).values())
-            out[key] = {"devices": round(dev, 2), "battery": round(bat, 2), "eur": round(dev + bat, 2)}
+            cut = sum(v.get("afknijp_eur", 0) for v in self.ledger.stats(since.isoformat()).values()) if self.limiter else 0.0
+            out[key] = {"devices": round(dev, 2), "battery": round(bat, 2), "curtail": round(cut, 2), "eur": round(dev + bat + cut, 2)}
         with self.ledger.lock:
             row = self.ledger.conn.execute("SELECT MIN(day) FROM device_day").fetchone()
         out["since"] = row[0] if row and row[0] else None
@@ -2262,7 +2543,15 @@ class Engine:
                    "negative_feed": any(sl.market < 0 for sl in self.prices.slots),
                    "night_w": self.model.night_w, "window": windows[0] if windows else None,
                    "best_battery": min((b for b in batts if b.get("payback_years")), key=lambda b: b["payback_years"], default=None) if batts else None}
-            out = {"has_panels": has_panels, "scores": sc, "windows": windows, "tips": coach.tips(ctx),
+            tips = coach.tips(ctx)
+            try:
+                wt = self.today_tip(now)
+            except Exception as exc:
+                log.debug("weertip: %s", exc)
+                wt = None
+            if wt:
+                tips = [wt] + tips
+            out = {"has_panels": has_panels, "scores": sc, "windows": windows, "tips": tips, "weather": self.weather_view(),
                    "export_per_day": round(ctx["export_per_day"], 1)}
         self._coach_cache = (now, out)
         return out
@@ -2285,21 +2574,30 @@ class Engine:
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         end = start + timedelta(days=2)
         with self.lock:
-            slots = [s for s in self.prices.slots if start.astimezone(timezone.utc) <= s.start < end.astimezone(timezone.utc)]
+            quarters = [{"ts": int(s.start.timestamp()), "end": int(s.end.timestamp()),
+                         "all_in": round(self.prices.import_price(s.start, live=False), 4)}
+                        for s in self.prices.slots if start.astimezone(timezone.utc) <= s.start < end.astimezone(timezone.utc)] \
+                if self.prices.quarter else []
+            from .prices import PriceSlot
+            slots = [PriceSlot(a, b, 0.0) for a, b, _ in self.prices.upcoming(start.astimezone(timezone.utc), end.astimezone(timezone.utc))]
             planned: dict[int, list] = {}
             names = {d.id: d.name for d in self.cfg.devices}
             for plans in (getattr(self, "_price_plans", {}), getattr(self, "_combo_plans", {})):
                 for dev_id, p in plans.items():
                     for h in p.get("hours", ()):
                         planned.setdefault(int(h.timestamp()), []).append(names.get(dev_id, dev_id))
+            hourly = {int(a.timestamp()): p for a, _, p in self.prices.upcoming(start.astimezone(timezone.utc), end.astimezone(timezone.utc))}
             rows = [{"ts": int(s.start.timestamp()), "end": int(s.end.timestamp()),
-                     "all_in": round(self.prices.import_price(s.start, live=False), 4), "market": round(s.market, 4),
+                     "all_in": round(hourly.get(int(s.start.timestamp()), self.prices.import_price(s.start, live=False)), 4),
+                     "market": round(self.prices._slot_at(s.start).market if self.prices._slot_at(s.start) else 0.0, 4),
                      "feed_in": round(self.prices.feed_in_price(s.start), 4),
-                     "planned": sorted(set(planned.get(int(s.start.timestamp()), [])))} for s in slots]
+                     "planned": sorted(set(planned.get(int(s.start.timestamp()), []))),
+                     "pv_w": (round(self.forecast.production_w(s.start + timedelta(minutes=30)) or 0)
+                              if self.cfg.solar.has_panels and self.forecast.hours else None)} for s in slots]
             live = self.prices._live(now)
         today = [r for r in rows if r["ts"] < int((start + timedelta(days=1)).timestamp())]
         avg = sum(r["all_in"] for r in today) / len(today) if today else None
-        return {"type": "dynamic", "supplier": _supplier_name(c), "start": int(start.timestamp()), "slots": rows,
+        return {"type": "dynamic", "supplier": _supplier_name(c), "start": int(start.timestamp()), "slots": rows, "quarters": quarters,
                 "avg_today": None if avg is None else round(avg, 4), "live_now": live,
                 "tomorrow_known": any(r["ts"] >= int((start + timedelta(days=1)).timestamp()) for r in rows)}
 

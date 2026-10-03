@@ -1,5 +1,18 @@
 # Wijzigingen
 
+## 0.27.0 – Weer, kwartierprijzen en slimmer warmte en laden
+- Weertip: is vandaag duidelijk zonniger dan de komende dagen, dan zegt Zonnestuur 's ochtends "doe vandaag de was, laat de auto vandaag laden" (op het dashboard, op de kaart van het apparaat en als melding). Zonder panelen: een tip als vandaag goedkoper is dan morgen.
+- Weer en zon voor vandaag en de komende dagen in de planningskaart; de verwachte zon staat ook in de prijsgrafiek.
+- Kwartierprijzen: de grafiek toont de prijs per kwartier en witgoed start op het goedkoopste kwartier binnen het geplande uur.
+- Voorzichtiger zonvoorspelling: de garantie rekent met een slechte dag (P10) die Zonnestuur uit je eigen panelen leert, en stelt de voorspelling van vandaag bij met wat je panelen nu echt leveren.
+- Auto op zon: wisselt (als je laadpaal dat kan) tussen 1 fase (vanaf ± 1,4 kW zon) en 3 fasen; kies hoeveel zon er minimaal in moet (bijv. 50% bij wisselend weer).
+- Warm water en verwarming: alleen verschuiven als het prijsverschil het rendementsverlies dekt; optioneel een wekelijkse legionellaronde op het zonnigste of goedkoopste uur; optioneel 1 °C lager in de duurste uren.
+- Sturingsprofiel: zelfconsumptie, prijs of netvriendelijk (niets inplannen tussen 17 en 21 uur of in dure nettarief-tijdvakken).
+- Terugleverkosten per kWh, als staffel of als vast bedrag; nettarief per tijdvak (vanaf 2028) instelbaar. De planning rekent ermee.
+- Wat het begrenzen van de panelen bij een negatieve prijs scheelde, telt mee in de opbrengst.
+- Verslag van de laatste keer op elke apparaatkaart (kWh, aandeel zon, wat het scheelde).
+- Knop "Eenvoudig": alleen wat nu belangrijk is. De stroom-animatie kan op pauze; betere leesbaarheid van grijze tekst.
+
 ## 0.26.0 – Duidelijk wat nu slim is, en wat er komt
 - Bovenaan een helder oordeel in drie stappen (goed moment, neutraal, liever wachten), met icoon en tekst, en het goedkoopste blok of de volgende zon.
 - Nieuwe kaart "Wat Zonnestuur de komende 24 uur doet": per apparaat en batterij wanneer, waarom en wat het ongeveer kost.
