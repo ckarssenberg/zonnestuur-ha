@@ -1,5 +1,10 @@
 # Wijzigingen
 
+## 0.24.1 – Melding als de was klaarstaat
+- Zet je de was- of droogmachine op 'start op afstand', dan krijg je meteen een melding hoe laat Zonnestuur hem start en wat de stroom dan kost, en een melding als hij gestart is.
+- Staat start op afstand aan maar is er geen programma gekozen, dan zegt Zonnestuur dat (op de kaart en na 10 minuten met een melding).
+- Aan of uit bij Instellingen → Meldingen ("Witgoed").
+
 ## 0.24.0 – Slimmer batterijladen voor elk merk, laden via elke auto
 - Batterij: elk kwartier een nieuw plan over de bekende prijzen (tot 48 uur), met vasthouden, laden op vermogensstappen, verlies per richting, slijtage en schakelkosten. Laadt tot wat de dure uren nodig hebben (van het net hoogstens 95%) en doet niets als het minder dan € 0,03 oplevert.
 - Batterij: laadsessie stopt bij het doel en houdt dan vast; vasthouden stopt als er zon naar het net gaat.

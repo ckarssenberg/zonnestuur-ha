@@ -835,6 +835,7 @@ async function settings() {
       </details>
       <label class="check-row"><input type="checkbox" id="n_alerts" ${N.alerts === false ? "" : "checked"}> Storingen: meter of apparaat reageert niet, schakelen lukt niet, warm water in gevaar</label>
       <label class="check-row"><input type="checkbox" id="n_tips" ${N.tips === false ? "" : "checked"}> Kansen: morgen negatieve prijzen of veel zon, vanavond dure stroom (hoogstens één per dag)</label>
+      <label class="check-row"><input type="checkbox" id="n_appl" ${N.appliances === false ? "" : "checked"}> Witgoed: als je de was of vaat klaarzet hoe laat hij start, en als hij gestart is</label>
       <label class="check-row"><input type="checkbox" id="n_rep" ${N.reports === false ? "" : "checked"}> Weekrapport op zondag om 19:00</label>
       <div class="row" style="margin-top:8px"><div class="field"><label for="n_link">Adres van Zonnestuur in meldingen (optioneel)</label><input id="n_link" placeholder="${CFG.ha_addon ? "bijv. https://jouw-ha.ui.nabu.casa" : "http://zonnestuur.local"}" value="${esc(N.link || "")}"></div>
         <div class="field" style="flex:0 0 auto"><button class="btn ghost" id="n_test">Testmelding</button></div></div>
@@ -1068,7 +1069,7 @@ async function settings() {
   }
   const readNotify = () => {
     const g = (id) => ($(id) ? $(id).value.trim() : "");
-    const n = { tips: $("n_tips").checked, alerts: $("n_alerts").checked, reports: $("n_rep").checked, link: g("n_link") };
+    const n = { tips: $("n_tips").checked, alerts: $("n_alerts").checked, reports: $("n_rep").checked, appliances: $("n_appl").checked, link: g("n_link") };
     if (g("n_svc")) n.service = g("n_svc");
     if (g("n_ntfy")) n.ntfy = { topic: g("n_ntfy"), server: g("n_ntfys") || "https://ntfy.sh" };
     if (g("n_tgc")) n.telegram = { chat_id: g("n_tgc"), token: g("n_tgt") };

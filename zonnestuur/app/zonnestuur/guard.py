@@ -85,7 +85,8 @@ class InverterLimiter:
 COOLDOWN = {"surplus": timedelta(hours=20), "negative_tomorrow": timedelta(hours=20), "sunny_tomorrow": timedelta(hours=20),
             "expensive_evening": timedelta(hours=20), "offline": timedelta(hours=12), "meter": timedelta(hours=6),
             "inverter": timedelta(hours=6), "morning": timedelta(hours=20), "fail": timedelta(hours=6),
-            "guarantee": timedelta(hours=6), "resolved": timedelta(0), "week": timedelta(days=6)}
+            "guarantee": timedelta(hours=6), "resolved": timedelta(0), "week": timedelta(days=6),
+            "appliance": timedelta(0)}
 TIP_KINDS = ("surplus", "negative_tomorrow", "sunny_tomorrow", "expensive_evening", "morning")
 ALERT_KINDS = ("offline", "meter", "fail", "guarantee", "resolved")
 
@@ -100,12 +101,16 @@ class Notifier:
     KANS     hoogstens één per dag, alleen 08:00–21:00: morgen negatieve prijzen, morgen veel zon, vanavond dure stroom,
              nu veel over terwijl alles al draait. Altijd met een bedrag erbij.
     RAPPORT  het weekrapport op zondag 19:00. Geen tips en rapporten tussen 22:00 en 07:00.
+    WITGOED  zet je de was klaar met 'start op afstand', dan meteen wanneer hij start (en wat dat kost), en een
+             melding als hij gestart is. Vergeten een programma te kiezen? Dan na 10 minuten een seintje.
+             Niet tussen 22:00 en 07:00: dan komt de melding om 07:00.
     """
     service: str = ""                 # Home Assistant: bijv. notify.mobile_app_telefoon
     tips: bool = True
     alerts: bool = True
     reports: bool = True
     morning: bool = False             # dagelijkse ochtendtip (standaard uit: zo min mogelijk meldingen)
+    appliances: bool = True           # witgoed: staat klaar (en wanneer hij start), en gestart
     night_alerts: bool = True         # storingen ook 's nachts
     channels: dict = field(default_factory=dict)      # volledige meld-instellingen (ntfy, telegram, e-mail)
     sent: dict = field(default_factory=dict)          # sleutel -> datetime laatst verstuurd
@@ -122,6 +127,7 @@ class Notifier:
             return None
         return cls(service=c.get("service", ""), tips=c.get("tips", True), alerts=c.get("alerts", True),
                    reports=c.get("reports", True), morning=bool(c.get("morning", False)),
+                   appliances=c.get("appliances", True),
                    night_alerts=c.get("night_alerts", True), channels=dict(c))
 
     def _held(self, key: str, cond: bool, mono: float, seconds: float) -> bool:

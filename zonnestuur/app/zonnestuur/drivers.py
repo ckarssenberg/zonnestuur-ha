@@ -313,6 +313,9 @@ class HAStartButton:
             return SwitchStatus(True, float(power or 0.0), None)
         self.started_at = None
         if not armed:
+            if self.remote and self.ha.state(self.remote).get("state") == "on":
+                # start op afstand staat aan, maar de startknop is er (nog) niet: meestal geen programma gekozen
+                raise NotReady("start op afstand staat aan, maar kies nog een programma op de machine")
             raise NotReady("wacht tot je hem klaarzet met start op afstand")
         return SwitchStatus(False, 0.0, None)
 

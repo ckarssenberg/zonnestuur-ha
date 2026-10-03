@@ -43,6 +43,9 @@ in plaats van die stroom voor bijna niets terug te leveren.
 
 ## Meldingen, weekrapport en doel
 
+- **Witgoed:** zet je de was klaar met 'start op afstand', dan meldt Zonnestuur meteen hoe laat hij start en wat de
+  stroom dan kost, en later dat hij gestart is. Vergeten een programma te kiezen? Dan krijg je na 10 minuten een seintje.
+
 - Meldingen kunnen via de Home Assistant-app, de gratis app **ntfy**, Telegram of e-mail. Je krijgt ze alleen bij een
   storing, hoogstens één keer per dag bij een kans om geld te besparen, en op zondag 19:00 het **weekrapport**.
 - Kies onder Instellingen → Jouw doel wat je belangrijk vindt. Het doel is "zoveel beter dan zonder Zonnestuur",

@@ -1389,9 +1389,66 @@ class Engine:
                     items.append((key, "week", r["title"], r["message"]))
                 except Exception as exc:
                     log.warning("weekrapport maken mislukt: %s", exc)
+        if self.notifier.appliances:
+            items += self._appliance_items(now, mono)
         self.notifier.send(self._ha_or_none(), now, items, click=self._public_url("rapport"))
         for k, kind, *_ in items:
             self.ledger.inc(now.date().isoformat(), f"melding_{kind}")
+
+    def _appliance_items(self, now: datetime, mono: float) -> list:
+        """Witgoed met 'start op afstand': melden dat hij klaarstaat en wanneer hij start, en dat hij gestart is."""
+        out = []
+        seen = getattr(self, "_appl", {})
+        quiet = self.notifier.quiet(now)
+        for d in self.cfg.devices:
+            if d.driver != "ha_start_button":
+                continue
+            st = self.controller.states.get(d.id)
+            if not st:
+                continue
+            s = seen.setdefault(d.id, {"armed": False, "on": False, "since": None, "told": False, "half": None})
+            armed = st.online and not st.on
+            half = (not st.online) and "kies nog een programma" in str(st.offline_reason)
+            # 1. klaargezet: wanneer start hij?
+            if armed and not s["armed"]:
+                s["since"], s["told"] = now, False
+            if armed and not s["told"] and not quiet:
+                out.append((f"klaar:{d.id}:{s['since']:%Y%m%d%H%M}", "appliance", f"{d.name} staat klaar", self._start_text(d, now)))
+                s["told"] = True
+            # 2. gestart door Zonnestuur
+            if st.on and not s["on"] and s["armed"]:
+                p = self.prices.import_price(now)
+                src = "met je eigen zonnestroom" if (self.grid_w or 0) < -300 else f"stroom kost nu € {p:.2f} per kWh"
+                out.append((f"start:{d.id}:{now:%Y%m%d%H%M}", "appliance", f"{d.name} is gestart", f"Gestart om {now:%H:%M}, {src}."))
+            # 3. start op afstand aan, maar geen programma gekozen
+            if half:
+                if s["half"] is None:
+                    s["half"] = mono
+                k = f"half:{d.id}:{now:%Y%m%d}"
+                if mono - s["half"] >= 600 and not quiet and k not in self.notifier.sent:
+                    out.append((k, "appliance", f"{d.name}: kies nog een programma",
+                                "Start op afstand staat aan, maar er is nog geen programma gekozen. Kies het programma op de machine "
+                                "en zet start op afstand opnieuw aan; dan start Zonnestuur hem op het goedkoopste moment."))
+            else:
+                s["half"] = None
+            s["armed"], s["on"] = armed, st.on
+        self._appl = seen
+        return out
+
+    def _start_text(self, d, now: datetime) -> str:
+        """Wanneer start Zonnestuur dit witgoed, en wat kost de stroom dan?"""
+        hours = self._best_hours(d.id, now)
+        when = next((h for h in hours if h >= now.strftime("%H:00")), None)
+        if when:
+            t = now.replace(hour=int(when[:2]), minute=0, second=0, microsecond=0)
+            p = self.prices.import_price(max(t, now), live=False)
+            avg = self._avg_price_today(now)
+            gain = f" Dat is {(avg - p) * 100:.0f} ct per kWh goedkoper dan gemiddeld vandaag." if avg and avg - p > 0.01 else ""
+            start_txt = "nu meteen" if t <= now else f"om {t:%H:%M}"
+            return f"Zonnestuur start hem {start_txt}: dan kost stroom € {p:.2f} per kWh.{gain} Je hoeft niets meer te doen."
+        if self.cfg.solar.has_panels:
+            return "Zonnestuur start hem zodra er genoeg zon over is. Je hoeft niets meer te doen."
+        return "Zonnestuur start hem in het goedkoopste uur. Je hoeft niets meer te doen."
 
     def _ha_or_none(self):
         return (lambda: ha_client(self.cfg)) if effective_ha(self.cfg).get("token") else None
