@@ -1419,7 +1419,11 @@ class Engine:
             if st.on and not s["on"] and s["armed"]:
                 p = self.prices.import_price(now)
                 src = "met je eigen zonnestroom" if (self.grid_w or 0) < -300 else f"stroom kost nu € {p:.2f} per kWh"
-                out.append((f"start:{d.id}:{now:%Y%m%d%H%M}", "appliance", f"{d.name} is gestart", f"Gestart om {now:%H:%M}, {src}."))
+                prog = self._program_label(d)
+                out.append((f"start:{d.id}:{now:%Y%m%d%H%M}", "appliance", f"{d.name} is gestart",
+                            f"Gestart om {now:%H:%M}{f' met {prog}' if prog else ''}, {src}."))
+            if st.on and not s["on"] and not (d.params or {}).get("program_keep") and (d.params or {}).get("program_id") not in (None, ""):
+                self._set_program_quiet(d, None, None, False)      # gekozen voor één wasbeurt
             # 3. start op afstand aan, maar geen programma gekozen
             if half:
                 if s["half"] is None:
@@ -1427,13 +1431,75 @@ class Engine:
                 k = f"half:{d.id}:{now:%Y%m%d}"
                 if mono - s["half"] >= 600 and not quiet and k not in self.notifier.sent:
                     out.append((k, "appliance", f"{d.name}: kies nog een programma",
-                                "Start op afstand staat aan, maar er is nog geen programma gekozen. Kies het programma op de machine "
-                                "en zet start op afstand opnieuw aan; dan start Zonnestuur hem op het goedkoopste moment."))
+                                "Start op afstand staat aan, maar er is nog geen programma gekozen. Kies het programma in Zonnestuur "
+                                "(op de kaart van de machine), of op de machine zelf; dan start Zonnestuur hem op het goedkoopste moment."))
             else:
                 s["half"] = None
             s["armed"], s["on"] = armed, st.on
         self._appl = seen
         return out
+
+    # ---- witgoed: programma kiezen in Zonnestuur --------------------------------
+    def programs_view(self, device_id: str) -> dict:
+        d = self._device(device_id)
+        if not d or d.driver != "ha_start_button":
+            return {"ok": False, "error": "onbekend apparaat"}
+        cache = getattr(self, "_programs", {})
+        hit = cache.get(device_id)
+        if not hit or time.monotonic() - hit[0] > 3600 or not hit[1]:
+            sw = (self.switches or {}).get(device_id)
+            progs = []
+            if sw is not None and hasattr(sw, "programs"):
+                try:
+                    progs = sw.programs()
+                except Exception as exc:
+                    log.debug("programma's ophalen: %s", exc)
+            cache[device_id] = hit = (time.monotonic(), progs)
+            self._programs = cache
+        p = d.params or {}
+        return {"ok": True, "programs": hit[1], "selected": p.get("program_id"), "keep": bool(p.get("program_keep"))}
+
+    def _program_label(self, d) -> Optional[str]:
+        pid = (d.params or {}).get("program_id")
+        if pid in (None, ""):
+            return None
+        hit = getattr(self, "_programs", {}).get(d.id)
+        name = next((x["name"] for x in (hit[1] if hit else []) if str(x["id"]) == str(pid)), None)
+        return name or (d.params or {}).get("program_name") or f"programma {pid}"
+
+    def _set_program_quiet(self, d, program_id, name: Optional[str], keep: bool) -> None:
+        """Programma bewaren zonder de koppeling opnieuw op te bouwen (een lopend programma blijft zo zichtbaar)."""
+        d.params = dict(d.params or {})
+        if program_id in (None, ""):
+            for k in ("program_id", "program_name", "program_keep"):
+                d.params.pop(k, None)
+        else:
+            d.params.update(program_id=program_id, program_name=name or "", program_keep=bool(keep))
+        sw = (self.switches or {}).get(d.id)
+        if sw is not None and hasattr(sw, "program_id"):
+            sw.program_id = None if program_id in (None, "") else program_id
+        if self.config_path:
+            save_config(self.cfg, self.config_path)
+
+    def set_program(self, device_id: str, body: dict) -> dict:
+        d = self._device(device_id)
+        if not d or d.driver != "ha_start_button":
+            return {"ok": False, "error": "onbekend apparaat"}
+        pid = body.get("program_id")
+        name = None
+        if pid not in (None, ""):
+            progs = self.programs_view(device_id).get("programs") or []
+            match = next((x for x in progs if str(x["id"]) == str(pid)), None)
+            if progs and not match:
+                return {"ok": False, "error": "onbekend programma"}
+            if match:
+                pid, name = match["id"], match["name"]
+        with self.lock:
+            self._set_program_quiet(d, pid, name, bool(body.get("keep")))
+            s = getattr(self, "_appl", {}).get(d.id)
+            if s:
+                s["told"] = False                          # opnieuw melden, nu met het programma erbij
+        return {"ok": True, "program": self._program_label(d)}
 
     def _start_text(self, d, now: datetime) -> str:
         """Wanneer start Zonnestuur dit witgoed, en wat kost de stroom dan?"""
@@ -1445,10 +1511,14 @@ class Engine:
             avg = self._avg_price_today(now)
             gain = f" Dat is {(avg - p) * 100:.0f} ct per kWh goedkoper dan gemiddeld vandaag." if avg and avg - p > 0.01 else ""
             start_txt = "nu meteen" if t <= now else f"om {t:%H:%M}"
-            return f"Zonnestuur start hem {start_txt}: dan kost stroom € {p:.2f} per kWh.{gain} Je hoeft niets meer te doen."
+            prog = self._program_label(d)
+            return (f"Zonnestuur start hem {start_txt}{f' met {prog}' if prog else ''}: dan kost stroom € {p:.2f} per kWh.{gain} "
+                    "Je hoeft niets meer te doen.")
+        prog = self._program_label(d)
+        met = f" met {prog}" if prog else ""
         if self.cfg.solar.has_panels:
-            return "Zonnestuur start hem zodra er genoeg zon over is. Je hoeft niets meer te doen."
-        return "Zonnestuur start hem in het goedkoopste uur. Je hoeft niets meer te doen."
+            return f"Zonnestuur start hem{met} zodra er genoeg zon over is. Je hoeft niets meer te doen."
+        return f"Zonnestuur start hem{met} in het goedkoopste uur. Je hoeft niets meer te doen."
 
     def _ha_or_none(self):
         return (lambda: ha_client(self.cfg)) if effective_ha(self.cfg).get("token") else None
@@ -1842,6 +1912,8 @@ class Engine:
                                 "next_ready_ok": (self.controller.is_satisfied(d, self.controller.states[d.id], ready[0])
                                                   if ready else None),
                                 "best_hours": self._best_hours(d.id, now),
+                                "program": self._program_label(d) if d.driver == "ha_start_button" else None,
+                                "program_keep": bool((d.params or {}).get("program_keep")),
                                 "last_event": next(iter(self.events.view_device(d.id, int((now - timedelta(days=2)).timestamp()))), None),
                                 "ev": self.ev_view(d, now),
                                 **st.to_dict(), "month": per_dev.get(d.id, {"kwh": 0, "kwh_solar": 0, "eur_saved": 0})})
@@ -2267,6 +2339,9 @@ def make_handler(engine: Engine):
                 return
             if url.path == "/api/setup/ev":
                 return self._json(200, engine.ev_offer())
+            gp = url.path.strip("/").split("/")
+            if len(gp) == 4 and gp[:2] == ["api", "device"] and gp[3] == "programs":
+                return self._json(200, engine.programs_view(gp[2]))
             if url.path == "/api/events":
                 return self._json(200, engine.events_view(min(14, max(1, int(q.get("days", ["2"])[0])))))
             if url.path == "/api/coach":
@@ -2328,6 +2403,8 @@ def make_handler(engine: Engine):
                 return self._json(200, engine.add_ev(body))
             if len(parts) == 4 and parts[:2] == ["api", "device"] and parts[3] == "ev":
                 return self._json(200, engine.set_ev(parts[2], body))
+            if len(parts) == 4 and parts[:2] == ["api", "device"] and parts[3] == "program":
+                return self._json(200, engine.set_program(parts[2], body))
             if len(parts) == 4 and parts[:2] == ["api", "device"] and parts[3] == "ready":
                 return self._json(200, engine.set_ready(parts[2], list(body.get("times") or []), body.get("days")))
             if url.path == "/api/config":

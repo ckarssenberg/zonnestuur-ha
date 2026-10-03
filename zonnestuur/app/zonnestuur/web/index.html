@@ -131,6 +131,10 @@
     background: var(--card-solid); border: 1px solid var(--card-line); font-size: 14px; font-weight: 650; }
   .ev-offer-cars label.car small { font-weight: 500; color: var(--ink-2); }
   .ev-offer-cars select { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 9px; border: 1px solid var(--card-line); background: var(--card-solid); color: var(--ink); max-width: 230px; }
+  .prog-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 8px; font-size: 13.5px; color: var(--ink-2); }
+  .prog-row label { display: flex; align-items: center; gap: 8px; }
+  .prog-row select { font: inherit; font-size: 14px; font-weight: 600; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--card-line); background: var(--card-solid); color: var(--ink); max-width: 230px; }
+  .prog-row .keep { font-size: 12.5px; }
   .ready-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13.5px; }
   .ready-row button { font: inherit; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--card-line); background: var(--card-solid); color: var(--ink); cursor: pointer; font-size: 17px; }
   .c-welcome .opts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -914,6 +918,7 @@ function renderDevices(s) {
       </div>
       ${d.ev ? evPanel(d) : ""}
       ${(d.kind === "ev" && !(d.ev && d.ev.cars.length)) || (d.kind !== "ev" && (d.ready_times || []).length) ? `<div class="ready-row"><span class="muted">${d.kind === "ev" ? "Vol om" : "Klaar om"}</span><button data-rd="-30" aria-label="Eerder">−</button><b class="num">${esc((d.ready_times || [])[0] || "geen")}</b><button data-rd="30" aria-label="Later">+</button></div>` : ""}
+      ${d.driver === "ha_start_button" ? progRow(d) : ""}
       ${d.last_event ? `<div class="why"><b>Waarom?</b> ${esc(d.last_event.text)}${d.last_event.outcome ? ` <span class="muted">${d.last_event.running ? "Tot nu: " : ""}${esc(d.last_event.outcome)}</span>` : ""}</div>` : ""}
       <div class="seg" role="group" aria-label="Bediening ${esc(d.name)}">
         <button data-mode="auto" class="${d.mode === "auto" && !(d.ev && d.ev.mode === "vol") ? "active" : ""}">Automatisch</button>
@@ -932,6 +937,7 @@ function renderDevices(s) {
     el.dataset.id = d.id;
     if (openEv.has(d.id)) { const dt = el.querySelector("details.ev-edit"); if (dt) dt.open = true; }
     if (d.ev) bindEv(el, d);
+    if (d.driver === "ha_start_button") bindProg(el, d);
     el.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", async () => {
       if (d.ev && d.ev.mode === "vol") await evPost(d.id, { mode: "slim" });
       await api(`api/device/${encodeURIComponent(d.id)}/mode`, {
@@ -943,6 +949,35 @@ function renderDevices(s) {
     wrap.appendChild(el);
   }
   for (const b of s.batteries || []) wrap.appendChild(batteryCard(s, b));
+}
+
+// ---------- witgoed: programma kiezen ----------
+const PROGS = {};
+function progRow(d) {
+  const P = PROGS[d.id];
+  const sel = P && P.selected != null ? String(P.selected) : "";
+  const opts = P && P.programs.length ? P.programs.map((x) => `<option value="${esc(String(x.id))}" ${String(x.id) === sel ? "selected" : ""}>${esc(x.name)}</option>`).join("")
+    : (d.program ? `<option value="" selected>${esc(d.program)}</option>` : "");
+  return `<div class="prog-row"><label><span>Programma</span><select data-prog aria-label="Programma van ${esc(d.name)}">
+      <option value="">${P && !P.programs.length ? "Kies op de machine (geen lijst beschikbaar)" : "Kies op de machine"}</option>${opts}</select></label>
+    ${d.program || sel ? `<label class="keep"><input type="checkbox" data-keep ${d.program_keep ? "checked" : ""}> altijd dit programma</label>` : ""}</div>
+    <div class="small muted" style="margin:-4px 0 10px">${d.program ? `Zonnestuur start de ${esc(d.name.toLowerCase())} met <b style="color:var(--ink)">${esc(d.program)}</b>${d.program_keep ? "" : " (alleen voor deze keer)"}. Vul de machine en zet start op afstand aan.`
+      : "Vul de machine, zet start op afstand aan en kies hier of op de machine het programma."}</div>`;
+}
+function bindProg(el, d) {
+  const sel = el.querySelector("[data-prog]"), keep = el.querySelector("[data-keep]");
+  if (!PROGS[d.id] && sel) {
+    PROGS[d.id] = { programs: [], selected: null, loading: true };
+    api(`api/device/${encodeURIComponent(d.id)}/programs`).then((r) => { PROGS[d.id] = { programs: r.programs || [], selected: r.selected }; refresh(); }).catch(() => {});
+  }
+  const save = async () => {
+    const r = await api(`api/device/${encodeURIComponent(d.id)}/program`, { method: "POST", body: JSON.stringify({ program_id: sel.value || null, keep: keep ? keep.checked : false }) });
+    if (r && r.ok === false) alert(r.error);
+    if (PROGS[d.id]) PROGS[d.id].selected = sel.value || null;
+    refresh();
+  };
+  if (sel) sel.onchange = save;
+  if (keep) keep.onchange = save;
 }
 
 // ---------- auto laden: auto's aan de laadpaal ----------

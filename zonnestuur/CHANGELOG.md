@@ -1,5 +1,9 @@
 # Wijzigingen
 
+## 0.25.0 – Programma kiezen in Zonnestuur
+- Kies het wasprogramma op de kaart van de machine (Miele en Home Connect): Zonnestuur zet het programma op het goedkoopste moment en start hem. Alleen voor deze wasbeurt, of 'altijd dit programma'.
+- Programmanamen in het Nederlands; de meldingen noemen het programma.
+
 ## 0.24.1 – Melding als de was klaarstaat
 - Zet je de was- of droogmachine op 'start op afstand', dan krijg je meteen een melding hoe laat Zonnestuur hem start en wat de stroom dan kost, en een melding als hij gestart is.
 - Staat start op afstand aan maar is er geen programma gekozen, dan zegt Zonnestuur dat (op de kaart en na 10 minuten met een melding).

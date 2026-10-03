@@ -160,6 +160,17 @@ class HomeAssistant:
     def call(self, domain: str, service: str, data: dict) -> None:
         _request(f"{self.url}/api/services/{domain}/{service}", "POST", data, headers=self._h(), timeout=self.timeout)
 
+    def call_response(self, domain: str, service: str, data: dict) -> dict:
+        """Dienst met antwoord (bijv. miele.get_programs)."""
+        r = _request(f"{self.url}/api/services/{domain}/{service}?return_response", "POST", data, headers=self._h(),
+                     timeout=max(self.timeout, 15))
+        return (r or {}).get("service_response") or {}
+
+    def template(self, tpl: str):
+        """Een Home Assistant-sjabloon uitrekenen (als JSON)."""
+        return _request(f"{self.url}/api/template", "POST", {"template": "{{ (" + tpl + ") | tojson }}"},
+                        headers=self._h(), timeout=self.timeout)
+
     def set_state(self, entity_id: str, state, attributes: dict) -> None:
         """Eigen sensor in Home Assistant zetten (verdwijnt bij een herstart van HA; Zonnestuur zet hem opnieuw)."""
         _request(f"{self.url}/api/states/{entity_id}", "POST", {"state": state, "attributes": attributes},
@@ -287,23 +298,76 @@ class HASetpointBoost:
             self.ha.call(self.domain, "set_temperature", {"entity_id": self.entity, "temperature": t})
 
 
-class HAStartButton:
-    """Witgoed via Home Assistant (bijv. Miele, Home Connect): het programma starten als de zon schijnt.
+# Programmanamen van witgoed (Miele, Home Connect) in het Nederlands
+PROGRAM_NL = {"cottons": "Katoen", "eco 40-60": "ECO 40-60", "delicates": "Fijne was", "woollens": "Wol", "silks": "Zijde",
+              "shirts": "Overhemden", "minimum iron": "Kreukherstellend", "quickpowerwash": "QuickPowerWash",
+              "dark garments / denim": "Donkere was / jeans", "express 20": "Express 20", "sportswear": "Sportkleding",
+              "outerwear": "Outdoor", "automatic plus": "Automatic plus", "pillows": "Kussens", "curtains": "Gordijnen",
+              "down filled items": "Donsartikelen", "down duvets": "Dekbedden", "first wash": "Nieuw textiel",
+              "separate rinse / starch": "Spoelen / stijven", "drain / spin": "Pompen / centrifugeren",
+              "clean machine": "Machine reinigen", "cottons hygiene": "Katoen hygiëne", "proofing": "Impregneren",
+              "mixed wash": "Gemengde was", "synthetics": "Synthetisch", "quick": "Snel", "towels": "Handdoeken",
+              "bed linen": "Beddengoed", "jeans": "Jeans", "hygiene": "Hygiëne", "cotton": "Katoen", "easy care": "Kreukherstellend",
+              "auto": "Automatisch", "eco": "ECO", "intensive": "Intensief", "normal": "Normaal"}
 
-    Jij vult de machine en zet hem op 'start op afstand'. Zonnestuur drukt op de startknop zodra er genoeg
-    overschot is. Uitzetten doet Zonnestuur nooit: een gestart programma loopt altijd af.
+
+def program_name(name: str) -> str:
+    raw = str(name or "")
+    key = raw.lower().replace("_", " ").strip()
+    key = key.split(".")[-1] if "." in key and " " not in key else key   # Home Connect: LaundryCare.Washer.Program.Cotton
+    return PROGRAM_NL.get(key, raw.split(".")[-1].replace("_", " ") or raw)
+
+
+class HAStartButton:
+    """Witgoed via Home Assistant (bijv. Miele, Home Connect): het programma starten op zon of het goedkoopste uur.
+
+    Jij vult de machine en zet hem op 'start op afstand'. Het programma kies je op de machine, of in Zonnestuur:
+    dan zet Zonnestuur het programma op het startmoment (Miele: miele.set_program; Home Connect: de programma-keuze)
+    en start hem. Uitzetten doet Zonnestuur nooit: een gestart programma loopt altijd af.
     """
 
     RUN_HOURS = 4.0
 
-    def __init__(self, ha: HomeAssistant, button_entity: str, remote_entity: str = "", power_entity: str = ""):
+    def __init__(self, ha: HomeAssistant, button_entity: str, remote_entity: str = "", power_entity: str = "",
+                 program_id=None, program_entity: str = ""):
         self.ha, self.button, self.remote, self.power_entity = ha, button_entity, remote_entity, power_entity
+        self.program_id, self.program_entity = program_id, program_entity
         self.started_at: Optional[float] = None
+        self._device_id: Optional[str] = None
+
+    def _button_ok(self) -> bool:
+        return self.ha.state(self.button).get("state") not in ("unavailable", "unknown", None)
+
+    def _remote_on(self) -> bool:
+        return not self.remote or self.ha.state(self.remote).get("state") == "on"
 
     def _armed(self) -> bool:
-        if self.ha.state(self.button).get("state") in ("unavailable", "unknown", None):
+        if not self._remote_on():
             return False
-        return not self.remote or self.ha.state(self.remote).get("state") == "on"
+        return self._button_ok() or self.program_id not in (None, "")
+
+    def device_id(self) -> Optional[str]:
+        if self._device_id is None:
+            try:
+                self._device_id = self.ha.template(f"device_id('{self.button}')") or ""
+            except DeviceError:
+                return None
+        return self._device_id or None
+
+    def programs(self) -> list[dict]:
+        """Programma's die deze machine kent: [{'id', 'name'}]."""
+        if self.program_entity:
+            opts = (self.ha.state(self.program_entity).get("attributes") or {}).get("options") or []
+            return [{"id": o, "name": program_name(o)} for o in opts]
+        dev = self.device_id()
+        if not dev:
+            return []
+        try:
+            r = self.ha.call_response("miele", "get_programs", {"device_id": dev})
+        except DeviceError:
+            return []
+        return [{"id": p.get("program_id"), "name": program_name(p.get("program"))} for p in r.get("programs") or []
+                if p.get("program_id") is not None]
 
     def status(self) -> SwitchStatus:
         armed = self._armed()
@@ -313,9 +377,9 @@ class HAStartButton:
             return SwitchStatus(True, float(power or 0.0), None)
         self.started_at = None
         if not armed:
-            if self.remote and self.ha.state(self.remote).get("state") == "on":
+            if self.remote and self._remote_on():
                 # start op afstand staat aan, maar de startknop is er (nog) niet: meestal geen programma gekozen
-                raise NotReady("start op afstand staat aan, maar kies nog een programma op de machine")
+                raise NotReady("start op afstand staat aan, maar kies nog een programma (op de machine of hier)")
             raise NotReady("wacht tot je hem klaarzet met start op afstand")
         return SwitchStatus(False, 0.0, None)
 
@@ -324,7 +388,29 @@ class HAStartButton:
             return                                      # een lopend programma nooit afbreken
         if not self._armed():
             raise NotReady("niet klaargezet")
-        self.ha.call("button", "press", {"entity_id": self.button})
+        if self.program_id not in (None, ""):
+            if self.program_entity:
+                self.ha.call(self.program_entity.split(".", 1)[0], "select_option",
+                             {"entity_id": self.program_entity, "option": self.program_id})
+            else:
+                dev = self.device_id()
+                if not dev:
+                    raise DeviceError("programma kiezen: apparaat niet gevonden in Home Assistant")
+                self.ha.call("miele", "set_program", {"device_id": dev, "program_id": int(self.program_id)})
+            # Miele start meestal meteen; anders verschijnt de startknop en drukken we hem in (op de achtergrond)
+            def _press_if_needed():
+                for _ in range(10):
+                    time.sleep(1.5)
+                    try:
+                        if self._button_ok():
+                            self.ha.call("button", "press", {"entity_id": self.button})
+                            return
+                    except DeviceError:
+                        return
+            import threading
+            threading.Thread(target=_press_if_needed, daemon=True, name="witgoed-start").start()
+        else:
+            self.ha.call("button", "press", {"entity_id": self.button})
         self.started_at = time.monotonic()
 
 
@@ -463,7 +549,8 @@ def make_switch(cfg, d):
         return HASetpointBoost(ha, p["entity"], float(p.get("normal_temp", 50)), float(p.get("boost_temp", 60)),
                                p.get("power_entity", ""), p.get("running_entity", ""), float(d.power_w))
     if drv == "ha_start_button":
-        return HAStartButton(ha, p["button_entity"], p.get("remote_entity", ""), p.get("power_entity", ""))
+        return HAStartButton(ha, p["button_entity"], p.get("remote_entity", ""), p.get("power_entity", ""),
+                             p.get("program_id"), p.get("program_entity", ""))
     if drv == "ha_current":
         return HACurrentControl(ha, p["current_entity"], p.get("switch_entity", ""), p.get("power_entity", ""),
                                 int(p.get("phases", 1)), float(p.get("volts", 230)), float(p.get("min_a", 6)),
@@ -586,8 +673,12 @@ def ha_candidates(states: list[dict]) -> dict:
             if not remote:
                 continue                                  # zonder 'start op afstand' is het vaak geen witgoed
             dev_name = name[: -len(" starten")] if name.lower().endswith(" starten") else name
+            stem = _stem(eid)
+            prog = next((e for e, st2 in by_id.items() if e.startswith("select.") and stem and stem in e and "program" in e
+                         and "active" not in e and (st2.get("attributes") or {}).get("options")), "")   # Home Connect
             devices.append({"driver": "ha_start_button", "button_entity": eid, "remote_entity": remote, "name": dev_name,
-                            "kind": "generic", "power_w": 1200, "power_entity": _match_power(eid, by_id), "score": 3})
+                            "kind": "generic", "power_w": 1200, "power_entity": _match_power(eid, by_id), "score": 3,
+                            "program_entity": prog})
         elif dom == "switch":
             if any(w in t for w in _NOT_A_LOAD):
                 continue
