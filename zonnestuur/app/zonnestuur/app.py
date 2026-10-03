@@ -867,7 +867,125 @@ class Engine:
             m = moment(now, self.grid_w, surplus_next, price if self.cfg.contract.type == "dynamic" else None, rank, nxt,
                        self.cfg.solar.has_panels)
             m.update(at=now.isoformat(timespec="minutes"), price_now=round(price, 4), grid_w=None if self.grid_w is None else round(self.grid_w))
+            m["level"] = {"groen": "goed", "oranje": "neutraal", "rood": "wachten"}.get(m["state"], "neutraal")
+            try:
+                m["window"] = self._good_window(now)
+            except Exception:
+                m["window"] = None
             return m
+
+    def _good_window(self, now: datetime) -> Optional[dict]:
+        """Het volgende goede blok van 3 uur in de komende 24 uur: zon over, of de goedkoopste aaneengesloten uren."""
+        if self.cfg.solar.has_panels and self.forecast.hours:
+            try:
+                for w in self.coach_view().get("windows") or []:
+                    if w.get("tomorrow") or w["to"] > now.strftime("%H:%M"):
+                        return {"from": w["from"], "to": w["to"], "kind": "zon", "tomorrow": bool(w.get("tomorrow")),
+                                "kwh": w.get("kwh")}
+            except Exception:
+                pass
+        if self.cfg.contract.type != "dynamic" or not self.prices.slots:
+            return None
+        start = now.replace(minute=0, second=0, microsecond=0)
+        per: dict = {}
+        for s0, _, p in self.prices.upcoming(start.astimezone(timezone.utc), (start + timedelta(hours=24)).astimezone(timezone.utc)):
+            per.setdefault(s0.astimezone(self.tz).replace(minute=0, second=0, microsecond=0), []).append(p)
+        hrs = sorted(per)
+        if len(hrs) < 3:
+            return None
+        avg = {h: sum(v) / len(v) for h, v in per.items()}
+        best = min(range(len(hrs) - 2), key=lambda i: sum(avg[hrs[i + k]] for k in range(3)))
+        h0 = hrs[best]
+        price = sum(avg[hrs[best + k]] for k in range(3)) / 3
+        return {"from": h0.strftime("%H:%M"), "to": (h0 + timedelta(hours=3)).strftime("%H:%M"), "kind": "prijs",
+                "tomorrow": h0.date() != now.date(), "price": round(price, 4), "now": h0 <= now < h0 + timedelta(hours=3)}
+
+    def plan_view(self, now: Optional[datetime] = None) -> dict:
+        """Wat Zonnestuur de komende 24 uur van plan is, per blok met één zin waarom en wat het ongeveer kost."""
+        now = now or datetime.now(self.tz)
+        horizon = now + timedelta(hours=24)
+        items = []
+        hour0 = now.replace(minute=0, second=0, microsecond=0)
+
+        def blocks(hours: list) -> list:
+            out, cur = [], None
+            for h in sorted(hours):
+                if cur and h == cur[1]:
+                    cur[1] = h + timedelta(hours=1)
+                else:
+                    if cur:
+                        out.append(cur)
+                    cur = [h, h + timedelta(hours=1)]
+            if cur:
+                out.append(cur)
+            return out
+
+        def price_of(a, b) -> Optional[float]:
+            ps, t = [], a
+            while t < b:
+                ps.append(self.prices.import_price(t, live=False))
+                t += timedelta(hours=1)
+            return sum(ps) / len(ps) if ps else None
+
+        sunny = getattr(self, "_sunny", {}) or {}
+        for d in self.cfg.devices:
+            st = self.controller.states.get(d.id)
+            if not st or st.mode == "off":
+                continue
+            if d.driver == "ha_start_button" and not (st.online and not st.on):
+                continue                                   # witgoed: alleen als hij klaarstaat
+            cheap = {h for h in self._planned_hours(d) if h + timedelta(hours=1) > now and h < horizon}
+            sun = {h for h in sunny.get(d.id, set()) if h + timedelta(hours=1) > now and h < horizon} - cheap
+            ready = self.controller.ready_datetimes(d, now)
+            kw = (d.max_w if d.modulating else d.power_w) / 1000
+            e = self.ev_need(d) if d.kind == "ev" else None
+            if e:
+                kw = e["kw"]
+            for kind, hs in (("prijs", cheap), ("zon", sun)):
+                for a, b in blocks(list(hs)):
+                    a2 = max(a, now) if a <= now else a
+                    hrs = (b - a2).total_seconds() / 3600
+                    p = price_of(a, b)
+                    if kind == "zon":
+                        why = "verwachte zon over"
+                        eur = 0.0
+                    else:
+                        why = "goedkoopste uren"
+                        if ready and ready[0] >= b:
+                            why += f" vóór {ready[0]:%H:%M}"
+                        eur = (p or 0) * kw * hrs
+                    if d.driver == "ha_start_button":
+                        what, eur = "start", (p or 0) * 1.0 if kind == "prijs" else 0.0
+                    elif d.kind == "ev":
+                        what = "laadt"
+                    elif d.kind in ("boiler", "heatpump"):
+                        what = "warmt op" if d.kind == "boiler" else "draait extra"
+                    else:
+                        what = "aan"
+                    items.append({"start": a.isoformat(timespec="minutes"), "end": b.isoformat(timespec="minutes"),
+                                  "device": d.id, "name": d.name, "kind": d.kind, "what": what, "source": kind, "why": why,
+                                  "price": None if p is None else round(p, 4), "eur": round(eur, 2),
+                                  "now": a <= now < b})
+        for b in self.batteries.values():
+            plan = [p for p in b.plan if p.start + timedelta(hours=1) > now and p.start < horizon and p.action != "auto"]
+            groups, cur = [], None
+            for p in plan:
+                if cur and cur["action"] == p.action and p.start == cur["end"]:
+                    cur["end"] = p.start + timedelta(hours=1)
+                    cur["soc"] = p.soc
+                else:
+                    cur = {"action": p.action, "start": p.start, "end": p.start + timedelta(hours=1), "soc": p.soc, "why": p.why,
+                           "price": p.price}
+                    groups.append(cur)
+            for g in groups:
+                items.append({"start": g["start"].astimezone(self.tz).isoformat(timespec="minutes"),
+                              "end": g["end"].astimezone(self.tz).isoformat(timespec="minutes"), "device": f"batterij:{b.cfg.id}",
+                              "name": b.cfg.name, "kind": "battery", "what": "laadt van het net" if g["action"] == "charge" else "houdt vast",
+                              "source": "prijs", "why": g["why"] + (f" · tot {round(g['soc'])}%" if g["action"] == "charge" else ""),
+                              "price": round(g["price"], 4), "eur": None,
+                              "now": g["start"] <= now < g["end"]})
+        items.sort(key=lambda x: (x["start"], x["name"]))
+        return {"items": items[:30], "window": self._good_window(now)}
 
     def compare_view(self) -> dict:
         from .report import compare
@@ -1921,6 +2039,20 @@ class Engine:
                 st.run_seconds_today = float(v.get("run", 0))
 
     # ---- voor het dashboard ------------------------------------------------
+    def _cached(self, key: str, seconds: float, fn):
+        c = getattr(self, "_view_cache", {})
+        hit = c.get(key)
+        if hit and time.monotonic() - hit[0] < seconds:
+            return hit[1]
+        try:
+            v = fn()
+        except Exception as exc:
+            log.debug("%s: %s", key, exc)
+            v = hit[1] if hit else None
+        c[key] = (time.monotonic(), v)
+        self._view_cache = c
+        return v
+
     def status_fast(self) -> dict:
         """Status voor het dashboard zonder te wachten op een trage regelronde: is die nog bezig (bijv. omdat een
         apparaat traag antwoordt), dan de vorige status, zodat het scherm nooit blijft hangen."""
@@ -1995,6 +2127,8 @@ class Engine:
                 "baseline_today": sorted(self.baseline_ids(now)),
                 "motivation": self.cfg.motivation,
                 "goal": self.goal_view(now),
+                "moment": self._cached("moment", 60, self.moment_view),
+                "plan": self._cached("plan", 60, self.plan_view),
             }
 
     def _value_view(self, today, month_start, year_start) -> dict:
@@ -2382,6 +2516,8 @@ def make_handler(engine: Engine):
                 self.end_headers()
                 self.wfile.write(body)
                 return
+            if url.path == "/api/plan":
+                return self._json(200, engine.plan_view())
             if url.path == "/api/setup/ev":
                 return self._json(200, engine.ev_offer())
             gp = url.path.strip("/").split("/")

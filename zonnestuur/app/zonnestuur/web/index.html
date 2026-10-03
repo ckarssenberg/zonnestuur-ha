@@ -96,7 +96,7 @@
           border-radius: 26px; padding: 22px; box-shadow: var(--shadow); backdrop-filter: blur(22px) saturate(150%);
           -webkit-backdrop-filter: blur(22px) saturate(150%); min-width: 0; }
   .c-hero, .c-plan, .c-usage, .c-feed, .c-learn { grid-column: span 12; }
-  .c-coach { grid-column: span 8; } .c-value { grid-column: span 4; }
+  .c-coach { grid-column: span 8; } .c-value { grid-column: span 4; } .c-plan24 { grid-column: span 12; }
   .c-today { grid-column: span 12 !important; }
   .c-welcome, .c-log, .c-compare { grid-column: span 12; }
   .c-welcome { border: 1.5px solid color-mix(in srgb, var(--sun) 45%, transparent); }
@@ -231,6 +231,27 @@
   .c-hero.s-batt { --hero-aura: color-mix(in srgb, var(--batt) 18%, transparent); } .c-hero.s-warn { --hero-aura: var(--warn-soft); }
   .hero-grid { position: relative; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 26px; align-items: center; }
   .hero-date { font-size: 13px; color: var(--ink-3); font-weight: 550; }
+  .verdict { display: inline-flex; align-items: center; gap: 10px; margin: 12px 0 2px; padding: 9px 16px 9px 12px; border-radius: 999px;
+             font: 650 17px/1.2 "Inter Tight", Inter, sans-serif; letter-spacing: -.01em; background: var(--chip); color: var(--ink); }
+  .verdict svg { width: 22px; height: 22px; flex: none; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .verdict.goed { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+  .verdict.wachten { background: var(--warn-soft); color: var(--warn); }
+  .verdict small { font: 550 13.5px/1.2 Inter, sans-serif; color: var(--ink-2); letter-spacing: 0; }
+  .nextwin { margin: 10px 0 0; font-size: 14px; color: var(--ink-2); } .nextwin b { color: var(--ink); font-weight: 650; }
+  .plan24 { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .plan24 li { display: grid; grid-template-columns: 116px 22px 1fr auto; gap: 4px 12px; align-items: baseline; padding: 11px 6px; border-top: 1px solid var(--rule); }
+  .plan24 li:first-child { border-top: 0; }
+  .plan24 .t { font-variant-numeric: tabular-nums; font-weight: 650; font-size: 14.5px; }
+  .plan24 .t small { display: block; font-weight: 550; font-size: 11.5px; color: var(--ink-3); }
+  .plan24 .ic { width: 10px; height: 10px; border-radius: 3px; align-self: center; }
+  .plan24 .ic.zon { background: var(--glow); } .plan24 .ic.prijs { background: var(--net); } .plan24 .ic.batt { background: var(--batt); }
+  .plan24 .w { font-size: 14.5px; } .plan24 .w b { font-weight: 650; } .plan24 .w span { display: block; font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
+  .plan24 .c { text-align: right; font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .plan24 .c b { display: block; color: var(--ink); font-size: 14px; }
+  .plan24 li.now { background: var(--chip); border-radius: 12px; border-top-color: transparent; }
+  .plan24 li.now + li { border-top-color: transparent; }
+  .plan24 .nowtag { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--good); margin-left: 6px; }
+  @media (max-width: 640px) { .plan24 li { grid-template-columns: 84px 14px 1fr; } .plan24 .c { grid-column: 3; text-align: left; } .plan24 .c b { display: inline; margin-right: 6px; } }
   .headline { font: 650 clamp(28px, 3.6vw, 44px)/1.08 "Inter Tight", Inter, sans-serif; letter-spacing: -.035em; margin: 8px 0 10px; text-wrap: balance; }
   .subline { color: var(--ink-2); font-size: 15.5px; margin: 0; max-width: 46ch; text-wrap: pretty; }
   .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
@@ -298,6 +319,9 @@
   .seg button { font: inherit; font-size: 13px; font-weight: 550; padding: 9px 6px; border: 0; border-radius: 10px; background: transparent;
                 color: var(--ink-2); cursor: pointer; transition: background .2s, color .2s; }
   .seg button.active { background: var(--seg-on); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .dev .seg { background: transparent; padding: 0; gap: 6px; }
+  .dev .seg button { min-height: 40px; border: 1px solid var(--card-line); background: transparent; font-size: 12.5px; color: var(--ink-2); }
+  .dev .seg button.active { background: var(--seg-on); border-color: transparent; color: var(--ink); font-weight: 650; }
   .seg button:focus-visible, .icon-btn:focus-visible, .btn-soft:focus-visible { outline: 2px solid var(--net); outline-offset: 2px; }
 
   /* batterij (kaart in het apparatenrooster) */
@@ -420,8 +444,10 @@
       <div class="hero-grid">
         <div>
           <div class="hero-date" id="heroDate">&nbsp;</div>
+          <div class="verdict" id="verdict" hidden role="status"></div>
           <h1 class="headline" id="headline">Even kijken…</h1>
           <p class="subline" id="subline">&nbsp;</p>
+          <p class="nextwin" id="nextWin" hidden></p>
           <div class="pills" id="pills"></div>
           <div class="kpis" id="kpis"></div>
         </div>
@@ -450,6 +476,13 @@
         <button class="btn-line on-sun" id="evAdd">Laden instellen</button>
       </div>
       <p class="small muted" id="evRes" role="status" style="margin:10px 0 0">Aanpassen kan altijd op de kaart van de laadpaal: welke auto, tot hoeveel procent, een minimum en een maximumprijs.</p>
+    </section>
+
+    <!-- plan komende 24 uur -->
+    <section class="card c-plan24" id="planCard" hidden aria-labelledby="planTitle">
+      <div class="title-row"><div><div class="eyebrow">Plan</div><h2 class="sec" id="planTitle">Wat Zonnestuur de komende 24 uur doet</h2></div><span class="small muted" id="planNote"></span></div>
+      <ol class="plan24" id="planList"></ol>
+      <button class="btn-line" id="planMore" hidden style="margin-top:10px">Toon alles</button>
     </section>
 
     <!-- zonnecoach -->
@@ -684,6 +717,54 @@ function heroState(s) {
   return ["", "Alles rustig", "Er is nu geen overschot. Zonnestuur houdt de meter in de gaten."];
 }
 
+// ---------- "is dit een goed moment?" en het plan voor de komende 24 uur ----------
+const V_ICON = {
+  goed: '<path d="M5 12.5l4.2 4.2L19 7"/>',
+  neutraal: '<path d="M6 12h12"/>',
+  wachten: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+};
+const V_WORD = { goed: "Goed moment", neutraal: "Neutraal moment", wachten: "Liever wachten" };
+function renderVerdict(s) {
+  const m = s.moment, el = $("verdict"), nw = $("nextWin");
+  if (!m || !s.configured) { el.hidden = true; nw.hidden = true; return; }
+  const lvl = m.level || "neutraal";
+  el.hidden = false;
+  el.className = "verdict " + lvl;
+  el.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${V_ICON[lvl]}</svg><span>${V_WORD[lvl]} <small>voor de was, droger of vaatwasser</small></span>`;
+  el.title = m.text || "";
+  const w = m.window;
+  if (w && !w.now) {
+    nw.hidden = false;
+    nw.innerHTML = `${w.kind === "zon" ? "Volgende zon over" : "Goedkoopste 3 uur"}: <b>${w.tomorrow ? "morgen " : ""}${esc(w.from)}–${esc(w.to)}</b>${w.kind === "zon" ? ` · zon over${w.kwh ? ` (± ${nl(w.kwh)} kWh)` : ""}` : w.price != null ? ` · gemiddeld ${eur3(w.price)} per kWh` : ""}`;
+  } else if (w && w.now) {
+    nw.hidden = false;
+    nw.innerHTML = `Nu loopt het goedkoopste blok van de komende 24 uur, tot <b>${esc(w.to)}</b>.`;
+  } else nw.hidden = true;
+}
+let PLAN_ALL = false;
+function renderPlan(s) {
+  const P = s.plan, card = $("planCard");
+  if (!P || !s.configured || !(P.items || []).length) { card.hidden = true; return; }
+  card.hidden = false;
+  const today = new Date(s.now).getDate();
+  const items = PLAN_ALL ? P.items : P.items.slice(0, 6);
+  $("planList").innerHTML = items.map((it) => {
+    const a = new Date(it.start), b = new Date(it.end);
+    const day = a.getDate() !== today ? "morgen" : "vandaag";
+    const ic = it.kind === "battery" ? "batt" : it.source;
+    const cost = it.eur != null && it.eur > 0.005 ? `<b>± ${eur(it.eur)}</b>` : it.source === "zon" ? "<b>eigen zon</b>" : "";
+    return `<li class="${it.now ? "now" : ""}"><span class="t">${hhmm(a)}–${hhmm(b)}<small>${day}${it.now ? '<span class="nowtag">nu</span>' : ""}</small></span>
+      <i class="ic ${ic}" aria-hidden="true"></i>
+      <span class="w"><b>${esc(it.name)}</b> ${esc(it.what)}<span>${esc(cap(it.why))}</span></span>
+      <span class="c">${cost}${it.price != null ? `${eur3(it.price)}/kWh` : ""}</span></li>`;
+  }).join("");
+  $("planMore").hidden = P.items.length <= 6;
+  $("planMore").textContent = PLAN_ALL ? "Minder tonen" : `Toon alles (${P.items.length})`;
+  const total = P.items.reduce((a, it) => a + (it.eur || 0), 0);
+  $("planNote").textContent = total > 0.01 ? `Geschatte kosten: ± ${eur(total)}` : "";
+}
+$("planMore").addEventListener("click", () => { PLAN_ALL = !PLAN_ALL; if (STATUS) renderPlan(STATUS); });
+
 function renderStatus(s) {
   STATUS = s;
   const now = new Date(s.now);
@@ -700,6 +781,8 @@ function renderStatus(s) {
   $("hero").className = "card c-hero " + cls;
   $("headline").textContent = head;
   $("subline").textContent = sub;
+  renderVerdict(s);
+  renderPlan(s);
   const Lc = s.license || {};
   const licPill = Lc.plan === "trial" && Lc.days_left <= 10 ? `<a class="pill sun" href="instellingen">Proef: nog ${Lc.days_left} ${Lc.days_left === 1 ? "dag" : "dagen"} alles · Pro ${esc(Lc.price)}</a>`
     : Lc.plan === "basic" ? `<a class="pill" href="instellingen">Zonnestuur Basis · alles slim sturen met Pro →</a>` : "";

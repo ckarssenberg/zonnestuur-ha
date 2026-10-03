@@ -1,5 +1,10 @@
 # Wijzigingen
 
+## 0.26.0 – Duidelijk wat nu slim is, en wat er komt
+- Bovenaan een helder oordeel in drie stappen (goed moment, neutraal, liever wachten), met icoon en tekst, en het goedkoopste blok of de volgende zon.
+- Nieuwe kaart "Wat Zonnestuur de komende 24 uur doet": per apparaat en batterij wanneer, waarom en wat het ongeveer kost.
+- Rustigere bediening op de apparaatkaarten: Automatisch is de standaard, ingrijpen is een tweede keuze.
+
 ## 0.25.2 – Dashboard rustig
 - Opgelost: de apparaatkaarten werden elke 4 seconden opnieuw opgebouwd, met de verschijn-animatie erbij. Daardoor leek het dashboard steeds opnieuw te laden. Nu alleen bijwerken als er iets verandert, en zonder animatie.
 
