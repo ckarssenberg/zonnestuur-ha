@@ -973,7 +973,9 @@ function batteryHtml(b) {
       ${keuze("b_st", st, [["zonnestuur", "Zonnestuur", "aanbevolen"], ["meekijken", "Mijn leverancier", "Zonnestuur kijkt mee en vergelijkt"], ["combinatie", "Afwisselend", "per maand wie het beste is"]])}
       <div class="row" data-st="meekijken combinatie" style="margin-top:12px"><div class="field"><label for="b_lev">Welke leverancier?</label><input id="b_lev" list="b_levl" value="${esc(b.leverancier || "")}" placeholder="bijv. Zonneplan">
         <datalist id="b_levl">${["Zonneplan", "Frank Energie", "Tibber", "Eneco", "Essent", "NextEnergy", "Budget Thuis", "Sessy"].map((x) => `<option value="${x}">`).join("")}</datalist>
-        <span class="hint">Op de pagina <a href="vergelijk">Vergelijken</a> zie je elke dag wat Zonnestuur had opgeleverd. Essent en Eneco staan niet toe dat een ander systeem stuurt; meekijken mag wel.</span></div></div>
+        <span class="hint">Op de pagina <a href="vergelijk">Vergelijken</a> zie je elke dag wat Zonnestuur had opgeleverd. Essent en Eneco staan niet toe dat een ander systeem stuurt; meekijken mag wel.</span></div>
+        <div class="field"><label for="b_ve">Sensor met opbrengst in € (optioneel)</label><input id="b_ve" placeholder="sensor.…" value="${esc(b.vergoeding_entity || "")}">
+        <span class="hint">Bijvoorbeeld de Powerplay-opbrengst van Zonneplan of de opbrengst van Slim handelen bij Frank, als de koppeling die doorgeeft. Dan telt Zonnestuur die vanzelf mee. Anders vul je het bedrag per maand in bij Vergelijken.</span></div></div>
       <div data-st="combinatie"><span class="small">Maanden waarin Zonnestuur stuurt:</span>
         <div class="chips" id="b_zsm" style="margin:6px 0 4px">${["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"].map((mm, i) => `<button type="button" data-m="${i + 1}" class="${(b.zs_maanden || [4, 5, 6, 7, 8, 9]).includes(i + 1) ? "on" : ""}">${mm}</button>`).join("")}</div>
         <p class="small muted" style="margin:0">Bij een Sessy wisselt Zonnestuur zelf. Bij andere merken krijg je bij elke wissel een melding om de sturing in de app van je leverancier aan of uit te zetten.</p></div>
@@ -1201,7 +1203,7 @@ function readBattery(prev) {
     reserve_kwh: Math.max(0, n("b_res") || 0), reserve_from: n("b_rfrom") || 0, reserve_until: n("b_runtil") || 0, reserve_winter_only: $("b_rwin").checked,
     peak_limit_w: Math.max(0, n("b_peak") || 0),
     goal: $("b_goal") ? $("b_goal").value : "slim",
-    sturing: $("b_st") ? $("b_st").value : "zonnestuur", leverancier: $("b_lev") ? v("b_lev") : "",
+    sturing: $("b_st") ? $("b_st").value : "zonnestuur", leverancier: $("b_lev") ? v("b_lev") : "", vergoeding_entity: $("b_ve") ? v("b_ve") : "",
     zs_maanden: [...document.querySelectorAll("#b_zsm button.on")].map((x) => Number(x.dataset.m)), grid_export: $("b_exp") ? $("b_exp").checked : false,
     max_export_w: Math.max(0, n("b_expw") || 0), script_export: $("s_export") ? v("s_export") : "",
     purchase_eur: Math.max(0, n("b_buy") || 0), cycles: Math.max(500, n("b_cyc") || 6000), season: $("b_season").checked,
@@ -1301,7 +1303,8 @@ async function settings() {
           <div class="field"><label for="w_lev">Wie stuurt het laden?</label><input id="w_lev" list="w_levl" value="${esc(w.leverancier || "")}" placeholder="bijv. Tibber"><datalist id="w_levl">${["Tibber", "Jedlix", "ANWB Slim Laden", "Vattenfall", "Eneco", "Frank Energie", "Zonneplan", "NextEnergy", "ENGIE", "Energiedirect"].map((x) => `<option value="${x}">`).join("")}</datalist></div></div>
         <div class="row"><div class="field"><label for="w_kl">Meestal klaar om</label><input id="w_kl" type="time" value="${esc(w.klaar || "07:30")}"></div>
           <div class="field"><label for="w_kw">Laadvermogen max. (kW)</label><input id="w_kw" type="number" step="0.1" min="1" max="22" value="${w.max_kw || 11}"></div>
-          <div class="field"><label for="w_vg">Vergoeding per kWh (€)</label><input id="w_vg" type="number" step="0.005" min="0" max="0.5" value="${w.vergoeding_kwh || ""}" placeholder="bijv. 0,025"><span class="hint">Bijvoorbeeld Jedlix, Vattenfall of Eneco bij een vast contract.</span></div></div>`; })()}</div>
+          <div class="field"><label for="w_vg">Vergoeding per kWh (€)</label><input id="w_vg" type="number" step="0.005" min="0" max="0.5" value="${w.vergoeding_kwh || ""}" placeholder="bijv. 0,025"><span class="hint">Bijvoorbeeld Jedlix, Vattenfall of Eneco bij een vast contract.</span></div></div>
+        <div class="row"><div class="field"><label for="w_ve">Sensor met opbrengst in € (optioneel)</label><input id="w_ve" placeholder="sensor.…" value="${esc(w.vergoeding_entity || "")}"><span class="hint">Geeft de koppeling van je leverancier door wat je verdiende? Dan telt Zonnestuur dat vanzelf mee. Anders vul je bij Vergelijken per laadbeurt in wat de app van je leverancier zegt (bijv. inclusief Grid Rewards van Tibber).</span></div></div>`; })()}</div>
     </section>` : ""}
     <section class="card" id="feedCard"><h2 class="t">Omvormer</h2>
       <p class="small muted" style="margin-top:-4px">Met je omvormer gekoppeld weet Zonnestuur precies wat je panelen nu opwekken. Bij een negatieve terugleverprijs knijpt hij de omvormer af tot je eigen verbruik, en daarna gaat hij vanzelf terug naar vol vermogen.</p>
@@ -1765,7 +1768,7 @@ async function settings() {
     next.batteries = readBattery(B);
     if ($("w_on")) next.waarnemen = $("w_on").checked && $("w_pe").value.trim() ? [Object.assign({}, (CFG.waarnemen || [])[0] || {}, {
       id: ((CFG.waarnemen || [])[0] || {}).id || "auto", naam: "Auto", power_entity: $("w_pe").value.trim(), leverancier: $("w_lev").value.trim(),
-      klaar: $("w_kl").value || "07:30", max_kw: Number($("w_kw").value) || 11, vergoeding_kwh: Number($("w_vg").value) || 0 })] : [];
+      klaar: $("w_kl").value || "07:30", max_kw: Number($("w_kw").value) || 11, vergoeding_kwh: Number($("w_vg").value) || 0, vergoeding_entity: $("w_ve") ? $("w_ve").value.trim() : "" })] : [];
     next.inverter = readInverter();
     next.notify = readNotify();
     next.motivation = $("g_mot").value;

@@ -1665,9 +1665,9 @@ function dagTijd(iso, now) {
 }
 function evCard(s, d) {
   const E = d.ev, car = E.cars.find((c) => c.id === E.active) || E.cars[0];
-  const soc = car.soc, tgt = Math.round(E.target ?? car.target_pct);
-  const plugged = car.plug === true || (car.plug == null && d.on), charging = d.on && (d.power_w || 0) > 50;
   const vt = E.vertrek || null;
+  const soc = car.soc, tgt = Math.round(E.target ?? ((vt && vt.pct) || car.target_pct));
+  const plugged = car.plug === true || (car.plug == null && d.on), charging = d.on && (d.power_w || 0) > 50;
   const ready = vt ? dagTijd(vt.at, s.now) : ((d.ready_times || [])[0] || null);
   const reached = soc != null && !(E.need_min > 0);
   const st = charging ? `Laadt nu met ${nl((d.power_w || 0) / 1000, 1)} kW` : plugged ? "Stekker erin" : car.plug === false ? "Stekker eruit" : "Wacht op de auto";
@@ -1745,6 +1745,10 @@ function evCard(s, d) {
     ${soc != null ? `<div class="evc-bat" role="img" aria-label="Accu ${Math.round(soc)}%, doel ${tgt}%"><i style="width:${Math.max(0, Math.min(100, soc))}%"></i><em style="left:${car.min_pct}%" title="Altijd minstens ${car.min_pct}%"></em><b style="left:${tgt}%" title="Doel ${tgt}%"></b></div>` : ""}
     <div class="evc-story">${q(q1)}${q(q2)}${q(q3, saved > 0.05 && !reached && E.mode !== "vol" ? "goed" : "")}</div>
     ${E.trip ? `<div class="evc-why"><b>${esc(E.trip.dag[0].toUpperCase() + E.trip.dag.slice(1))}:</b> ${E.trip.km} km${E.trip.temp != null ? ` bij ${nl(E.trip.temp, 0)} °C` : ""}${E.trip.factor > 1.01 ? ` (${Math.round((E.trip.factor - 1) * 100)}% meer verbruik door het weer)` : ""} = ± ${nl(E.trip.kwh, 1)} kWh. Daarom laden tot ${E.trip.pct}%.${E.trip.te_weinig ? " Dat is je maximum; voor deze rit is het krap." : ""}</div>` : ""}
+    ${(() => { if (reached || !(E.need_min > 0) || !E.kw) return "";
+      const sn = E.snelheid || [], geleerd = sn.filter((v) => v != null).length, hoog = [sn[8], sn[9]].find((v) => v != null);
+      const t = E.kw_now ? `laadt nu met ${nl(E.kw_now, 1)} kW (gemeten)` : `gemiddeld ± ${nl(E.kw, 1)} kW tot ${tgt}%`;
+      return `<div class="evc-why"><b>Snelheid:</b> ${t}${hoog ? `; boven 80% gaat deze auto naar ± ${nl(hoog, 1)} kW` : ""}. ${geleerd ? "Zonnestuur meet dat bij elke laadbeurt en past de planning steeds aan." : "Zonnestuur leert de echte snelheid van deze auto tijdens het laden."}</div>`; })()}
     ${tl}
     ${rit}
     <div class="evc-act">${go}${skip}</div>

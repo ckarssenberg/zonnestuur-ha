@@ -86,6 +86,12 @@ html, body { overscroll-behavior-y: none; }
   .row .r { text-align: right; }
   .row .plus { color: var(--good); font-weight: 650; } .row .min { color: var(--warn); font-weight: 650; }
   .row .muted { grid-column: 1 / -1; }
+  .sessie { grid-column: 1 / -1; display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-top: 6px; }
+  .sessie label { display: grid; gap: 4px; font-size: 13px; color: var(--ink-2); }
+  .eur { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+  .eur i { font-style: normal; color: var(--ink-3); padding-left: 10px; }
+  .eur input { font: inherit; font-size: 14px; border: 0; background: transparent; color: var(--ink); padding: 8px 10px 8px 6px; width: 100px; }
+  .sessie .btn { padding: 8px 14px; }
   h2 { font: 650 17px/1.3 "Inter Tight", "Inter", sans-serif; margin: 18px 0 0; }
   .check { display: flex; gap: 12px; align-items: flex-start; }
   .check i { flex: none; width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; font-style: normal; font-weight: 700; background: var(--chip); }
@@ -122,6 +128,17 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 let token = ""; try { token = localStorage.getItem("zs_token") || ""; } catch (e) {}
 try { const t = localStorage.getItem("zs_theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
 const api = async (p, body) => { const r = await fetch(p, { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json", ...(token ? { "X-Token": token } : {}) }, body: body ? JSON.stringify(body) : undefined }); return r.json(); };
+// Waar je bij elke leverancier ziet wat een laadbeurt of de batterij echt kostte of opleverde
+const WAAR = [
+  [/tibber/i, "In de Tibber-app: tik op je auto, dan Laadtijdlijn en op Kosten tot nu toe (die bedragen zijn inclusief Grid Rewards)."],
+  [/zonneplan/i, "In de Zonneplan-app: bij Powerplay of Slim laden zie je de opbrengst per dag en per maand."],
+  [/frank/i, "In de Frank-app: bij Slim laden of Slim handelen staat per sessie of per maand wat het opleverde."],
+  [/jedlix/i, "In de Jedlix-app: bij je laadsessies en bij Beloningen."],
+  [/anwb/i, "In de ANWB Energie-app: bij Slim laden en je verbruik per uur."],
+  [/sessy/i, "In de Sessy-app, of in de app van de leverancier die je Sessy stuurt (bijv. Frank)."],
+  [/essent|eneco|vattenfall|greenchoice|budget|vandebron|engie|energiedirect|nextenergy|easyenergy|coolblue|pure|innova|vanons/i, "In de app of op Mijn-omgeving van je leverancier, bij verbruik of slim laden."],
+];
+function waarStaat(wie) { const x = WAAR.find(([r]) => r.test(wie || "")); return x ? x[1] : "Kijk in de app van je leverancier bij je laadsessies of verbruik."; }
 const MAAND = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
 const mnaam = (k) => MAAND[Number(k.slice(5, 7)) - 1] + " " + k.slice(0, 4);
 function card(it) {
@@ -140,8 +157,10 @@ function card(it) {
   const DAG = { weekday: "short", day: "numeric", month: "short" }, TIJD = { hour: "2-digit", minute: "2-digit" };
   const sessies = bat ? "" : Object.entries(it.per_dag || {}).filter(([, v]) => v.van).sort(([a], [b]) => b.localeCompare(a)).slice(0, 14).map(([d, v]) => {
     const a = new Date(v.van * 1000), z = new Date(v.tot * 1000), x = v.werkelijk - v.zonnestuur;
-    return `<div class="row"><b>${a.toLocaleDateString("nl-NL", DAG)} · ${a.toLocaleTimeString("nl-NL", TIJD)}–${z.toLocaleTimeString("nl-NL", TIJD)}</b><span class="r ${kl(x)}">${x > 0.005 ? "−" + eur(x) : x < -0.005 ? "+" + eur(-x) : "gelijk"}</span>
-      <span class="muted">${nl(v.kwh, 1)} kWh · ${esc(it.wie)} ${nl(v.prijs * 100, 1)} ct/kWh (${eur(v.werkelijk)}) · Zonnestuur ${nl(v.prijs_zs * 100, 1)} ct/kWh (${eur(v.zonnestuur)})</span></div>`; }).join("");
+    const wn = x > 0.005 ? `Zonnestuur ${eur(x)} goedkoper` : x < -0.005 ? `${esc(it.wie)} ${eur(-x)} goedkoper` : "gelijk";
+    return `<div class="row"><b>${a.toLocaleDateString("nl-NL", DAG)} · ${a.toLocaleTimeString("nl-NL", TIJD)}–${z.toLocaleTimeString("nl-NL", TIJD)}</b><span class="r ${kl(x)}">${wn}</span>
+      <span class="muted">${nl(v.kwh, 1)} kWh · ${esc(it.wie)} ${eur(v.werkelijk)} (${nl(v.werkelijk / v.kwh * 100, 1)} ct/kWh${v.app ? ", volgens de app" : ", met de gewone prijs"}) · Zonnestuur ${eur(v.zonnestuur)} (${nl(v.prijs_zs * 100, 1)} ct/kWh)</span>
+      <span class="sessie"><label>Kosten volgens de app van ${esc(it.wie)}<span class="eur"><i>€</i><input inputmode="decimal" data-sd="${d}" value="${v.app ? nl(v.werkelijk, 2) : ""}" placeholder="${nl(v.eigen ?? v.werkelijk, 2)}"></span></label><button class="btn ghost" data-ss="${d}">Opslaan</button></span></div>`; }).join("");
   const days = Object.entries(it.per_dag || {}).sort(([a], [b]) => a.localeCompare(b)).slice(-31);
   const mx = Math.max(0.05, ...days.map(([, v]) => Math.abs(v.werkelijk - v.zonnestuur)));
   const bars = days.map(([d, v]) => { const x = v.werkelijk - v.zonnestuur, h = Math.abs(x) / mx * 45;
@@ -156,10 +175,10 @@ function card(it) {
     <p class="verdict">${esc(it.tekst)}</p>${cmp}
     ${days.length > 2 ? `<div class="bars" role="img" aria-label="Verschil per dag">${bars}</div><p class="hint">Per dag: groen = Zonnestuur goedkoper, oranje = ${esc(it.wie)} goedkoper.</p>` : ""}
     <h2>Per maand</h2><div class="rows">${rows}</div>
-    ${sessies ? `<h2>Laadbeurten</h2><div class="rows">${sessies}</div><p class="hint">Met de prijs van je eigen contract per uur, inclusief energiebelasting en btw. Geld dat ${esc(it.wie)} je teruggeeft voor onderbroken laden (bijv. Grid Rewards) zit hier nog niet in: vul dat hieronder in.</p>` : ""}
+    ${sessies ? `<h2>Laadbeurten</h2><p class="hint" style="margin-top:4px">Zonnestuur rekent met de gewone prijs van je contract per uur, inclusief energiebelasting en btw. Leveranciers geven soms extra korting, bijvoorbeeld Tibber met Grid Rewards als het net om extra verbruik vraagt. Dat kan Zonnestuur niet zien. Vul daarom bij een laadbeurt in wat de app van ${esc(it.wie)} zegt; dan telt dat bedrag. ${esc(waarStaat(it.wie))}</p><div class="rows">${sessies}</div>` : ""}
     <h2>Uitbetaald door ${esc(it.wie)}</h2>
     <div class="vg"><span>In</span><select data-vm>${opts}</select><input data-ve inputmode="decimal" placeholder="€ 0,00" aria-label="Bedrag"><button class="btn ghost" data-vs>Opslaan</button></div>
-    <p class="hint">${bat ? "Kijk in de app van je leverancier wat de batterij die maand opleverde (bijv. Powerplay of Slim handelen)." : "Bijv. Grid Rewards of een vergoeding van Jedlix. Kijk in de app van je leverancier wat je die maand terugkreeg. Een vast bedrag per geladen kWh vul je in bij Instellingen."}</p>
+    <p class="hint">${bat ? "Kijk in de app van je leverancier wat de batterij die maand opleverde (bijv. Powerplay of Slim handelen)." : "Voor wat je los terugkreeg en niet al per laadbeurt hebt ingevuld, bijv. een maandvergoeding van Jedlix. " + waarStaat(it.wie)}</p>
     ${act ? `<div class="act">${act}</div>` : ""}</section>`;
 }
 async function load() {
@@ -174,6 +193,11 @@ async function load() {
   $("items").innerHTML = check + (it.length ? it.map(card).join("") : `<section class="card"><p class="sub">Er is nog niets om te vergelijken. Stuurt je leverancier je thuisbatterij? Zet dan bij Instellingen &gt; Thuisbatterij "Wie stuurt de batterij?" op "${"je leverancier, Zonnestuur kijkt mee"}". Laat een leverancier je auto laden? Vul dan bij Instellingen &gt; Meekijken bij slim laden de laadpaal in.</p><p><a href="instellingen#batCard">Naar Instellingen</a></p></section>`);
   document.querySelectorAll("[data-vs]").forEach((b) => b.onclick = async () => {
     const c = b.closest("section"); const r = await api("api/vergelijk/vergoeding", { soort: c.dataset.soort, id: c.dataset.id, maand: c.querySelector("[data-vm]").value, eur: c.querySelector("[data-ve]").value });
+    if (r.ok === false) alert(r.error); else load();
+  });
+  document.querySelectorAll("[data-ss]").forEach((b) => b.onclick = async () => {
+    const c = b.closest("section"), inp = c.querySelector(`[data-sd="${b.dataset.ss}"]`);
+    const r = await api("api/vergelijk/sessie", { soort: c.dataset.soort, id: c.dataset.id, dag: b.dataset.ss, eur: inp.value });
     if (r.ok === false) alert(r.error); else load();
   });
   document.querySelectorAll("[data-kies]").forEach((b) => b.onclick = async () => {

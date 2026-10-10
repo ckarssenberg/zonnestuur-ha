@@ -1,5 +1,11 @@
 # Wijzigingen
 
+## 0.48.0
+- Auto: Zonnestuur meet hoe snel je auto echt laadt (ook dat het boven ± 80% langzamer gaat) en rekent daar de hele tijd mee. De laadkaart laat de gemeten snelheid zien.
+- Vergelijken: vul per laadbeurt in wat de app van je leverancier zegt dat hij kostte (bijv. inclusief Grid Rewards van Tibber); dan telt dat bedrag. Per leverancier staat erbij waar je het vindt.
+- Geeft de koppeling van je leverancier de opbrengst door (bijv. Powerplay van Zonneplan), dan telt Zonnestuur die vanzelf mee.
+- De vergelijking rekent voor Zonnestuur met de echte laadsnelheid van je auto, niet met die op papier.
+
 ## 0.47.2
 - Prijsverwachting: haalt eerst de recentste dagen op en leert opnieuw zodra er meer historie is, zodat hij na de installatie sneller goed voorspelt.
 
