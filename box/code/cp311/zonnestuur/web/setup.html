@@ -112,6 +112,24 @@ html, body { overscroll-behavior-y: none; }
   .pro-kop { font-size: 17px; margin: 0; letter-spacing: -.01em; }
   .pro-blok summary { cursor: pointer; }
   label.check-row { display: flex; gap: 10px; align-items: center; margin-top: 10px; font-size: 14px; color: var(--ink-2); }
+  label.check-row.big { font-size: 16px; font-weight: 650; color: var(--ink); }
+  .stap { display: flex; gap: 12px; align-items: flex-start; margin: 22px 0 10px; }
+  .stap h3 { margin: 2px 0 0; font: 650 16px/1.3 "Inter Tight", Inter, sans-serif; letter-spacing: -.01em; }
+  .stap p { margin: 2px 0 0; }
+  .stap-n { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--bg); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .merken { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .merk, .keuze { font: inherit; text-align: left; display: grid; gap: 2px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--card-solid); color: var(--ink); cursor: pointer; }
+  .merk b, .keuze b { font-size: 15px; font-weight: 650; }
+  .merk span, .keuze span { font-size: 12.5px; color: var(--ink-3); line-height: 1.35; }
+  .merk.on, .keuze.on { border-color: var(--sun); box-shadow: 0 0 0 3px var(--sun-soft); }
+  .merk.on b, .keuze.on b { color: var(--sun-ink); }
+  .keuzes { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+  details.meer { margin-top: 22px; }
+  .drie { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .drie .field { margin-bottom: 4px; }
+  .ok-line { margin: 0 0 6px; font-size: 14px; color: var(--good); font-weight: 600; overflow-wrap: anywhere; }
+  .ok-line code { color: var(--ink-2); font-weight: 500; }
+  details.meer > summary { font-size: 15px; color: var(--ink); }
   .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .tile { font: inherit; display: grid; justify-items: center; gap: 6px; padding: 14px 8px; border-radius: 16px; border: 1px solid var(--line); background: var(--card-solid); color: var(--ink); cursor: pointer; font-size: 13.5px; font-weight: 600; }
   .tile svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -133,6 +151,27 @@ html, body { overscroll-behavior-y: none; }
   .done-ic { width: 64px; height: 64px; border-radius: 20px; display: grid; place-items: center; background: var(--good-soft); color: var(--good); margin-bottom: 14px; }
   .done-ic svg { width: 32px; height: 32px; }
   .settings section { margin-top: 14px; }
+  body.breed main { max-width: 1120px; }
+  .inst-kop { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .inst-kop .btn { flex: none; }
+  .settings.met-nav { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 8px 28px; align-items: start; }
+  .settings.met-nav > :first-child { grid-column: 1 / -1; }
+  .inst-nav { position: sticky; top: 16px; display: grid; gap: 4px; margin-top: 14px; }
+  .inst-nav button { font: inherit; font-size: 15px; font-weight: 600; text-align: left; padding: 11px 14px; border-radius: 12px; border: 0; background: none; color: var(--ink-2); cursor: pointer; }
+  .inst-nav button:hover { background: var(--chip); color: var(--ink); }
+  .inst-nav button.on { background: var(--ink); color: var(--bg); }
+  .inst-inhoud { min-width: 0; max-width: 760px; }
+  .inst-inhoud .weg { display: none !important; }
+  .savebar { position: sticky; bottom: 12px; z-index: 5; background: var(--card-solid); border: 1px solid var(--line); border-radius: 999px; padding: 8px 8px 8px 20px; box-shadow: var(--shadow); }
+  @media (max-width: 860px) {
+    .settings.met-nav { grid-template-columns: minmax(0, 1fr); }
+    .inst-nav { display: flex; overflow-x: auto; gap: 6px; top: 0; z-index: 6; margin: 4px -16px 0; padding: 10px 16px; background: var(--bg); scrollbar-width: none; }
+    .inst-nav::-webkit-scrollbar { display: none; }
+    .inst-nav button { flex: none; padding: 9px 14px; border-radius: 999px; font-size: 14px; border: 1px solid var(--line); background: var(--card-solid); }
+    .inst-nav button.on { border-color: var(--ink); }
+    .savebar { border-radius: 20px; flex-wrap: nowrap; padding: 8px 8px 8px 16px; }
+    .savebar .small { font-size: 12.5px; }
+  }
   .settings h2 { margin-top: 0; }
   .dev-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
   .dev-row:last-child { border-bottom: 0; }
@@ -840,6 +879,17 @@ function wachtOpBetaling() {
     } catch (e) {}
   }, 5000);
 }
+// Batterij instellen in een paar vragen. Alle velden blijven bestaan (readBattery leest ze), maar alleen wat elke
+// gebruiker moet weten staat in beeld: welk merk, verbinden, hoe groot, wie stuurt en wat je wilt. De rest staat onder
+// "Meer instellingen" met goede standaardwaarden.
+const BAT_MERK = {
+  homewizard: { naam: "HomeWizard", sub: "Plug-In Battery", cap: 2.7, ch: 800, dis: 800 },
+  marstek: { naam: "Marstek", sub: "Venus C, D of E", cap: 5.12, ch: 2500, dis: 2500 },
+  zendure: { naam: "Zendure", sub: "SolarFlow, Hyper", cap: 2.88, ch: 2400, dis: 2400 },
+  sessy: { naam: "Sessy", sub: "thuisbatterij", cap: 5.0, ch: 2200, dis: 1700 },
+  victron: { naam: "Victron", sub: "GX met ESS", cap: 10, ch: 3000, dis: 3000 },
+  ha: { naam: "Ander merk", sub: "via de koppelmotor", cap: null },
+};
 function batteryHtml(b) {
   const f = (id, label, val, type = "text", extra = "") => `<div class="field" ${extra}><label for="${id}">${label}</label><input id="${id}" type="${type}" ${type === "number" ? 'step="any"' : ""} value="${esc(val ?? "")}"></div>`;
   const m = b.mode_map || {}, fm = b.force_map || {}, R = b.reserve_kwh ?? 0;
@@ -848,85 +898,96 @@ function batteryHtml(b) {
   const link = drv === "direct" ? (b.direct_type || "homewizard") : (CFG.has_ha ? "ha" : "homewizard");
   const lsel = (v) => link === v ? "selected" : "";
   const on = !!(b.soc_entity || drv === "direct");
-  return `<p class="small muted" style="margin-top:-4px">Zonnestuur rekent elk kwartier uit wat de batterij het beste doet: <b>zelf gebruiken</b>, <b>vasthouden</b> voor een duurder uur, of <b>laden van het net</b> als dat straks duidelijk meer oplevert. Het laadpercentage volgt daaruit: zoveel als de dure uren nodig hebben, niet meer. ${CFG.has_ha ? "Werkt met elk merk dat de koppelmotor kan sturen, en met HomeWizard, Marstek, Zendure en Victron ook rechtstreeks." : "HomeWizard, Marstek, Zendure en Victron koppel je rechtstreeks. Andere merken gaan via de koppelmotor."}</p>
+  const merken = Object.entries(BAT_MERK).filter(([k]) => k !== "ha" || CFG.has_ha);
+  const stap = (n, t, sub) => `<div class="stap"><span class="stap-n">${n}</span><div><h3>${t}</h3>${sub ? `<p class="small muted">${sub}</p>` : ""}</div></div>`;
+  const keuze = (id, cur, opts) => `<div class="keuzes" data-for="${id}">${opts.map(([v, t, s]) => `<button type="button" class="keuze ${cur === v ? "on" : ""}" data-v="${v}"><b>${t}</b>${s ? `<span>${s}</span>` : ""}</button>`).join("")}</div>`;
+  const st = b.sturing || "zonnestuur", goal = b.goal || "slim";
+  return `<p class="small muted" style="margin-top:-4px">Zonnestuur rekent elk kwartier uit wat je batterij het beste doet: <b>zelf gebruiken</b>, <b>vasthouden</b> voor een duurder uur, <b>laden</b> als stroom goedkoop is of de zon schijnt. Daarbij kijkt hij naar de stroomprijs, het weer en wat jouw huis gewoonlijk verbruikt.</p>
     <div class="chips" id="b_found" style="margin:10px 0"></div>
-    <label class="check-row"><input type="checkbox" id="b_on" ${on ? "checked" : ""}> Ik heb een thuisbatterij</label>
+    <label class="check-row big"><input type="checkbox" id="b_on" ${on ? "checked" : ""}> Ik heb een thuisbatterij</label>
     <div id="b_form" ${on ? "" : "hidden"}>
-      <div class="row"><div class="field"><label for="b_st">Wie stuurt de batterij?</label><select id="b_st">
-        <option value="zonnestuur" ${(b.sturing || "zonnestuur") === "zonnestuur" ? "selected" : ""}>Zonnestuur</option>
-        <option value="meekijken" ${b.sturing === "meekijken" ? "selected" : ""}>Mijn leverancier (Zonnestuur kijkt mee)</option>
-        <option value="combinatie" ${b.sturing === "combinatie" ? "selected" : ""}>Afwisselend per maand</option></select>
-        <span class="hint">Stuurt Zonneplan, Frank, Tibber of een andere leverancier je batterij? Laat Zonnestuur dan eerst meekijken: op de pagina <a href="vergelijk">Vergelijken</a> zie je wat Zonnestuur had opgeleverd.</span></div>
-        <div class="field" data-st="meekijken combinatie"><label for="b_lev">Leverancier</label><input id="b_lev" list="b_levl" value="${esc(b.leverancier || "")}" placeholder="bijv. Zonneplan">
-          <datalist id="b_levl">${["Zonneplan", "Frank Energie", "Tibber", "Eneco", "Essent", "NextEnergy", "Budget Thuis", "Sessy"].map((x) => `<option value="${x}">`).join("")}</datalist></div></div>
-      <div data-st="combinatie"><span class="small">Maanden waarin Zonnestuur stuurt:</span>
-        <div class="chips" id="b_zsm" style="margin:6px 0 4px">${["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"].map((m, i) => `<button type="button" data-m="${i + 1}" class="${(b.zs_maanden || [4, 5, 6, 7, 8, 9]).includes(i + 1) ? "on" : ""}">${m}</button>`).join("")}</div>
-        <p class="small muted" style="margin:0">Bij een Sessy wisselt Zonnestuur zelf. Bij andere merken krijg je bij elke wissel een melding om de sturing in de app van je leverancier aan of uit te zetten.</p></div>
-      <p class="small muted" data-st="meekijken" style="margin:0">Zonnestuur stuurt niets naar de batterij; hij leest alleen het laadniveau en het vermogen. Let op: Essent en Eneco staan in hun voorwaarden niet toe dat een ander systeem de batterij stuurt; meekijken kan wel.</p>
-      <div class="row"><div class="field"><label for="b_link">Koppeling</label><select id="b_link">
+      ${stap(1, "Welke batterij heb je?", "")}
+      <div class="merken" id="b_merken">${merken.map(([k, x]) => `<button type="button" class="merk ${link === k ? "on" : ""}" data-merk="${k}"><b>${x.naam}</b><span>${x.sub}</span></button>`).join("")}</div>
+      <select id="b_link" hidden>
         ${CFG.has_ha ? `<option value="ha" ${lsel("ha")}>Via de koppelmotor (elk merk)</option>` : ""}
-        <option value="homewizard" ${lsel("homewizard")}>HomeWizard Plug-In Battery (rechtstreeks)</option>
-        <option value="marstek" ${lsel("marstek")}>Marstek Venus (rechtstreeks)</option>
-        <option value="zendure" ${lsel("zendure")}>Zendure SolarFlow (rechtstreeks)</option>
-        <option value="victron" ${lsel("victron")}>Victron GX met ESS (rechtstreeks)</option>
-        <option value="sessy" ${lsel("sessy")}>Sessy (rechtstreeks)</option></select></div></div>
+        <option value="homewizard" ${lsel("homewizard")}>HomeWizard</option><option value="marstek" ${lsel("marstek")}>Marstek</option>
+        <option value="zendure" ${lsel("zendure")}>Zendure</option><option value="victron" ${lsel("victron")}>Victron</option>
+        <option value="sessy" ${lsel("sessy")}>Sessy</option></select>
+
+      ${stap(2, "Verbinden", "")}
       <div id="b_direct">
+        <p class="small muted" id="d_help" style="margin:0 0 10px"></p>
         <div class="row">${f("d_host", "IP-adres", b.direct_host)}
           <div data-dt="homewizard" class="field"><label for="d_tok">Token van de P1-meter</label><input id="d_tok" type="password" autocomplete="off" placeholder="${b.has_direct_token ? "bewaard (leeg = houden)" : "druk op Koppelen"}"></div>
           <div data-dt="homewizard" class="field" style="flex:0 0 auto"><button type="button" class="btn ghost" id="d_pair">Koppelen</button></div>
-          <div data-dt="marstek victron">${f("d_port", "Poort", b.direct_port || "", "number")}</div>
           <div data-dt="zendure">${f("d_serial", "Serienummer (leeg = zelf uitlezen)", b.direct_serial)}</div>
-          <div data-dt="victron">${f("d_unit", "Modbus unit-id", b.direct_unit || 100, "number")}</div>
           <div data-dt="sessy">${f("d_suser", "Gebruikersnaam (sticker)", b.direct_type === "sessy" ? b.direct_serial : "")}</div>
           <div data-dt="sessy" class="field"><label for="d_spass">Wachtwoord (sticker)</label><input id="d_spass" type="password" autocomplete="off" placeholder="${b.direct_type === "sessy" && b.has_direct_token ? "bewaard (leeg = houden)" : ""}"></div></div>
         <div data-dt="homewizard"><div class="row">${f("d_bats", "Batterijen voor het laadniveau (ip=token, …)", b.direct_batteries)}
           <div class="field"><label for="d_bip">IP van een batterij</label><input id="d_bip" placeholder="192.168.1.…"></div>
           <div class="field" style="flex:0 0 auto"><button type="button" class="btn ghost" id="d_bpair">Batterij koppelen</button></div></div></div>
-        <p class="small muted" id="d_help" style="margin:0"></p>
-        <label class="check-row"><input type="checkbox" id="d_self" ${b.self_regulate ? "checked" : ""}> Zonnestuur regelt zelf nul op de meter (anders doet de batterij dat)</label>
-        <div class="row"><div class="field" style="flex:0 0 auto"><button type="button" class="btn ghost" id="d_test">Test verbinding</button></div><div class="field"><span class="small" id="d_res"></span></div></div>
+        <div class="row" style="align-items:center"><div class="field" style="flex:0 0 auto"><button type="button" class="btn" id="d_test">Test verbinding</button></div><div class="field"><span class="small" id="d_res"></span></div></div>
       </div>
-      <div class="row">${f("b_name", "Naam", b.name || "Thuisbatterij")}${f("b_cap", "Capaciteit (kWh)", b.capacity_kwh ?? 5, "number")}${f("b_minsoc", "Altijd minimaal in batterij (%)", b.min_soc ?? 10, "number")}</div>
-      <div class="row">${f("b_ch", "Max. laden (W)", b.max_charge_w ?? 800, "number")}${f("b_dis", "Max. ontladen (W)", b.max_discharge_w ?? 800, "number")}${f("b_eff", "Rendement heen en terug (%)", Math.round((b.efficiency ?? 0.9) * 100), "number")}</div>
-      <div class="row">${f("b_buy", "Aankoopprijs (€, optioneel)", b.purchase_eur || "", "number")}${f("b_cyc", "Laadcycli volgens fabrikant", b.cycles ?? 6000, "number")}
-        <div class="field"><label class="check"><input type="checkbox" id="b_season" ${b.season === false ? "" : "checked"}> Zomer: vooral eigen zon</label><span class="hint">Met aankoopprijs en cycli rekent Zonnestuur de slijtage per kWh zelf uit. In de zomer laadt hij alleen van het net als het duidelijk loont.</span></div></div>
-      <h3 class="t" style="font-size:15px; margin:14px 0 4px">Wat wil je met je batterij?</h3>
-      <div class="row"><div class="field"><label for="b_goal">Doel</label><select id="b_goal">
-        <option value="slim" ${(b.goal || "slim") === "slim" ? "selected" : ""}>Slim (aanbevolen)</option>
-        <option value="zelf" ${b.goal === "zelf" ? "selected" : ""}>Zelfvoorzienend</option>
-        <option value="max" ${b.goal === "max" ? "selected" : ""}>Maximaal verdienen</option></select>
-        <span class="hint"><b>Slim</b>: eigen zon eerst, handelen als het duidelijk loont. <b>Zelfvoorzienend</b>: alleen eigen zon, nooit van of naar het net. <b>Maximaal verdienen</b>: ook kleine winsten, het hele jaar, en verkopen aan het net. Zonnestuur maakt elk kwartier een plan voor de komende 48 uur met de stroomprijzen, de zonverwachting, je eigen verbruik en het weer (kouder = meer verbruik). Laadverlies en slijtage tellen mee.</span></div></div>
-      <h3 class="t" style="font-size:15px; margin:14px 0 4px">Laden van het net</h3>
-      <label class="check-row"><input type="checkbox" id="b_grid" ${b.grid_charge === false ? "" : "checked"}> Laden van het net als dat duidelijk loont (dynamisch contract, negatieve prijzen)</label>
-      <div class="row">${f("b_gmax", "Van het net hoogstens tot (%)", b.max_grid_soc ?? 95, "number")}${f("b_gw", "Laadvermogen van het net (W, leeg = max.)", b.max_grid_charge_w || "", "number")}</div>
-      <h3 class="t" style="font-size:15px; margin:14px 0 4px">Verkopen aan het net</h3>
-      <label class="check-row"><input type="checkbox" id="b_exp" ${b.grid_export ? "checked" : ""}> Stroom uit de batterij verkopen als terugleveren tijdelijk veel oplevert (prijspiek)</label>
-      <div class="row">${f("b_expw", "Verkopen met hoogstens (W, leeg = max. ontladen)", b.max_export_w || "", "number")}
-        <div data-drv="scripts">${f("s_export", "Script: verkopen (krijgt power_w mee)", b.script_export)}</div></div>
-      <p class="small muted" style="margin:0">Werkt met een dynamisch contract. Kan met Marstek, Zendure, Victron en batterijen met een vermogen-instelling; niet met de HomeWizard-batterij. Zonnestuur verkoopt alleen wat je zelf niet nodig hebt tot de volgende goedkope uren.</p>
-      <h3 class="t" style="font-size:15px; margin:14px 0 4px">Reserve en piek</h3>
-      <div class="row">${f("b_res", "Winterreserve (kWh, 0 = uit)", R, "number")}${f("b_rfrom", "Reserve vanaf (uur)", b.reserve_from ?? 12, "number")}${f("b_runtil", "Mag op vanaf (uur)", b.reserve_until ?? 17, "number")}</div>
-      <label class="check-row"><input type="checkbox" id="b_rwin" ${b.reserve_winter_only === false ? "" : "checked"}> Reserve alleen van oktober tot en met maart</label>
-      <div class="row">${f("b_peak", "Piekgrens netafname tijdens laden (W, 0 = uit)", b.peak_limit_w ?? 0, "number")}</div>
-      <p class="small muted" style="margin:0">De piekgrens is voor een capaciteitstarief (zoals in België): tijdens het laden blijft je netafname eronder.</p>
-      <details id="b_adv" style="margin-top:12px"><summary class="small">Geavanceerd: hoe Zonnestuur de batterij stuurt</summary>
-        <div class="row" style="margin-top:10px">
-          <div class="field"><label for="b_drv">Sturing</label><select id="b_drv">
-            <option value="mode" ${sel("mode")}>Stand kiezen (batterij regelt zelf nul op de meter)</option>
-            <option value="setpoint" ${sel("setpoint")}>Eén vermogen-instelling (+/−)</option>
-            <option value="split" ${sel("split")}>Aparte laad- en ontlaadinstelling</option>
-            <option value="scripts" ${sel("scripts")}>Eigen scripts (voor elk merk)</option></select></div>
-          ${f("b_soc", "Laadniveau (sensor, %)", b.soc_entity)}${f("b_pw", "Vermogen (sensor, optioneel)", b.power_entity)}</div>
-        <div data-drv="mode">
-          <div class="row">${f("b_mode", "Stand (select.…)", b.mode_entity)}${f("m_auto", "Stand: nul op de meter", m.auto)}${f("m_save", "Stand: vasthouden (niet ontladen)", m.save)}${f("m_charge", "Stand: laden van het net", m.charge)}</div>
-          <div class="row">${f("m_idle", "Stand: stand-by", m.idle)}${f("m_manual", "Stand: handmatig/API", m.manual)}${f("b_cpw", "Laadvermogen bij laden (number.…, optioneel)", b.charge_power_entity)}</div>
-          <div class="row">${f("b_force", "Tweede stand voor laden/stilstaan (select.…, optioneel)", b.force_entity)}${f("f_charge", "Tweede stand: laden", fm.charge)}${f("f_idle", "Tweede stand: stilstaan", fm.idle)}</div>
-        </div>
-        <div data-drv="setpoint split"><div class="row">${f("b_sp", "Vermogen-instelling (number.…)", b.setpoint_entity)}${f("b_ce", "Laadvermogen (number.…)", b.charge_entity)}${f("b_de", "Ontlaadvermogen (number.…)", b.discharge_entity)}</div>
-          <label class="check-row"><input type="checkbox" id="b_spp" ${b.setpoint_charge_positive === false ? "" : "checked"}> Positief vermogen = laden (uit bij o.a. Sessy)</label></div>
-        <div data-drv="scripts"><div class="row">${f("s_auto", "Script: zelf gebruiken", b.script_auto)}${f("s_save", "Script: vasthouden", b.script_save)}${f("s_charge", "Script: laden (krijgt power_w mee)", b.script_charge)}</div>
-          <p class="small muted" style="margin:0">Elk merk dat je in de koppelmotor met een script kunt sturen (ook via een dienst, zoals Huawei 'forcible charge'), werkt zo. Zonnestuur roept het script aan met de variabelen <code>action</code> en <code>power_w</code>.</p></div>
-        <div class="row">${f("b_sw", "Schakelaar die aan moet om te sturen (switch.…, optioneel, bv. RS485)", b.control_switch_entity)}</div>
+      <div id="b_haintro">${b.soc_entity && b.soc_entity.trim() ? `<p class="ok-line">✓ Gekoppeld via de koppelmotor. Laadniveau uit <code>${esc(b.soc_entity)}</code>.</p>` : `<p class="small muted" style="margin:0 0 10px">Kies hierboven bij "Gevonden" je batterij, dan vult Zonnestuur alles zelf in. Staat hij er niet bij? Vul dan onder "Meer instellingen → Hoe Zonnestuur de batterij stuurt" de sensoren in.</p>`}</div>
+
+      ${stap(3, "Hoe groot is hij?", "Staat op de doos of in de app van je batterij. We vulden de standaard van dit merk in.")}
+      <div class="drie">${f("b_cap", "Opslag (kWh)", b.capacity_kwh ?? 5, "number")}${f("b_ch", "Laden (W)", b.max_charge_w ?? 800, "number")}${f("b_dis", "Ontladen (W)", b.max_discharge_w ?? 800, "number")}</div>
+
+      ${stap(4, "Wie stuurt de batterij?", "")}
+      <select id="b_st" hidden><option value="zonnestuur" ${st === "zonnestuur" ? "selected" : ""}>Zonnestuur</option><option value="meekijken" ${st === "meekijken" ? "selected" : ""}>Leverancier</option><option value="combinatie" ${st === "combinatie" ? "selected" : ""}>Afwisselend</option></select>
+      ${keuze("b_st", st, [["zonnestuur", "Zonnestuur", "aanbevolen"], ["meekijken", "Mijn leverancier", "Zonnestuur kijkt mee en vergelijkt"], ["combinatie", "Afwisselend", "per maand wie het beste is"]])}
+      <div class="row" data-st="meekijken combinatie" style="margin-top:12px"><div class="field"><label for="b_lev">Welke leverancier?</label><input id="b_lev" list="b_levl" value="${esc(b.leverancier || "")}" placeholder="bijv. Zonneplan">
+        <datalist id="b_levl">${["Zonneplan", "Frank Energie", "Tibber", "Eneco", "Essent", "NextEnergy", "Budget Thuis", "Sessy"].map((x) => `<option value="${x}">`).join("")}</datalist>
+        <span class="hint">Op de pagina <a href="vergelijk">Vergelijken</a> zie je elke dag wat Zonnestuur had opgeleverd. Essent en Eneco staan niet toe dat een ander systeem stuurt; meekijken mag wel.</span></div></div>
+      <div data-st="combinatie"><span class="small">Maanden waarin Zonnestuur stuurt:</span>
+        <div class="chips" id="b_zsm" style="margin:6px 0 4px">${["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"].map((mm, i) => `<button type="button" data-m="${i + 1}" class="${(b.zs_maanden || [4, 5, 6, 7, 8, 9]).includes(i + 1) ? "on" : ""}">${mm}</button>`).join("")}</div>
+        <p class="small muted" style="margin:0">Bij een Sessy wisselt Zonnestuur zelf. Bij andere merken krijg je bij elke wissel een melding om de sturing in de app van je leverancier aan of uit te zetten.</p></div>
+
+      <div data-st="zonnestuur combinatie">
+      ${stap(5, "Wat wil je met je batterij?", "")}
+      <select id="b_goal" hidden><option value="slim" ${goal === "slim" ? "selected" : ""}>Slim</option><option value="zelf" ${goal === "zelf" ? "selected" : ""}>Zelf</option><option value="max" ${goal === "max" ? "selected" : ""}>Max</option></select>
+      ${keuze("b_goal", goal, [["slim", "Slim besparen", "eigen zon eerst, handelen als het duidelijk loont (aanbevolen)"], ["zelf", "Zelfvoorzienend", "alleen eigen zon, nooit laden van het net"], ["max", "Zo veel mogelijk verdienen", "ook kleine winsten en verkopen bij prijspieken"]])}
+      </div>
+
+      <details id="b_meer" class="meer"><summary>Meer instellingen</summary>
+        <div class="row" style="margin-top:12px">${f("b_name", "Naam", b.name || "Thuisbatterij")}${f("b_minsoc", "Altijd minimaal in de batterij (%)", b.min_soc ?? 10, "number")}${f("b_eff", "Rendement heen en terug (%)", Math.round((b.efficiency ?? 0.9) * 100), "number")}</div>
+        <div class="row">${f("b_buy", "Aankoopprijs (€, optioneel)", b.purchase_eur || "", "number")}${f("b_cyc", "Laadcycli volgens fabrikant", b.cycles ?? 6000, "number")}
+          <div class="field"><label class="check"><input type="checkbox" id="b_season" ${b.season === false ? "" : "checked"}> Zomer: vooral eigen zon</label><span class="hint">Met aankoopprijs en cycli rekent Zonnestuur de slijtage per kWh mee.</span></div></div>
+        <h3 class="sub-t">Laden van het net</h3>
+        <label class="check-row"><input type="checkbox" id="b_grid" ${b.grid_charge === false ? "" : "checked"}> Laden van het net als dat duidelijk loont (dynamisch contract)</label>
+        <div class="row" style="margin-top:10px">${f("b_gmax", "Van het net hoogstens tot (%)", b.max_grid_soc ?? 95, "number")}${f("b_gw", "Laadvermogen van het net (W, leeg = max.)", b.max_grid_charge_w || "", "number")}</div>
+        <h3 class="sub-t">Verkopen aan het net</h3>
+        <label class="check-row"><input type="checkbox" id="b_exp" ${b.grid_export ? "checked" : ""}> Stroom uit de batterij verkopen bij een prijspiek</label>
+        <div class="row" style="margin-top:10px">${f("b_expw", "Verkopen met hoogstens (W, leeg = max. ontladen)", b.max_export_w || "", "number")}
+          <div data-drv="scripts">${f("s_export", "Script: verkopen (krijgt power_w mee)", b.script_export)}</div></div>
+        <p class="small muted" style="margin:0">Kan met Marstek, Zendure, Victron, Sessy en batterijen met een vermogen-instelling; niet met de HomeWizard-batterij.</p>
+        <h3 class="sub-t">Reserve en piek</h3>
+        <div class="row">${f("b_res", "Winterreserve (kWh, 0 = uit)", R, "number")}${f("b_rfrom", "Reserve vanaf (uur)", b.reserve_from ?? 12, "number")}${f("b_runtil", "Mag op vanaf (uur)", b.reserve_until ?? 17, "number")}</div>
+        <label class="check-row"><input type="checkbox" id="b_rwin" ${b.reserve_winter_only === false ? "" : "checked"}> Reserve alleen van oktober tot en met maart</label>
+        <div class="row" style="margin-top:10px">${f("b_peak", "Piekgrens netafname tijdens laden (W, 0 = uit)", b.peak_limit_w ?? 0, "number")}</div>
+        <div id="b_dextra"><h3 class="sub-t">Verbinding</h3>
+          <div class="row"><div data-dt="marstek victron">${f("d_port", "Poort", b.direct_port || "", "number")}</div>
+          <div data-dt="victron">${f("d_unit", "Modbus unit-id", b.direct_unit || 100, "number")}</div></div>
+          <label class="check-row"><input type="checkbox" id="d_self" ${b.self_regulate ? "checked" : ""}> Zonnestuur regelt zelf nul op de meter (anders doet de batterij dat)</label></div>
+        <details id="b_adv" style="margin-top:12px"><summary class="small">Hoe Zonnestuur de batterij stuurt (koppelmotor)</summary>
+          <div class="row" style="margin-top:10px">
+            <div class="field"><label for="b_drv">Sturing</label><select id="b_drv">
+              <option value="mode" ${sel("mode")}>Stand kiezen (batterij regelt zelf nul op de meter)</option>
+              <option value="setpoint" ${sel("setpoint")}>Eén vermogen-instelling (+/−)</option>
+              <option value="split" ${sel("split")}>Aparte laad- en ontlaadinstelling</option>
+              <option value="scripts" ${sel("scripts")}>Eigen scripts (voor elk merk)</option></select></div>
+            ${f("b_soc", "Laadniveau (sensor, %)", b.soc_entity)}${f("b_pw", "Vermogen (sensor, optioneel)", b.power_entity)}</div>
+          <div data-drv="mode">
+            <div class="row">${f("b_mode", "Stand (select.…)", b.mode_entity)}${f("m_auto", "Stand: nul op de meter", m.auto)}${f("m_save", "Stand: vasthouden (niet ontladen)", m.save)}${f("m_charge", "Stand: laden van het net", m.charge)}</div>
+            <div class="row">${f("m_idle", "Stand: stand-by", m.idle)}${f("m_manual", "Stand: handmatig/API", m.manual)}${f("b_cpw", "Laadvermogen bij laden (number.…, optioneel)", b.charge_power_entity)}</div>
+            <div class="row">${f("b_force", "Tweede stand voor laden/stilstaan (select.…, optioneel)", b.force_entity)}${f("f_charge", "Tweede stand: laden", fm.charge)}${f("f_idle", "Tweede stand: stilstaan", fm.idle)}</div>
+          </div>
+          <div data-drv="setpoint split"><div class="row">${f("b_sp", "Vermogen-instelling (number.…)", b.setpoint_entity)}${f("b_ce", "Laadvermogen (number.…)", b.charge_entity)}${f("b_de", "Ontlaadvermogen (number.…)", b.discharge_entity)}</div>
+            <label class="check-row"><input type="checkbox" id="b_spp" ${b.setpoint_charge_positive === false ? "" : "checked"}> Positief vermogen = laden (uit bij o.a. Sessy)</label></div>
+          <div data-drv="scripts"><div class="row">${f("s_auto", "Script: zelf gebruiken", b.script_auto)}${f("s_save", "Script: vasthouden", b.script_save)}${f("s_charge", "Script: laden (krijgt power_w mee)", b.script_charge)}</div>
+            <p class="small muted" style="margin:0">Elk merk dat je in de koppelmotor met een script kunt sturen, werkt zo. Zonnestuur roept het script aan met de variabelen <code>action</code> en <code>power_w</code>.</p></div>
+          <div class="row">${f("b_sw", "Schakelaar die aan moet om te sturen (switch.…, optioneel)", b.control_switch_entity)}</div>
+        </details>
       </details>
     </div>`;
 }
@@ -1011,6 +1072,9 @@ function bindDirect() {
   const upd = () => {
     const t = $("b_link").value, direct = t !== "ha";
     $("b_direct").hidden = !direct; if ($("b_adv")) $("b_adv").hidden = direct;
+    if ($("b_haintro")) $("b_haintro").hidden = direct;
+    if ($("b_dextra")) $("b_dextra").hidden = !direct;
+    document.querySelectorAll("#b_merken .merk").forEach((x) => x.classList.toggle("on", x.dataset.merk === t));
     document.querySelectorAll("[data-dt]").forEach((x) => { x.hidden = !x.dataset.dt.split(" ").includes(t); });
     $("d_help").textContent = D_HELP[t] || "";
     $("d_port").placeholder = t === "marstek" ? "30000" : "502";
@@ -1068,6 +1132,51 @@ function readBattery(prev) {
     setpoint_charge_positive: pos, power_charge_positive: (prev && prev.power_charge_positive !== undefined) ? prev.power_charge_positive : pos },
     $("b_link") && $("b_link").value !== "ha" ? readDirect() : { direct_type: "" })];
 }
+// Instellingen in vijf groepen, met een vaste navigatie (links op een groot scherm, bovenaan op de telefoon).
+const GROEPEN = [
+  ["huis", "Je huis", ["Apparaten", "Thuisbatterij", "Zonnepanelen", "Omvormer", "Meter", "Meekijken bij slim laden"]],
+  ["geld", "Prijs en doel", ["Energiecontract", "Jouw doel", "Meten wat Zonnestuur oplevert"]],
+  ["schermen", "Schermen en meldingen", ["Meldingen en weekrapport", "Huisscherm en radio", "Wandscherm", "Sensoren voor je dashboard"]],
+  ["koppelingen", "Koppelingen", ["Andere systemen", "Een merk koppelen", "Auto's via de cloud", "Apparaat toevoegen via een ander systeem", "Koppelmotor", "Eigen domoticaserver"]],
+  ["account", "Pro en hulp", ["Zonnestuur Pro", "Hulp en problemen", "Beveiliging"]],
+];
+function groepeer() {
+  const root = document.querySelector(".settings"); if (!root) return;
+  const secs = [...root.querySelectorAll(":scope > section")];
+  const welke = (sec) => {
+    if (sec.id === "editCard") return "huis";
+    const t = ((sec.querySelector("h2") || {}).textContent || "").trim();
+    const g = GROEPEN.find(([, , ts]) => ts.some((x) => t.startsWith(x)));
+    return g ? g[0] : "koppelingen";
+  };
+  secs.forEach((x) => { x.dataset.groep = welke(x); });
+  const kop = root.firstElementChild, save = root.querySelector(":scope > .actions");
+  const nav = document.createElement("nav"); nav.className = "inst-nav"; nav.setAttribute("aria-label", "Onderdelen van de instellingen");
+  nav.innerHTML = GROEPEN.map(([id, t]) => `<button type="button" data-g="${id}">${t}</button>`).join("");
+  const inh = document.createElement("div"); inh.className = "inst-inhoud";
+  secs.forEach((x) => inh.appendChild(x));
+  if (save) { save.classList.add("savebar"); inh.appendChild(save); }
+  root.classList.add("met-nav"); document.body.classList.add("breed");
+  kop.after(nav); nav.after(inh);
+  const toon = (g, scroll) => {
+    secs.forEach((x) => x.classList.toggle("weg", x.dataset.groep !== g));
+    nav.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.g === g));
+    const act = nav.querySelector("button.on"); if (act && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = act.offsetLeft - 16;
+    if (save) save.classList.toggle("weg", !secs.some((x) => x.dataset.groep === g && !x.hidden && x.querySelector("input,select,textarea")));
+    try { sessionStorage.setItem("zs_inst", g); } catch (e) {}
+    if (scroll) window.scrollTo({ top: 0 });
+  };
+  nav.onclick = (e) => { const b = e.target.closest("button[data-g]"); if (b) toon(b.dataset.g, true); };
+  let start = "huis";
+  try { start = sessionStorage.getItem("zs_inst") || start; } catch (e) {}
+  const doel = location.hash && document.querySelector(location.hash);
+  if (doel && doel.dataset && doel.dataset.groep) start = doel.dataset.groep;
+  else if (doel && doel.closest && doel.closest("section[data-groep]")) start = doel.closest("section[data-groep]").dataset.groep;
+  toon(start, false);
+  window.toonGroep = (g) => toon(g, false);
+  window.onhashchange = () => { const d = location.hash && document.querySelector(location.hash); const sec = d && d.closest && d.closest("section[data-groep]");
+    if (sec) { toon(sec.dataset.groep, false); d.scrollIntoView({ block: "start" }); } };
+}
 async function settings() {
   await loadSuppliers();
   const B = (CFG.batteries && CFG.batteries[0]) || {};
@@ -1078,7 +1187,7 @@ async function settings() {
   Object.keys(SYSX).forEach((k) => { CFG[k] = CFG[k] || {}; });
   const N = CFG.notify || {};
   $("app").innerHTML = `<div class="settings">
-    <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:6px"><h1 class="t" style="margin:0">Instellingen</h1><a class="btn ghost small" href="./">← Dashboard</a></div>
+    <div class="inst-kop"><h1 class="t" style="margin:0">Instellingen</h1><a class="btn ghost small" href="./">← Dashboard</a></div>
     <section class="card" id="licCard"><h2 class="t">Zonnestuur Pro</h2><p class="small muted">Laden…</p></section>
     <section class="card"><h2 class="t">Apparaten</h2>
       <div>${CFG.devices.map((d, i) => `<div class="dev-row"><div class="ico" style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--chip)">${ICONS[d.kind].replace("<svg", '<svg width="20" height="20" stroke="currentColor" fill="none" stroke-width="1.8"')}</div>
@@ -1166,7 +1275,7 @@ async function settings() {
     </section>
     <section class="card" id="goalCard"><h2 class="t">Jouw doel</h2>
       <p class="small muted" style="margin-top:-4px">Een doel werkt beter dan vergelijken met de buren. Het doel telt het seizoen niet mee: het is altijd "zoveel beter dan zonder Zonnestuur".</p>
-      <div class="row"><div class="field"><label for="g_mot">Wat vind je het belangrijkst?</label><select id="g_mot">${[["", "Kies…"], ["geld", "Geld besparen"], ["milieu", "Zo veel mogelijk eigen groene stroom"], ["allebei", "Allebei"]].map(([v, l]) => `<option value="${v}" ${CFG.motivation === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+      <div class="row" style="align-items:flex-start"><div class="field"><label for="g_mot">Wat vind je het belangrijkst?</label><select id="g_mot">${[["", "Kies…"], ["geld", "Geld besparen"], ["milieu", "Zo veel mogelijk eigen groene stroom"], ["allebei", "Allebei"]].map(([v, l]) => `<option value="${v}" ${CFG.motivation === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
         <div class="field"><label for="g_prof">Sturing</label><select id="g_prof">${[["", "Zelfconsumptie: zo veel mogelijk eigen zon"], ["prijs", "Prijs: zo goedkoop mogelijk, ook van het net"], ["netvriendelijk", "Netvriendelijk: niet in de avondpiek"]].map(([v, l]) => `<option value="${v}" ${(CFG.profile || "") === v ? "selected" : ""}>${l}</option>`).join("")}</select>
           <span class="hint">Netvriendelijk helpt het net (minder pieken tussen 17 en 21 uur) en scheelt straks nettarief.</span></div>
         <div class="field"><label for="g_type">Doel</label><select id="g_type"><option value="pct" ${(CFG.goal?.type || "pct") === "pct" ? "selected" : ""}>Procentpunten meer zelf gebruikt</option><option value="eur" ${CFG.goal?.type === "eur" ? "selected" : ""}>Euro's per maand</option></select></div>
@@ -1268,6 +1377,7 @@ async function settings() {
     </section>
     <div class="actions"><span class="small muted">Wijzigingen gaan meteen in, zonder herstart.</span><button class="btn" id="saveBtn">Opslaan</button></div>
   </div>`;
+  groepeer();
   const redraw = () => { $("cbox").innerHTML = contractHtml(c); bindContract(c, redraw); };
   bindContract(c, redraw);
   document.querySelectorAll("#ctype button").forEach((b) => b.onclick = () => {
@@ -1460,6 +1570,24 @@ async function settings() {
     const st = () => { const v = $("b_st") ? $("b_st").value : "zonnestuur"; document.querySelectorAll("[data-st]").forEach((x) => { x.hidden = !x.dataset.st.split(" ").includes(v); }); };
     if ($("b_st")) { $("b_st").onchange = st; st(); }
     document.querySelectorAll("#b_zsm button").forEach((x) => x.onclick = () => x.classList.toggle("on"));
+    // keuzeknoppen zetten de verborgen keuzelijst (die readBattery leest)
+    document.querySelectorAll("#batCard .keuzes").forEach((g) => g.querySelectorAll(".keuze").forEach((k) => k.onclick = () => {
+      const s = $(g.dataset.for); s.value = k.dataset.v; s.dispatchEvent(new Event("change"));
+      g.querySelectorAll(".keuze").forEach((x) => x.classList.toggle("on", x === k));
+    }));
+    // merk kiezen: koppeling + de standaard van dat merk (alleen als je die velden nog niet zelf veranderde)
+    const std = { cap: $("b_cap") ? $("b_cap").value : "", ch: $("b_ch") ? $("b_ch").value : "", dis: $("b_dis") ? $("b_dis").value : "" };
+    document.querySelectorAll("#b_merken .merk").forEach((k) => k.onclick = () => {
+      const t = k.dataset.merk, x = BAT_MERK[t] || {};
+      $("b_link").value = t; $("b_link").onchange();
+      const ongewijzigd = (id, oud) => $(id).value === oud || $(id).value === "" || ["5", "800"].includes($(id).value);
+      if (x.cap) {
+        if (ongewijzigd("b_cap", std.cap)) $("b_cap").value = x.cap;
+        if (ongewijzigd("b_ch", std.ch)) $("b_ch").value = x.ch;
+        if (ongewijzigd("b_dis", std.dis)) $("b_dis").value = x.dis;
+        std.cap = $("b_cap").value; std.ch = $("b_ch").value; std.dis = $("b_dis").value;
+      }
+    });
     bindDrv();
   };
   bindBattery();

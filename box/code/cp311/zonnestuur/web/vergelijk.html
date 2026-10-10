@@ -80,6 +80,16 @@ html, body { overscroll-behavior-y: none; }
   .vg input, .vg select { font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); width: 120px; }
   .vg select { width: auto; }
   .hint { color: var(--ink-3); font-size: 13px; margin-top: 8px; }
+  .rows { margin-top: 14px; border-top: 1px solid var(--line); }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  .row b { font-weight: 650; }
+  .row .r { text-align: right; }
+  .row .plus { color: var(--good); font-weight: 650; } .row .min { color: var(--warn); font-weight: 650; }
+  .row .muted { grid-column: 1 / -1; }
+  h2 { font: 650 17px/1.3 "Inter Tight", "Inter", sans-serif; margin: 18px 0 0; }
+  .check { display: flex; gap: 12px; align-items: flex-start; }
+  .check i { flex: none; width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; font-style: normal; font-weight: 700; background: var(--chip); }
+  .check i.ok { color: var(--good); } .check i.let { color: var(--warn); }
 </style>
 <link rel="stylesheet" href="stijl.css">
 </head>
@@ -124,9 +134,14 @@ function card(it) {
   const cmp = `<div class="cmp">${bat ? `<div><span>Zonder batterij</span><b>${eur(tot.n)}</b></div>` : ""}
       <div class="${tot.w <= tot.z ? "win" : ""}"><span>Zo stuurde ${esc(it.wie)}</span><b>${eur(tot.w)}</b></div>
       <div class="${tot.z < tot.w ? "win" : ""}"><span>Zo had Zonnestuur het gedaan</span><b>${eur(tot.z)}</b></div></div>`;
-  const rows = ms.map(([k, m]) => `<tr><td>${mnaam(k)}<br><span class="muted">${m.dagen} dagen${m.vergoeding ? ` · vergoeding ${eur(m.vergoeding)}` : ""}</span></td>
-      ${bat ? `<td>${eur(m.zonder)}</td>` : `<td>${nl(m.kwh, 0)} kWh</td>`}<td>${eur(m.werkelijk)}</td><td>${eur(m.zonnestuur)}</td>
-      <td class="${m.verschil > 0.005 ? "plus" : m.verschil < -0.005 ? "min" : ""}">${m.verschil > 0 ? "+" : ""}${eur(m.verschil)}</td></tr>`).join("");
+  const kl = (x) => x > 0.005 ? "plus" : x < -0.005 ? "min" : "";
+  const rows = ms.map(([k, m]) => `<div class="row"><b>${mnaam(k)}</b><span class="r ${kl(m.verschil)}">${m.verschil > 0 ? "Zonnestuur " : m.verschil < 0 ? esc(it.wie) + " " : ""}${eur(Math.abs(m.verschil))} ${m.verschil > 0.005 ? "goedkoper" : m.verschil < -0.005 ? "goedkoper" : "verschil"}</span>
+      <span class="muted">${m.dagen} ${m.dagen === 1 ? "dag" : "dagen"}${bat ? ` · zonder batterij ${eur(m.zonder)}` : ` · ${nl(m.kwh, 1)} kWh geladen`} · ${esc(it.wie)} ${eur(m.werkelijk)} · Zonnestuur ${eur(m.zonnestuur)}${m.vergoeding ? ` · uitbetaald ${eur(m.vergoeding)}` : ""}</span></div>`).join("");
+  const DAG = { weekday: "short", day: "numeric", month: "short" }, TIJD = { hour: "2-digit", minute: "2-digit" };
+  const sessies = bat ? "" : Object.entries(it.per_dag || {}).filter(([, v]) => v.van).sort(([a], [b]) => b.localeCompare(a)).slice(0, 14).map(([d, v]) => {
+    const a = new Date(v.van * 1000), z = new Date(v.tot * 1000), x = v.werkelijk - v.zonnestuur;
+    return `<div class="row"><b>${a.toLocaleDateString("nl-NL", DAG)} · ${a.toLocaleTimeString("nl-NL", TIJD)}–${z.toLocaleTimeString("nl-NL", TIJD)}</b><span class="r ${kl(x)}">${x > 0.005 ? "−" + eur(x) : x < -0.005 ? "+" + eur(-x) : "gelijk"}</span>
+      <span class="muted">${nl(v.kwh, 1)} kWh · ${esc(it.wie)} ${nl(v.prijs * 100, 1)} ct/kWh (${eur(v.werkelijk)}) · Zonnestuur ${nl(v.prijs_zs * 100, 1)} ct/kWh (${eur(v.zonnestuur)})</span></div>`; }).join("");
   const days = Object.entries(it.per_dag || {}).sort(([a], [b]) => a.localeCompare(b)).slice(-31);
   const mx = Math.max(0.05, ...days.map(([, v]) => Math.abs(v.werkelijk - v.zonnestuur)));
   const bars = days.map(([d, v]) => { const x = v.werkelijk - v.zonnestuur, h = Math.abs(x) / mx * 45;
@@ -140,15 +155,23 @@ function card(it) {
   return `<section class="card" data-id="${esc(it.id)}" data-soort="${it.soort}">${head}
     <p class="verdict">${esc(it.tekst)}</p>${cmp}
     ${days.length > 2 ? `<div class="bars" role="img" aria-label="Verschil per dag">${bars}</div><p class="hint">Per dag: groen = Zonnestuur goedkoper, oranje = ${esc(it.wie)} goedkoper.</p>` : ""}
-    <div class="tw"><table><thead><tr><th>Maand</th><th>${bat ? "Zonder batterij" : "Geladen"}</th><th>${esc(it.wie)}</th><th>Zonnestuur</th><th>Verschil</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="vg"><span>Uitbetaald door ${esc(it.wie)} in</span><select data-vm>${opts}</select><input data-ve inputmode="decimal" placeholder="€ 0,00" aria-label="Bedrag"><button class="btn ghost" data-vs>Opslaan</button></div>
-    <p class="hint">${bat ? "Kijk in de app van je leverancier wat de batterij die maand opleverde (bijv. Powerplay of Slim handelen)." : "Een vergoeding per geladen kWh (bijv. Jedlix) vul je in bij Instellingen; een maandbedrag kan hier."}</p>
+    <h2>Per maand</h2><div class="rows">${rows}</div>
+    ${sessies ? `<h2>Laadbeurten</h2><div class="rows">${sessies}</div><p class="hint">Met de prijs van je eigen contract per uur, inclusief energiebelasting en btw. Geld dat ${esc(it.wie)} je teruggeeft voor onderbroken laden (bijv. Grid Rewards) zit hier nog niet in: vul dat hieronder in.</p>` : ""}
+    <h2>Uitbetaald door ${esc(it.wie)}</h2>
+    <div class="vg"><span>In</span><select data-vm>${opts}</select><input data-ve inputmode="decimal" placeholder="€ 0,00" aria-label="Bedrag"><button class="btn ghost" data-vs>Opslaan</button></div>
+    <p class="hint">${bat ? "Kijk in de app van je leverancier wat de batterij die maand opleverde (bijv. Powerplay of Slim handelen)." : "Bijv. Grid Rewards of een vergoeding van Jedlix. Kijk in de app van je leverancier wat je die maand terugkreeg. Een vast bedrag per geladen kWh vul je in bij Instellingen."}</p>
     ${act ? `<div class="act">${act}</div>` : ""}</section>`;
 }
 async function load() {
   const r = await api("api/vergelijk");
   const it = r.items || [];
-  $("items").innerHTML = it.length ? it.map(card).join("") : `<section class="card"><p class="sub">Er is nog niets om te vergelijken. Stuurt je leverancier je thuisbatterij? Zet dan bij Instellingen &gt; Thuisbatterij "Wie stuurt de batterij?" op "${"je leverancier, Zonnestuur kijkt mee"}". Laat een leverancier je auto laden? Vul dan bij Instellingen &gt; Meekijken bij slim laden de laadpaal in.</p><p><a href="instellingen#batCard">Naar Instellingen</a></p></section>`;
+  const pc = r.prijscontrole || {};
+  const check = pc.sensor ? `<section class="card"><div class="eyebrow">Prijscontrole</div><div class="check" style="margin-top:10px">${!pc.n
+      ? `<i>…</i><p class="sub" style="margin:0">Zonnestuur legt elk kwartier zijn eigen prijs naast die van ${esc(pc.leverancier || "je leverancier")}. Over een uur zie je hier of ze kloppen.</p>`
+      : Math.abs(pc.verschil) < 0.002
+      ? `<i class="ok">✓</i><p class="sub" style="margin:0">Onze prijzen kloppen met ${esc(pc.leverancier || "je leverancier")}: gemiddeld ${nl(Math.abs(pc.verschil) * 100, 1)} cent verschil per kWh, gemeten over ${nl(pc.n)} kwartieren. Inclusief energiebelasting, btw en de opslag van je leverancier.</p>`
+      : `<i class="let">!</i><p class="sub" style="margin:0">${esc(pc.leverancier || "Je leverancier")} rekent gemiddeld ${nl(Math.abs(pc.verschil) * 100, 1)} cent per kWh ${pc.verschil > 0 ? "meer" : "minder"} dan wij uitrekenden (${nl(pc.n)} kwartieren). ${pc.correctie ? "Zonnestuur rekent voortaan met dat verschil, zodat plannen en besparingen kloppen." : "Na 12 uur meten rekent Zonnestuur daar vanzelf mee."}</p>`}</div></section>` : "";
+  $("items").innerHTML = check + (it.length ? it.map(card).join("") : `<section class="card"><p class="sub">Er is nog niets om te vergelijken. Stuurt je leverancier je thuisbatterij? Zet dan bij Instellingen &gt; Thuisbatterij "Wie stuurt de batterij?" op "${"je leverancier, Zonnestuur kijkt mee"}". Laat een leverancier je auto laden? Vul dan bij Instellingen &gt; Meekijken bij slim laden de laadpaal in.</p><p><a href="instellingen#batCard">Naar Instellingen</a></p></section>`);
   document.querySelectorAll("[data-vs]").forEach((b) => b.onclick = async () => {
     const c = b.closest("section"); const r = await api("api/vergelijk/vergoeding", { soort: c.dataset.soort, id: c.dataset.id, maand: c.querySelector("[data-vm]").value, eur: c.querySelector("[data-ve]").value });
     if (r.ok === false) alert(r.error); else load();

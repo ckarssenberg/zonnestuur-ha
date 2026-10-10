@@ -93,6 +93,13 @@ html, body { overscroll-behavior-y: none; }
       <div class="key"><i style="background:repeating-linear-gradient(45deg,rgba(255,255,255,.55) 0 2px,transparent 2px 5px),#e34948"></i><span>Duur (ook gestreept, zodat je het zonder kleur ziet).</span></div>
       <p>De stippellijn in de grafiek is de geplande stand van je thuisbatterij.</p>
     </section>
+    <section id="verwachting"><h2>Prijsverwachting uit het weer</h2>
+      <p>De beurs geeft de prijzen van morgen pas rond 13:00. Voor de dagen daarna voorspelt Zonnestuur de prijs zelf. Veel wind maakt stroom goedkoop (vooral 's nachts en 's avonds), veel zon maakt de middag goedkoop, kou maakt hem duurder, en in het weekend is hij meestal lager. Zonnestuur leert dat uit de prijzen en het weer van de afgelopen twee maanden: wind en zon aan de Nederlandse en Duitse kust, in het Ruhrgebied en in Oost-Duitsland.</p>
+      <p>Onder de prijsgrafiek zie je per dag de verwachte prijs en waarom. Zonnestuur toetst zichzelf: hij voorspelt de afgelopen week alsof hij die nog niet kende, en laat zien hoeveel cent hij ernaast zat. De auto (met een latere vertrektijd) en de thuisbatterij gebruiken de verwachting; zodra de echte prijzen er zijn, plannen ze opnieuw.</p>
+    </section>
+    <section id="prijscontrole"><h2>Kloppen de prijzen?</h2>
+      <p>Zonnestuur rekent de prijs zelf uit: de beursprijs plus btw, energiebelasting en de opslag van je leverancier. Heb je bij Energiecontract de prijssensor van je leverancier gekozen (bijvoorbeeld van Tibber), dan legt hij elk kwartier zijn eigen prijs naast die van je leverancier. Wijkt het structureel af, bijvoorbeeld omdat je een andere opslag hebt, dan rekent hij voortaan met dat verschil. Je ziet de uitkomst op de pagina <a href="vergelijk">Vergelijken</a>.</p>
+    </section>
     <section id="apparaten"><h2>Apparaten bijsturen</h2>
       <ul><li><b>Automatisch</b>: Zonnestuur beslist.</li><li><b>Nu aan</b>: twee uur aan, daarna weer automatisch.</li><li><b>Vandaag overslaan</b>: tot morgen uit.</li></ul>
       <p>Onder elke kaart staat waarom het apparaat aan of uit staat, en na afloop hoeveel stroom het gebruikte en wat het scheelde.</p>
@@ -106,6 +113,7 @@ html, body { overscroll-behavior-y: none; }
       <ul><li><b>Vol om</b>: hoe laat hij klaar moet zijn.</li><li><b>Laden tot</b>: tot welk percentage (minder dan 100% is beter voor de accu).</li>
         <li><b>Altijd minstens</b>: daaronder laadt hij meteen, wat het ook kost.</li><li><b>Prijs</b>: nooit duurder laden dan dit (behalve onder je minimum).</li></ul>
       <p><b>Laden op wat je rijdt</b>: kies bij Laadinstellingen "wat ik rijd" en vul je kilometers per werkdag en weekenddag in. Zonnestuur rekent uit hoeveel er nodig is om thuis te komen met je minimum (plus 10% marge) en laadt niet meer dan dat. Bij kou kost rijden meer stroom (verwarming, koude accu): bij 0 °C ± 20% meer. Hij gebruikt de weersverwachting van die dag.</p>
+      <p><b>Moet de auto pas later klaar zijn?</b> Kies op de laadkaart "Moet de auto later klaar zijn?", dan een dag, een tijd en eventueel hoe vol. Zonnestuur laadt dan in de goedkoopste of zonnigste uren tot dat moment, ook als dat over een paar dagen verspreid is. Voor dagen waarvan de prijs nog niet bekend is, gebruikt hij de prijsverwachting uit het weer. Daarna gaan je gewone tijden vanzelf weer in.</p>
       <p>Met zonnepanelen laadt hij bij weinig zon op 1 fase (vanaf ± 1,4 kW) en bij veel zon op 3 fasen, als je laadpaal dat kan.</p>
     </section>
     <section id="warmte"><h2>Warm water en verwarming</h2>

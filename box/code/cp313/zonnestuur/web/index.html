@@ -317,6 +317,17 @@ html, body { overscroll-behavior-y: none; }
   .price-stats div, .use-stats div { display: grid; gap: 2px; }
   .price-stats b, .use-stats b { font-family: "Inter Tight", Inter, sans-serif; font-size: 21px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
   .price-stats span, .use-stats span { font-size: 12px; color: var(--ink-3); }
+  .verw { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .verw h3 { margin: 0 0 4px; font: 650 16px/1.3 "Inter Tight", Inter, sans-serif; letter-spacing: -.01em; }
+  .verw-dagen { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; margin-top: 12px; }
+  .verw-dag { background: var(--chip); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; }
+  .verw-kop { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+  .verw-kop b { font-weight: 650; }
+  .verw-meer { margin-top: 10px; } .verw-meer summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+  .verw-bars { display: flex; align-items: flex-end; gap: 1px; height: 42px; }
+  .verw-bars i { flex: 1; border-radius: 2px 2px 0 0; background: var(--mid); opacity: .85; }
+  .verw-bars i.cheap { background: var(--cheap); } .verw-bars i.dear { background: var(--dear); }
+  .verw-dag small { color: var(--ink-2); font-size: 12.5px; line-height: 1.35; }
   .lanes-title { display: flex; justify-content: space-between; align-items: baseline; margin: 16px 0 2px; }
 
   /* apparaten */
@@ -621,6 +632,18 @@ html, body { overscroll-behavior-y: none; }
   .evc-tl .blk { position: absolute; top: 7px; height: 6px; border-radius: 99px; background: var(--glow); }
   .evc-tl .lb { position: absolute; top: 15px; font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .evc-tl .lb.r { right: 0; } .evc-tl .lb.l { left: 0; }
+  .evc-tl .nacht { position: absolute; top: 3px; width: 1.5px; height: 14px; border-radius: 2px; background: var(--ink-3); opacity: .45; }
+  .evc-rit { margin: 14px 20px 0; border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; font-size: 14px; }
+  .evc-rit summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 10px; }
+  .evc-rit summary::-webkit-details-marker { display: none; }
+  .evc-rit summary span { color: var(--sun-ink); font-weight: 650; white-space: nowrap; }
+  .evc-rit.on { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--glow-soft); border-color: transparent; }
+  .evc-rit.on small { display: block; color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+  .evc-rit.on .evc-lnk { white-space: nowrap; }
+  @media (max-width: 520px) { .evc-rit.on { flex-direction: column; align-items: flex-start; } }
+  .rit-f { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 12px; align-items: end; }
+  .rit-f label { display: grid; gap: 4px; font-size: 13px; color: var(--ink-2); }
+  .rit-f select, .rit-f input { font: inherit; font-size: 15px; padding: 9px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); min-width: 0; }
   .evc-act { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 20px 0; align-items: center; }
   .evc-go { font: inherit; font-weight: 650; font-size: 15px; border: 0; cursor: pointer; padding: 12px 22px; border-radius: 999px; color: #04140c; background: var(--glow); min-height: 46px; }
   .evc-go.uit { background: var(--chip); color: var(--ink); }
@@ -850,6 +873,7 @@ html, body { overscroll-behavior-y: none; }
         <span class="bl" hidden><i class="sw" style="background:var(--mid)"></i>Batterij: vasthouden</span>
       </div>
       <details class="table" id="priceTableWrap"><summary>Toon als tabel</summary><table id="priceTable"></table></details>
+      <div class="verw" id="verw" hidden></div>
     </section>
 
     <div class="sec-head" id="s-apparaten"><h2>Apparaten</h2><p>Bedienen en bijsturen: wat elk apparaat nu doet, en waarom.</p></div>
@@ -1630,11 +1654,21 @@ function hhmmRanges(list) {
   for (const h of hs) { const l = out[out.length - 1]; if (l && (l[1] % 24) === h) l[1] = h + 1; else out.push([h, h + 1]); }
   return out.map(([a, b]) => `${String(a).padStart(2, "0")}:00–${String(b % 24).padStart(2, "0")}:00`);
 }
+// Dag + tijd kort: "18:00" als het vandaag is, "morgen 07:30", anders "ma 12 okt 08:00".
+function dagTijd(iso, now) {
+  if (!iso) return "";
+  const t = new Date(iso), n = now ? new Date(now) : new Date(), hm = t.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+  const d0 = new Date(n); d0.setHours(0, 0, 0, 0); const dd = Math.round((new Date(t).setHours(0, 0, 0, 0) - d0) / 864e5);
+  if (dd === 0) return hm;
+  if (dd === 1) return "morgen " + hm;
+  return t.toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" }) + " " + hm;
+}
 function evCard(s, d) {
   const E = d.ev, car = E.cars.find((c) => c.id === E.active) || E.cars[0];
   const soc = car.soc, tgt = Math.round(E.target ?? car.target_pct);
   const plugged = car.plug === true || (car.plug == null && d.on), charging = d.on && (d.power_w || 0) > 50;
-  const ready = (d.ready_times || [])[0] || null;
+  const vt = E.vertrek || null;
+  const ready = vt ? dagTijd(vt.at, s.now) : ((d.ready_times || [])[0] || null);
   const reached = soc != null && !(E.need_min > 0);
   const st = charging ? `Laadt nu met ${nl((d.power_w || 0) / 1000, 1)} kW` : plugged ? "Stekker erin" : car.plug === false ? "Stekker eruit" : "Wacht op de auto";
   const chips = E.cars.length > 1 ? `<div class="ev-cars" role="group" aria-label="Welke auto hangt aan de lader?">${E.cars.map((c) =>
@@ -1653,7 +1687,9 @@ function evCard(s, d) {
   else if (!plugged && car.plug === false) q2 = ["Laden", "Steek de stekker erin", `dan laadt hij ${nl(E.need_kwh || 0, 1)} kWh in de goedkope uren`];
   else if (E.mode === "vol") q2 = ["Laden", "Nu meteen", `${nl(E.need_kwh || 0, 1)} kWh · ${hm(E.need_min || 0)}`];
   else if (E.plan) { const rg = hhmmRanges(E.plan);
-    q2 = ["Laadt", `${E.plan[0]}–${E.done_at}`, `${hm(E.need_min || 0)} laden${rg.length > 1 ? `, in ${rg.length} delen` : ""} · ${nl(E.need_kwh || 0, 1)} kWh`]; }
+    const a = E.plan_iso ? dagTijd(E.plan_iso[0], s.now) : E.plan[0], z = E.done_iso ? dagTijd(E.done_iso, s.now) : E.done_at;
+    const days = new Set((E.plan_iso || []).map((x) => x.slice(0, 10))).size;
+    q2 = ["Laadt", days > 1 ? `vanaf ${a}` : `${a}–${E.done_at}`, `${hm(E.need_min || 0)} laden${days > 1 ? `, verdeeld over ${days} dagen` : rg.length > 1 ? `, in ${rg.length} delen` : ""} · klaar ${z}`]; }
   else q2 = ["Laden", soc == null ? "Onbekend" : "Wordt gepland", soc == null ? "accupercentage onbekend" : "zodra de prijzen er zijn"];
   // 3. kosten
   const saved = E.cost != null && E.cost_direct != null ? E.cost_direct - E.cost : 0;
@@ -1667,13 +1703,30 @@ function evCard(s, d) {
   let tl = "";
   const nowD = new Date(s.now), endT = !reached && (ready || E.done_at);
   if (endT && E.plan && E.mode !== "vol" && !charging) {
-    const end = new Date(nowD); end.setHours(Number(endT.slice(0, 2)), Number(endT.slice(3, 5)), 0, 0); if (end <= nowD) end.setDate(end.getDate() + 1);
+    let end;
+    if (vt) end = new Date(vt.at);
+    else { end = new Date(nowD); const r0 = (d.ready_times || [])[0] || E.done_at; end.setHours(Number(r0.slice(0, 2)), Number(r0.slice(3, 5)), 0, 0); if (end <= nowD) end.setDate(end.getDate() + 1); }
     const span = end - nowD, x = (t) => Math.max(0, Math.min(100, (t - nowD) / span * 100));
-    const blocks = hhmmRanges(E.plan).map((r) => { const a = new Date(nowD); a.setHours(Number(r.slice(0, 2)), 0, 0, 0); if (a < nowD - 3600e3) a.setDate(a.getDate() + 1);
-      let n = (Number(r.slice(6, 8)) - Number(r.slice(0, 2)) + 24) % 24 || 24; return [x(a), x(+a + n * 3600e3)]; })
+    const starts = (E.plan_iso || []).map((i) => new Date(i)).sort((a, b) => a - b);
+    const blocks = starts.map((a) => [x(a), x(+a + 3600e3)])
       .map(([a, b]) => `<i class="blk" style="left:${a.toFixed(1)}%;width:${Math.max(1.5, b - a).toFixed(1)}%"></i>`).join("");
-    tl = `<div class="evc-tl" role="img" aria-label="Laadmomenten tussen nu en ${esc(endT)}"><i class="rail"></i>${blocks}<span class="lb l">nu</span><span class="lb r">${esc(endT)}</span></div>`;
+    // middernachten als streepjes, zodat je ziet over hoeveel dagen het gaat
+    let nachten = "";
+    const m = new Date(nowD); m.setHours(24, 0, 0, 0);
+    for (; m < end; m.setDate(m.getDate() + 1)) nachten += `<i class="nacht" style="left:${x(m).toFixed(1)}%" title="${m.toLocaleDateString("nl-NL", { weekday: "long" })}"></i>`;
+    tl = `<div class="evc-tl" role="img" aria-label="Laadmomenten tussen nu en ${esc(endT)}"><i class="rail"></i>${nachten}${blocks}<span class="lb l">nu</span><span class="lb r">${esc(endT)}</span></div>`;
   }
+  // eenmalige vertrektijd: "ik moet pas maandag weg"
+  const DAGEN = [];
+  for (let i = 0; i < 8; i++) { const t = new Date(nowD); t.setDate(t.getDate() + i); DAGEN.push([`${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`,
+    i === 0 ? "vandaag" : i === 1 ? "morgen" : t.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "short" })]); }
+  const rit = vt ? `<div class="evc-rit on"><div><b>Eenmalig: klaar ${esc(dagTijd(vt.at, s.now))}</b><small>${vt.pct ? `tot ${vt.pct}%` : `tot ${tgt}%`} · laadt in de goedkoopste uren tot dan. Daarna weer je gewone tijden.</small></div><button class="evc-lnk" data-rit-uit>Terug naar normaal</button></div>`
+    : `<details class="evc-rit"><summary>Moet de auto later klaar zijn? <span>Kies een dag</span></summary>
+      <div class="rit-f"><label>Dag<select data-rit-dag>${DAGEN.map(([v, t], i) => `<option value="${v}" ${i === 1 ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
+      <label>Tijd<input type="time" data-rit-tijd value="${esc((d.ready_times || [])[0] || "08:00")}" step="900"></label>
+      <label>Hoe vol<select data-rit-pct><option value="">zoals altijd (${car.target_pct}%)</option>${[50, 60, 70, 80, 90, 100].map((v) => `<option value="${v}">${v}%</option>`).join("")}</select></label>
+      <button class="evc-go" data-rit-ok>Opslaan</button></div>
+      <p class="small muted" style="margin:6px 0 0">Zonnestuur laadt dan alleen in de goedkoopste of zonnigste uren tot dat moment, ook over meerdere dagen. Voor de dagen waarvan de prijs nog niet bekend is, gebruikt hij de verwachting uit het weer.</p></details>`;
   // knop: één duidelijke actie
   const vol = E.mode === "vol" && d.mode === "auto";
   const go = reached ? "" : vol ? `<button class="evc-go uit" data-evmode="slim">Toch slim laden</button>`
@@ -1693,6 +1746,7 @@ function evCard(s, d) {
     <div class="evc-story">${q(q1)}${q(q2)}${q(q3, saved > 0.05 && !reached && E.mode !== "vol" ? "goed" : "")}</div>
     ${E.trip ? `<div class="evc-why"><b>${esc(E.trip.dag[0].toUpperCase() + E.trip.dag.slice(1))}:</b> ${E.trip.km} km${E.trip.temp != null ? ` bij ${nl(E.trip.temp, 0)} °C` : ""}${E.trip.factor > 1.01 ? ` (${Math.round((E.trip.factor - 1) * 100)}% meer verbruik door het weer)` : ""} = ± ${nl(E.trip.kwh, 1)} kWh. Daarom laden tot ${E.trip.pct}%.${E.trip.te_weinig ? " Dat is je maximum; voor deze rit is het krap." : ""}</div>` : ""}
     ${tl}
+    ${rit}
     <div class="evc-act">${go}${skip}</div>
     ${warn.length ? `<div class="evc-warn">${warn.join(" ")}</div>` : ""}
     ${d.last_event ? `<div class="evc-why"><b>Waarom?</b> ${esc(d.last_event.text)}</div>` : ""}
@@ -1724,6 +1778,11 @@ function bindEv(el, d) {
   el.querySelectorAll("[data-evadd]").forEach((b) => b.onclick = () => go({ add_cars: b.dataset.evadd.split(",") }));
   if (!car) return;
   el.querySelectorAll("[data-evcar]").forEach((b) => b.onclick = () => go({ car: b.dataset.evcar }));
+  el.querySelectorAll("[data-rit-ok]").forEach((b) => b.onclick = () => {
+    const f = b.closest(".rit-f"), dag = f.querySelector("[data-rit-dag]").value, tijd = f.querySelector("[data-rit-tijd]").value || "08:00";
+    go({ vertrek: { at: `${dag}T${tijd}`, pct: f.querySelector("[data-rit-pct]").value || null } });
+  });
+  el.querySelectorAll("[data-rit-uit]").forEach((b) => b.onclick = () => go({ vertrek: null }));
   el.querySelectorAll("[data-evmode]").forEach((b) => b.onclick = async () => {
     if (b.dataset.evmode === "vol" && d.mode !== "auto")              // eerder overgeslagen: eerst weer automatisch
       await api(`api/device/${encodeURIComponent(d.id)}/mode`, { method: "POST", body: JSON.stringify({ mode: "auto", hours: null }) });
@@ -1978,8 +2037,31 @@ function priceClass(p, avg) {
   return p <= avg - band ? "cheap" : p >= avg + band ? "dear" : "mid";
 }
 const CLASS_WORD = { cheap: "goedkoop", mid: "normaal", dear: "duur" };
+// De komende dagen: verwachte prijs uit wind, zon en temperatuur (voor dagen die de beurs nog niet heeft gegeven)
+function drawVerwachting(P) {
+  const box = $("verw"), V = P && P.verwachting;
+  if (!box) return;
+  if (!V || P.type !== "dynamic") { box.hidden = true; return; }
+  if (!V.klaar || !(V.dagen || []).length) {
+    box.hidden = false;
+    box.innerHTML = `<h3>Verwachting komende dagen</h3><p class="small muted">Zonnestuur leert nu hoe wind, zon en temperatuur de stroomprijs bepalen (${V.historie_dagen || 0} van de 14 dagen). Daarna zie je hier de verwachte prijs voor de dagen die nog niet bekend zijn.</p>`;
+    return;
+  }
+  const allP = V.dagen.flatMap((d) => d.uren.map((u) => u.all_in)), lo = Math.min(0, ...allP), hi = Math.max(0.05, ...allP);
+  const dag = (iso) => { const t = new Date(iso + "T12:00:00").toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "short" }); return t[0].toUpperCase() + t.slice(1); };
+  box.hidden = false;
+  box.innerHTML = `<h3>Verwachting komende dagen</h3>
+    <p class="small muted">Nog niet bekend bij de beurs, dus voorspeld uit wind, zon en temperatuur.${V.fout_ct != null ? ` Vorige week zat de voorspelling er gemiddeld ${nl(V.fout_ct, 1)} cent per kWh naast.` : ""}</p>
+    ${(() => { const kaart = (d) => `<div class="verw-dag">
+      <div class="verw-kop"><b>${esc(dag(d.dag))}</b><span class="num">± ${eur3(d.gem)}</span></div>
+      <div class="verw-bars" aria-hidden="true">${d.uren.map((u) => `<i class="${priceClass(u.all_in, V.gem7 || d.gem)}" style="height:${Math.max(4, (u.all_in - lo) / (hi - lo) * 100).toFixed(0)}%"></i>`).join("")}</div>
+      <small>${esc(d.reden)}. Goedkoopst rond ${esc(d.goedkoopst[0] || "")}.</small></div>`;
+      const D = V.dagen.slice(0, 7);
+      return `<div class="verw-dagen">${D.slice(0, 3).map(kaart).join("")}</div>` + (D.length > 3 ? `<details class="verw-meer"><summary>Nog ${D.length - 3} dagen</summary><div class="verw-dagen">${D.slice(3).map(kaart).join("")}</div></details>` : ""); })()}`;
+}
 function drawPrices() {
   const P = PRICES; if (!P) return;
+  try { drawVerwachting(P); } catch (e) { zsFout(e); }
   const stats = $("priceStats"), svg = $("priceSvg"), box = $("priceChart"), tip = $("priceTip");
   if (P.type === "fixed") {
     $("priceNote").textContent = P.supplier ? P.supplier + " · vast of variabel" : "vast of variabel contract";

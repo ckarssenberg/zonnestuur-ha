@@ -1,5 +1,13 @@
 # Wijzigingen
 
+## 0.47.0
+- Auto: "Moet de auto later klaar zijn?" Kies een dag en tijd (bijv. maandag 08:00) en hoe vol. Zonnestuur laadt dan in de goedkoopste of zonnigste uren tot dat moment, ook over meerdere dagen.
+- Prijsverwachting uit het weer: veel wind of zon maakt stroom goedkoop. Zonnestuur voorspelt de prijs voor de dagen die de beurs nog niet heeft gegeven en laat per dag zien wat hij verwacht en waarom. Auto en thuisbatterij plannen daarmee.
+- Prijscontrole: met de prijssensor van je leverancier (bijv. Tibber) legt Zonnestuur elk kwartier zijn eigen prijs ernaast en corrigeert zichzelf als het structureel afwijkt.
+- Vergelijken: per laadbeurt zie je hoe laat, hoeveel kWh en de prijs per kWh, zodat je het naast de app van je leverancier kunt leggen.
+- Thuisbatterij instellen in vijf korte vragen; alles wat je meestal niet nodig hebt staat onder "Meer instellingen".
+- Instellingen opnieuw ingedeeld in vijf groepen met een vaste navigatie, en een Opslaan-knop die altijd in beeld is.
+
 ## 0.46.3
 - Huisscherm (Nest Hub): onderaan zie je nu wat er draait: auto laden (ook als Tibber of een andere app laadt), de boiler of warmtepomp en de thuisbatterij.
 
