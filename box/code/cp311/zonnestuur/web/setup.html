@@ -130,6 +130,31 @@ html, body { overscroll-behavior-y: none; }
   .ok-line { margin: 0 0 6px; font-size: 14px; color: var(--good); font-weight: 600; overflow-wrap: anywhere; }
   .ok-line code { color: var(--ink-2); font-weight: 500; }
   details.meer > summary { font-size: 15px; color: var(--ink); }
+  .meer-sam { display: block; font-weight: 500; font-size: 13px; color: var(--ink-3); margin: 2px 0 0 16px; }
+  .blok { border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-top: 12px; background: var(--card-solid); }
+  .blok h4 { margin: 0; font: 650 15.5px/1.3 "Inter Tight", Inter, sans-serif; letter-spacing: -.01em; }
+  .blok-uitleg { margin: 4px 0 0; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+  .blok-ctl { display: grid; gap: 10px; margin-top: 12px; }
+  .blok-in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(140px, 200px); gap: 10px; align-items: center; }
+  .blok-in label { font-weight: 600; font-size: 14px; }
+  .blok-in input, .blok-in select { padding: 10px 12px; font-size: 15px; }
+  .blok-tip { margin: 0; font-size: 13px; color: var(--ink-3); }
+  .met-eenheid { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 14px; background: var(--field); overflow: hidden; }
+  .blok .met-eenheid input, .met-eenheid input { border: 0 !important; border-radius: 0; min-width: 0; background: transparent; box-shadow: none !important; flex: 1; }
+  .met-eenheid i { font-style: normal; color: var(--ink-3); font-size: 14px; padding: 0 12px; white-space: nowrap; }
+  .met-eenheid.voor i { padding-right: 0; }
+  label.schakel { display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  label.schakel input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  label.schakel span { flex: none; width: 46px; height: 28px; border-radius: 99px; background: var(--chip); border: 1px solid var(--line); position: relative; transition: background .15s; }
+  label.schakel span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s; }
+  label.schakel input:checked + span { background: var(--good); border-color: var(--good); }
+  label.schakel input:checked + span::after { transform: translateX(18px); }
+  label.schakel input:focus-visible + span { outline: 3px solid var(--sun); outline-offset: 2px; }
+  details.installateur { margin-top: 16px; }
+  details#b_adv.blok > summary { list-style: none; } details#b_adv.blok > summary::-webkit-details-marker { display: none; }
+  details#b_adv.blok > summary b { color: var(--ink); font-size: 15.5px; } details#b_adv.blok > summary b::after { content: " ›"; color: var(--ink-3); }
+  details#b_adv.blok > summary .blok-uitleg { font-weight: 400; margin-top: 4px; }
+  @media (max-width: 520px) { .blok-in { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
   .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .tile { font: inherit; display: grid; justify-items: center; gap: 6px; padding: 14px 8px; border-radius: 16px; border: 1px solid var(--line); background: var(--card-solid); color: var(--ink); cursor: pointer; font-size: 13.5px; font-weight: 600; }
   .tile svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -890,6 +915,16 @@ const BAT_MERK = {
   victron: { naam: "Victron", sub: "GX met ESS", cap: 10, ch: 3000, dis: 3000 },
   ha: { naam: "Ander merk", sub: "via de koppelmotor", cap: null },
 };
+function fx(id, label, val, uitleg) {
+  return `<div class="field" style="margin:0"><label for="${id}">${label}</label><input id="${id}" value="${esc(val ?? "")}">${uitleg ? `<span class="hint">${uitleg}</span>` : ""}</div>`;
+}
+function blok(titel, uitleg, inhoud) {
+  return `<div class="blok"><h4>${titel}</h4><p class="blok-uitleg">${uitleg}</p><div class="blok-ctl">${inhoud}</div></div>`;
+}
+function opties(id, cur, waarden, fmt) {
+  const v = [...new Set([...waarden, Number(cur)])].sort((a, b) => a - b);
+  return `<select id="${id}">${v.map((x) => `<option value="${x}" ${Number(cur) === x ? "selected" : ""}>${fmt(x)}</option>`).join("")}</select>`;
+}
 function batteryHtml(b) {
   const f = (id, label, val, type = "text", extra = "") => `<div class="field" ${extra}><label for="${id}">${label}</label><input id="${id}" type="${type}" ${type === "number" ? 'step="any"' : ""} value="${esc(val ?? "")}"></div>`;
   const m = b.mode_map || {}, fm = b.force_map || {}, R = b.reserve_kwh ?? 0;
@@ -949,44 +984,89 @@ function batteryHtml(b) {
       ${keuze("b_goal", goal, [["slim", "Slim besparen", "eigen zon eerst, handelen als het duidelijk loont (aanbevolen)"], ["zelf", "Zelfvoorzienend", "alleen eigen zon, nooit laden van het net"], ["max", "Zo veel mogelijk verdienen", "ook kleine winsten en verkopen bij prijspieken"]])}
       </div>
 
-      <details id="b_meer" class="meer"><summary>Meer instellingen</summary>
-        <div class="row" style="margin-top:12px">${f("b_name", "Naam", b.name || "Thuisbatterij")}${f("b_minsoc", "Altijd minimaal in de batterij (%)", b.min_soc ?? 10, "number")}${f("b_eff", "Rendement heen en terug (%)", Math.round((b.efficiency ?? 0.9) * 100), "number")}</div>
-        <div class="row">${f("b_buy", "Aankoopprijs (€, optioneel)", b.purchase_eur || "", "number")}${f("b_cyc", "Laadcycli volgens fabrikant", b.cycles ?? 6000, "number")}
-          <div class="field"><label class="check"><input type="checkbox" id="b_season" ${b.season === false ? "" : "checked"}> Zomer: vooral eigen zon</label><span class="hint">Met aankoopprijs en cycli rekent Zonnestuur de slijtage per kWh mee.</span></div></div>
-        <h3 class="sub-t">Laden van het net</h3>
-        <label class="check-row"><input type="checkbox" id="b_grid" ${b.grid_charge === false ? "" : "checked"}> Laden van het net als dat duidelijk loont (dynamisch contract)</label>
-        <div class="row" style="margin-top:10px">${f("b_gmax", "Van het net hoogstens tot (%)", b.max_grid_soc ?? 95, "number")}${f("b_gw", "Laadvermogen van het net (W, leeg = max.)", b.max_grid_charge_w || "", "number")}</div>
-        <h3 class="sub-t">Verkopen aan het net</h3>
-        <label class="check-row"><input type="checkbox" id="b_exp" ${b.grid_export ? "checked" : ""}> Stroom uit de batterij verkopen bij een prijspiek</label>
-        <div class="row" style="margin-top:10px">${f("b_expw", "Verkopen met hoogstens (W, leeg = max. ontladen)", b.max_export_w || "", "number")}
-          <div data-drv="scripts">${f("s_export", "Script: verkopen (krijgt power_w mee)", b.script_export)}</div></div>
-        <p class="small muted" style="margin:0">Kan met Marstek, Zendure, Victron, Sessy en batterijen met een vermogen-instelling; niet met de HomeWizard-batterij.</p>
-        <h3 class="sub-t">Reserve en piek</h3>
-        <div class="row">${f("b_res", "Winterreserve (kWh, 0 = uit)", R, "number")}${f("b_rfrom", "Reserve vanaf (uur)", b.reserve_from ?? 12, "number")}${f("b_runtil", "Mag op vanaf (uur)", b.reserve_until ?? 17, "number")}</div>
-        <label class="check-row"><input type="checkbox" id="b_rwin" ${b.reserve_winter_only === false ? "" : "checked"}> Reserve alleen van oktober tot en met maart</label>
-        <div class="row" style="margin-top:10px">${f("b_peak", "Piekgrens netafname tijdens laden (W, 0 = uit)", b.peak_limit_w ?? 0, "number")}</div>
-        <div id="b_dextra"><h3 class="sub-t">Verbinding</h3>
-          <div class="row"><div data-dt="marstek victron">${f("d_port", "Poort", b.direct_port || "", "number")}</div>
-          <div data-dt="victron">${f("d_unit", "Modbus unit-id", b.direct_unit || 100, "number")}</div></div>
-          <label class="check-row"><input type="checkbox" id="d_self" ${b.self_regulate ? "checked" : ""}> Zonnestuur regelt zelf nul op de meter (anders doet de batterij dat)</label></div>
-        <details id="b_adv" style="margin-top:12px"><summary class="small">Hoe Zonnestuur de batterij stuurt (koppelmotor)</summary>
-          <div class="row" style="margin-top:10px">
-            <div class="field"><label for="b_drv">Sturing</label><select id="b_drv">
-              <option value="mode" ${sel("mode")}>Stand kiezen (batterij regelt zelf nul op de meter)</option>
-              <option value="setpoint" ${sel("setpoint")}>Eén vermogen-instelling (+/−)</option>
-              <option value="split" ${sel("split")}>Aparte laad- en ontlaadinstelling</option>
-              <option value="scripts" ${sel("scripts")}>Eigen scripts (voor elk merk)</option></select></div>
-            ${f("b_soc", "Laadniveau (sensor, %)", b.soc_entity)}${f("b_pw", "Vermogen (sensor, optioneel)", b.power_entity)}</div>
-          <div data-drv="mode">
-            <div class="row">${f("b_mode", "Stand (select.…)", b.mode_entity)}${f("m_auto", "Stand: nul op de meter", m.auto)}${f("m_save", "Stand: vasthouden (niet ontladen)", m.save)}${f("m_charge", "Stand: laden van het net", m.charge)}</div>
-            <div class="row">${f("m_idle", "Stand: stand-by", m.idle)}${f("m_manual", "Stand: handmatig/API", m.manual)}${f("b_cpw", "Laadvermogen bij laden (number.…, optioneel)", b.charge_power_entity)}</div>
-            <div class="row">${f("b_force", "Tweede stand voor laden/stilstaan (select.…, optioneel)", b.force_entity)}${f("f_charge", "Tweede stand: laden", fm.charge)}${f("f_idle", "Tweede stand: stilstaan", fm.idle)}</div>
+      <details id="b_meer" class="meer"><summary>Meer instellingen <span class="meer-sam" id="b_sam"></span></summary>
+        <p class="small muted" style="margin:12px 0 4px">Je hoeft hier niets te veranderen: de standaard werkt voor de meeste huizen. Wil je het toch anders, dan staat bij elke instelling wat hij doet.</p>
+
+        ${blok("Altijd achter de hand", `Zonnestuur maakt de batterij nooit leger dan dit. Zo houd je altijd wat over, bijvoorbeeld voor de ochtend of als de stroom uitvalt (als je batterij dat kan). Hoger = meer zekerheid, maar minder besparing.`,
+          `<div class="blok-in"><label for="b_minsoc">Nooit leger dan</label>${opties("b_minsoc", b.min_soc ?? 10, [0, 5, 10, 15, 20, 30, 40, 50], (v) => v + "%")}</div>`)}
+
+        ${blok("Laden van het net", `Is stroom 's nachts of bij veel wind goedkoop, dan vult Zonnestuur de batterij uit het net en gebruikt hij die stroom als het duur is. Hij doet dat alleen als het na laadverlies en slijtage echt iets oplevert. Werkt alleen met een dynamisch contract.`,
+          `<label class="schakel"><input type="checkbox" id="b_grid" ${b.grid_charge === false ? "" : "checked"}><span></span>Mag laden van het net</label>
+          <div class="blok-in" data-aan="b_grid"><label for="b_gmax">Van het net hoogstens tot</label>${opties("b_gmax", b.max_grid_soc ?? 95, [60, 70, 80, 90, 95, 100], (v) => v + "%")}</div>
+          <div class="blok-in" data-aan="b_grid"><label for="b_gw">Hoe snel</label><span class="met-eenheid"><input id="b_gw" type="number" step="any" min="0" placeholder="zo snel als kan" value="${esc(b.max_grid_charge_w || "")}"><i>W</i></span></div>
+          <p class="blok-tip" data-aan="b_grid">Laat "Hoe snel" leeg. Vul alleen iets in als je hoofdzekering krap is, bijvoorbeeld als de auto ook laadt.</p>`)}
+
+        ${blok("Verkopen bij een prijspiek", `Soms is terugleveren even heel veel waard (een dure avond, of een tekort op het net). Dan kan Zonnestuur stroom uit de batterij aan het net verkopen. Hij verkoopt alleen wat je zelf niet nodig hebt tot de volgende goedkope uren. Kan met Marstek, Zendure, Victron en Sessy, niet met de HomeWizard-batterij.`,
+          `<label class="schakel"><input type="checkbox" id="b_exp" ${b.grid_export ? "checked" : ""}><span></span>Mag verkopen</label>
+          <div class="blok-in" data-aan="b_exp"><label for="b_expw">Met hoogstens</label><span class="met-eenheid"><input id="b_expw" type="number" step="any" min="0" placeholder="zo snel als kan" value="${esc(b.max_export_w || "")}"><i>W</i></span></div>
+          <div data-drv="scripts">${f("s_export", "Script: verkopen (krijgt power_w mee)", b.script_export)}</div>`)}
+
+        ${blok("Reserve voor de winteravond", `In de winter is er weinig zon en is stroom 's avonds duur. Zonnestuur kan dan vanaf de middag een deel van de batterij bewaren voor de avond, ook als er overdag een goedkoop moment lijkt te zijn.`,
+          `<label class="schakel"><input type="checkbox" id="b_res_on" ${R > 0 ? "checked" : ""}><span></span>Reserve bewaren</label>
+          <div class="blok-in" data-aan="b_res_on"><label for="b_res">Hoeveel</label><span class="met-eenheid"><input id="b_res" type="number" step="0.5" min="0" value="${esc(R)}"><i>kWh</i></span></div>
+          <div class="blok-in" data-aan="b_res_on"><label for="b_rfrom">Bewaren vanaf</label>${opties("b_rfrom", b.reserve_from ?? 12, [...Array(24).keys()], (v) => String(v).padStart(2, "0") + ":00")}</div>
+          <div class="blok-in" data-aan="b_res_on"><label for="b_runtil">Gebruiken vanaf</label>${opties("b_runtil", b.reserve_until ?? 17, [...Array(24).keys()], (v) => String(v).padStart(2, "0") + ":00")}</div>
+          <label class="check-row" data-aan="b_res_on"><input type="checkbox" id="b_rwin" ${b.reserve_winter_only === false ? "" : "checked"}> Alleen van oktober tot en met maart</label>`)}
+
+        ${blok("Zomer: vooral eigen zon", `In de zomer vult de zon de batterij meestal vanzelf. Met dit aan laadt Zonnestuur dan alleen van het net als het duidelijk loont, zodat er ruimte blijft voor je eigen zonnestroom.`,
+          `<label class="schakel"><input type="checkbox" id="b_season" ${b.season === false ? "" : "checked"}><span></span>Aan (aanbevolen)</label>`)}
+
+        ${blok("Slijtage meerekenen", `Elke keer laden en ontladen slijt de batterij een klein beetje. Vul in wat hij kostte en hoe vaak hij volgens de fabrikant geladen kan worden. Dan laadt Zonnestuur alleen van het net als de winst groter is dan de slijtage. Weet je het niet? Laat het leeg.`,
+          `<div class="blok-in"><label for="b_buy">Aankoopprijs</label><span class="met-eenheid voor"><i>€</i><input id="b_buy" type="number" step="any" min="0" placeholder="niet ingevuld" value="${esc(b.purchase_eur || "")}"></span></div>
+          <div class="blok-in"><label for="b_cyc">Aantal keer vol laden</label><span class="met-eenheid"><input id="b_cyc" type="number" step="100" min="500" value="${esc(b.cycles ?? 6000)}"><i>keer</i></span></div>`)}
+
+        ${blok("Rendement", `Van elke 10 kWh die je in de batterij stopt, komt er ongeveer 9 weer uit; de rest gaat verloren als warmte. Dat is 90%. Staat in de handleiding; anders laat je het zo.`,
+          `<div class="blok-in"><label for="b_eff">Rendement</label><span class="met-eenheid"><input id="b_eff" type="number" step="1" min="50" max="100" value="${esc(Math.round((b.efficiency ?? 0.9) * 100))}"><i>%</i></span></div>`)}
+
+        ${blok("Naam", `Zo heet de batterij in de app.`, `<div class="blok-in"><label for="b_name">Naam</label><input id="b_name" value="${esc(b.name || "Thuisbatterij")}"></div>`)}
+
+        <details class="installateur"><summary>Voor de installateur</summary>
+        <p class="small muted" style="margin:10px 0 0">Technische instellingen voor wie de batterij aansluit. Bij een merk dat Zonnestuur rechtstreeks kent (HomeWizard, Marstek, Zendure, Victron, Sessy) is hier meestal niets nodig. Vraag het bij twijfel aan <a href="mailto:info@zonnestuur.nl">info@zonnestuur.nl</a>.</p>
+        ${blok("Piekgrens tijdens laden", `Voor een capaciteitstarief, zoals in België: je betaalt dan voor je hoogste piek per maand. Zonnestuur laadt de batterij van het net zo dat de totale afname van het huis onder deze grens blijft. In Nederland laat je dit op 0 (uit).`,
+          `<div class="blok-in"><label for="b_peak">Piekgrens</label><span class="met-eenheid"><input id="b_peak" type="number" step="100" min="0" value="${esc(b.peak_limit_w ?? 0)}"><i>W</i></span></div>`)}
+        <div id="b_dextra">${blok("Verbinding met de batterij", `Alleen nodig als de batterij niet op de gewone poort luistert. Marstek gebruikt standaard poort 30000 (de lokale API, aan te zetten in de Marstek-app). Victron gebruikt Modbus TCP op poort 502 met unit-id 100 (de GX zelf); zet Modbus TCP aan op de GX onder Instellingen → Services.`,
+          `<div class="blok-in" data-dt="marstek victron"><label for="d_port">Poort</label><input id="d_port" type="number" placeholder="standaard" value="${esc(b.direct_port || "")}"></div>
+          <div class="blok-in" data-dt="victron"><label for="d_unit">Modbus unit-id</label><input id="d_unit" type="number" value="${esc(b.direct_unit || 100)}"></div>
+          <label class="schakel"><input type="checkbox" id="d_self" ${b.self_regulate ? "checked" : ""}><span></span>Zonnestuur regelt zelf nul op de meter</label>
+          <p class="blok-tip">Normaal houdt de batterij zelf de meter op nul (hij levert precies wat het huis vraagt). Zet dit alleen aan als de batterij dat niet kan of als zijn eigen meting niet klopt: dan stuurt Zonnestuur elke paar seconden het vermogen bij op basis van je slimme meter.</p>`)}</div>
+        <details id="b_adv" class="blok"><summary><b>Sturing via de koppelmotor</b><span class="blok-uitleg" style="display:block">Voor merken die Zonnestuur niet rechtstreeks kent. Zonnestuur heeft drie dingen nodig: het laadniveau lezen, en de batterij laten <i>zelf gebruiken</i>, <i>vasthouden</i> en <i>laden</i>. Kies hieronder hoe jouw batterij dat in de koppelmotor aanbiedt.</span></summary>
+          <div class="blok-ctl">
+            <div class="field"><label for="b_drv">Hoe stuur je deze batterij?</label><select id="b_drv">
+              <option value="mode" ${sel("mode")}>Met een stand (keuzelijst), bijv. HomeWizard, Zendure</option>
+              <option value="setpoint" ${sel("setpoint")}>Met één vermogen-getal (+ laden, − ontladen), bijv. Sessy, Marstek</option>
+              <option value="split" ${sel("split")}>Met een apart laad- en ontlaadvermogen, bijv. Huawei, GoodWe</option>
+              <option value="scripts" ${sel("scripts")}>Met eigen scripts (werkt voor elk merk)</option></select>
+              <span class="hint">Weet je het niet? Kijk in de koppelmotor welke instellingen de batterij heeft: een keuzelijst (select.…) is "stand", een getal (number.…) is "vermogen".</span></div>
+            ${fx("b_soc", "Laadniveau", b.soc_entity, "De sensor met het laadpercentage, bijv. sensor.batterij_soc. Verplicht.")}
+            ${fx("b_pw", "Vermogen (optioneel)", b.power_entity, "De sensor met wat de batterij nu laadt of levert in W. Daarmee ziet Zonnestuur of zijn opdracht wordt uitgevoerd.")}
           </div>
-          <div data-drv="setpoint split"><div class="row">${f("b_sp", "Vermogen-instelling (number.…)", b.setpoint_entity)}${f("b_ce", "Laadvermogen (number.…)", b.charge_entity)}${f("b_de", "Ontlaadvermogen (number.…)", b.discharge_entity)}</div>
-            <label class="check-row"><input type="checkbox" id="b_spp" ${b.setpoint_charge_positive === false ? "" : "checked"}> Positief vermogen = laden (uit bij o.a. Sessy)</label></div>
-          <div data-drv="scripts"><div class="row">${f("s_auto", "Script: zelf gebruiken", b.script_auto)}${f("s_save", "Script: vasthouden", b.script_save)}${f("s_charge", "Script: laden (krijgt power_w mee)", b.script_charge)}</div>
-            <p class="small muted" style="margin:0">Elk merk dat je in de koppelmotor met een script kunt sturen, werkt zo. Zonnestuur roept het script aan met de variabelen <code>action</code> en <code>power_w</code>.</p></div>
-          <div class="row">${f("b_sw", "Schakelaar die aan moet om te sturen (switch.…, optioneel)", b.control_switch_entity)}</div>
+          <div data-drv="mode" class="blok-ctl">
+            <p class="blok-tip">De batterij heeft een keuzelijst met standen. Vul de keuzelijst in en welke stand bij welke opdracht hoort; de namen moeten precies zo geschreven zijn als in de keuzelijst.</p>
+            ${fx("b_mode", "Keuzelijst met de stand", b.mode_entity, "Bijv. select.p1_meter_battery_group_mode.")}
+            ${fx("m_auto", "Stand voor zelf gebruiken", m.auto, "De batterij volgt het huis: laden bij overschot, leveren bij verbruik (vaak 'zero' of 'nul op de meter').")}
+            ${fx("m_save", "Stand voor vasthouden", m.save, "Wel laden met zon, niet ontladen (bijv. 'zero_charge_only'). Leeg = stand-by gebruiken.")}
+            ${fx("m_charge", "Stand voor laden van het net", m.charge, "Volladen, ook uit het net (bijv. 'to_full' of 'force charge').")}
+            ${fx("m_idle", "Stand voor stilstaan", m.idle, "Niets doen (bijv. 'standby'). Optioneel.")}
+            ${fx("m_manual", "Stand voor handmatig", m.manual, "Alleen als de batterij eerst in 'handmatig' of 'API' moet voordat een vermogen werkt. Meestal leeg.")}
+            ${fx("b_cpw", "Laadvermogen bij laden (optioneel)", b.charge_power_entity, "Een getal (number.…) waarmee je zegt hoe snel hij van het net laadt.")}
+            ${fx("b_force", "Tweede keuzelijst (optioneel)", b.force_entity, "Sommige merken hebben een aparte lijst voor geforceerd laden of stilstaan. Vul dan ook de twee standen hieronder in.")}
+            ${fx("f_charge", "Tweede lijst: laden", fm.charge, "")}${fx("f_idle", "Tweede lijst: stilstaan", fm.idle, "")}
+          </div>
+          <div data-drv="setpoint split" class="blok-ctl">
+            ${fx("b_sp", "Vermogen-getal", b.setpoint_entity, "Eén number.… waarmee je het vermogen zet (bij 'één vermogen-getal').")}
+            ${fx("b_ce", "Laadvermogen", b.charge_entity, "Bij 'apart laad- en ontlaadvermogen': het number.… voor laden.")}
+            ${fx("b_de", "Ontlaadvermogen", b.discharge_entity, "Het number.… voor ontladen.")}
+            <label class="check-row"><input type="checkbox" id="b_spp" ${b.setpoint_charge_positive === false ? "" : "checked"}> Een positief getal betekent laden</label>
+            <p class="blok-tip">Bij de meeste merken is + laden en − ontladen. Bij Sessy is het andersom: zet het vinkje dan uit.</p>
+          </div>
+          <div data-drv="scripts" class="blok-ctl">
+            <p class="blok-tip">Maak in de koppelmotor drie scripts. Zonnestuur roept ze aan met de variabelen <code>action</code> (auto, save, charge of export) en <code>power_w</code> (het vermogen in W). Zo werkt elk merk, ook als het alleen via een dienst te sturen is (bijv. Huawei 'forcible charge').</p>
+            ${fx("s_auto", "Script: zelf gebruiken", b.script_auto, "Bijv. script.batterij_normaal.")}
+            ${fx("s_save", "Script: vasthouden", b.script_save, "Niet ontladen.")}
+            ${fx("s_charge", "Script: laden", b.script_charge, "Laden van het net met power_w watt.")}
+          </div>
+          <div class="blok-ctl">${fx("b_sw", "Schakelaar om te mogen sturen (optioneel)", b.control_switch_entity, "Sommige koppelingen (bijv. via RS485) moeten eerst een schakelaar 'besturing toestaan' aan hebben. Zonnestuur zet die aan zolang hij stuurt.")}</div>
+        </details>
         </details>
       </details>
     </div>`;
@@ -1570,6 +1650,23 @@ async function settings() {
     const st = () => { const v = $("b_st") ? $("b_st").value : "zonnestuur"; document.querySelectorAll("[data-st]").forEach((x) => { x.hidden = !x.dataset.st.split(" ").includes(v); }); };
     if ($("b_st")) { $("b_st").onchange = st; st(); }
     document.querySelectorAll("#b_zsm button").forEach((x) => x.onclick = () => x.classList.toggle("on"));
+    // "Meer instellingen": wat bij een schakelaar hoort alleen tonen als hij aan staat, en een korte samenvatting
+    const aan = () => {
+      document.querySelectorAll("#batCard [data-aan]").forEach((x) => { const c = $(x.dataset.aan); x.hidden = !!c && !c.checked; });
+      if ($("b_sam")) {
+        const d = [];
+        d.push(`nooit leger dan ${$("b_minsoc").value}%`);
+        d.push($("b_grid").checked ? "laden van het net aan" : "niet van het net");
+        if ($("b_exp").checked) d.push("verkopen aan");
+        if (Number($("b_res").value) > 0 && $("b_res_on").checked) d.push(`${$("b_res").value} kWh reserve`);
+        $("b_sam").textContent = d.join(" · ");
+      }
+    };
+    if ($("b_res_on")) $("b_res_on").addEventListener("change", () => {
+      if (!$("b_res_on").checked) $("b_res").value = 0; else if (!(Number($("b_res").value) > 0)) $("b_res").value = 2;
+    });
+    document.querySelectorAll("#b_meer input, #b_meer select").forEach((x) => x.addEventListener("change", aan));
+    aan();
     // keuzeknoppen zetten de verborgen keuzelijst (die readBattery leest)
     document.querySelectorAll("#batCard .keuzes").forEach((g) => g.querySelectorAll(".keuze").forEach((k) => k.onclick = () => {
       const s = $(g.dataset.for); s.value = k.dataset.v; s.dispatchEvent(new Event("change"));

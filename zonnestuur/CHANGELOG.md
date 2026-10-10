@@ -1,5 +1,9 @@
 # Wijzigingen
 
+## 0.47.1
+- Thuisbatterij, "Meer instellingen": elke instelling in een eigen blok met uitleg in gewone woorden, schakelaars in plaats van vinkjes en een samenvatting van wat er nu ingesteld staat.
+- Nieuw deel "Voor de installateur" met uitleg bij de piekgrens, de verbinding en de sturing via de koppelmotor.
+
 ## 0.47.0
 - Auto: "Moet de auto later klaar zijn?" Kies een dag en tijd (bijv. maandag 08:00) en hoe vol. Zonnestuur laadt dan in de goedkoopste of zonnigste uren tot dat moment, ook over meerdere dagen.
 - Prijsverwachting uit het weer: veel wind of zon maakt stroom goedkoop. Zonnestuur voorspelt de prijs voor de dagen die de beurs nog niet heeft gegeven en laat per dag zien wat hij verwacht en waarom. Auto en thuisbatterij plannen daarmee.
