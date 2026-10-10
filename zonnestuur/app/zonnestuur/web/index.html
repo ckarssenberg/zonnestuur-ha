@@ -192,6 +192,7 @@ html, body { overscroll-behavior-y: none; }
   }
   .secnav .viewbtn { border: 0; background: none; color: var(--ink-2); font: inherit; font-size: 13.5px; font-weight: 600; padding: 7px 14px; border-radius: 10px; cursor: pointer; border-left: 1px solid var(--card-line); border-radius: 0 10px 10px 0; white-space: nowrap; }
   .secnav .viewbtn:hover { color: var(--ink); }
+  .secnav svg { display: none; }
   body.simple .adv, body.simple .dev .strip, body.simple .dev .strip-axis, body.simple .dev .facts .fact.more { display: none !important; }
   .flow { position: relative; }
   .flowpause { position: absolute; right: 4px; top: 4px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--card-line); background: var(--card-solid);
@@ -674,8 +675,12 @@ html, body { overscroll-behavior-y: none; }
     .brand { font-size: 16px; gap: 8px; } .brand svg { width: 24px; height: 24px; }
     .live { padding: 0; width: 34px; height: 34px; justify-content: center; } .live #clock { display: none; } .live i { width: 9px; height: 9px; }
     .icon-btn { width: 36px; height: 36px; border-radius: 12px; }
-    .secnav { width: 100%; justify-content: space-between; margin: 0 0 12px; border-radius: 14px; }
-    .secnav a, .secnav .viewbtn { padding: 8px 10px; font-size: 13px; }
+    /* telefoon: vaste balk onderin, zoals een app */
+    .secnav { position: fixed; top: auto; bottom: 0; left: 0; right: 0; width: 100%; max-width: none; margin: 0; z-index: 40; justify-content: space-around; gap: 0;
+              border-radius: 18px 18px 0 0; padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); box-shadow: 0 -6px 24px rgba(0,0,0,.10); overflow: visible; }
+    .secnav a, .secnav .viewbtn { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px; font-size: 11px; border-radius: 12px; border-left: 0; min-width: 0; }
+    .secnav svg { display: block; width: 22px; height: 22px; }
+    body { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
     .grid { gap: 12px; }
     .card { padding: 18px 16px; border-radius: 18px; }
     .c-hero { padding: 2px 2px 4px; }
@@ -763,7 +768,7 @@ html, body { overscroll-behavior-y: none; }
   </header>
 
   <nav class="secnav" aria-label="Onderdelen" id="secnav">
-    <a href="#hero" data-s="hero">Nu</a><a href="#s-planning" data-s="s-planning">Planning</a><a href="#s-apparaten" data-s="s-apparaten">Apparaten</a><a href="#s-inzicht" data-s="s-inzicht" class="adv">Inzicht</a><button type="button" class="viewbtn" id="viewBtn" aria-pressed="false">Eenvoudig</button>
+    <a href="#hero" data-s="hero"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg><span>Nu</span></a><a href="#s-planning" data-s="s-planning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Planning</span></a><a href="#s-apparaten" data-s="s-apparaten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg><span>Apparaten</span></a><a href="#s-inzicht" data-s="s-inzicht" class="adv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Inzicht</span></a><button type="button" class="viewbtn" id="viewBtn" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h6"/></svg><span>Eenvoudig</span></button>
   </nav>
   <div class="grid">
     <!-- nu -->
@@ -973,7 +978,7 @@ try { token = localStorage.getItem("zs_token") || ""; } catch (e) {}
   try { const v = localStorage.getItem("zs_simple"); if (v !== null) simple = v === "1"; paused = localStorage.getItem("zs_flowpause") === "1"; } catch (e) {}
   const show = () => {
     document.body.classList.toggle("simple", simple);
-    vb.textContent = simple ? "Uitgebreid" : "Eenvoudig"; vb.setAttribute("aria-pressed", String(simple));
+    (vb.querySelector("span") || vb).textContent = simple ? "Uitgebreid" : "Eenvoudig"; vb.setAttribute("aria-pressed", String(simple));
     vb.title = simple ? "Toon alles: grafieken, logboek en inzicht" : "Toon alleen wat nu belangrijk is";
     flow.classList.toggle("paused", paused); fp.setAttribute("aria-pressed", String(paused));
     fp.setAttribute("aria-label", paused ? "Animatie hervatten" : "Animatie pauzeren"); fp.title = fp.getAttribute("aria-label");

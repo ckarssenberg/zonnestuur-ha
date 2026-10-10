@@ -1383,6 +1383,9 @@ async function settings() {
         <div id="s_mf" class="row" style="flex:1;margin:0"></div>
         <div class="field" style="flex:0 0 auto"><button class="btn ghost" id="p1test">Controleren</button></div></div>
       <label class="check-row"><input type="checkbox" id="s_inv" ${CFG.meter && CFG.meter.invert ? "checked" : ""}> Plus en min omdraaien</label>
+      ${(() => { const cur = `${CFG.fuse_phases || 3}x${CFG.fuse_a || 0}`; const opts = [["3x0", "Niet bewaken"], ["1x25", "1 × 25 A"], ["1x35", "1 × 35 A"], ["1x40", "1 × 40 A"], ["3x25", "3 × 25 A (meest gebruikelijk)"], ["3x35", "3 × 35 A"], ["3x40", "3 × 40 A"], ["3x50", "3 × 50 A"], ["3x63", "3 × 63 A"], ["3x80", "3 × 80 A"]];
+        return `<div class="blok" style="margin-top:16px"><h4>Hoofdzekering</h4><p class="blok-uitleg">Laden de auto, de warmtepomp en de batterij tegelijk, dan kan de hoofdzekering eruit slaan. Zonnestuur houdt alles samen eronder: eerst laadt de auto wat zachter, daarna wacht wat het minst belangrijk is. Je vindt de waarde op je meterkast of op je energierekening (bijv. 3x25A).</p>
+        <div class="blok-ctl"><div class="blok-in"><label for="s_fuse">Mijn aansluiting</label><select id="s_fuse">${opts.map(([v, t]) => `<option value="${v}" ${(v === cur || (v === "3x0" && !CFG.fuse_a)) ? "selected" : ""}>${t}</option>`).join("")}${opts.some(([v]) => v === cur) || !CFG.fuse_a ? "" : `<option value="${cur}" selected>${esc(cur.replace("x", " × "))} A</option>`}</select></div></div></div>`; })()}
       <p class="small muted" id="p1res"></p>
     </section>
     <section class="card" id="sysCard"><h2 class="t">Andere systemen</h2>
@@ -1773,6 +1776,7 @@ async function settings() {
     next.notify = readNotify();
     next.motivation = $("g_mot").value;
     next.profile = $("g_prof").value;
+    if ($("s_fuse")) { const [ph, a] = $("s_fuse").value.split("x").map(Number); next.fuse_a = a || 0; next.fuse_phases = ph || 3; }
     next.goal = { type: $("g_type").value, extra_pp: Number($("g_pp").value) || 10, eur_month: Number($("g_eur").value) || 25 };
     const tdev = [...document.querySelectorAll("#t_devs button.on")].map((b) => b.dataset.id);
     next.trial = { enabled: $("t_on").checked, every: Number($("t_every").value) || 7, devices: tdev.length === CFG.devices.length ? [] : tdev };

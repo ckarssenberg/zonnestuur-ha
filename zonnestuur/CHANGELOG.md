@@ -1,5 +1,9 @@
 # Wijzigingen
 
+## 0.49.0
+- Hoofdzekering bewaken: vul bij Instellingen > Meter je aansluiting in (bijv. 3 × 25 A). Zonnestuur houdt auto, warmtepomp, boiler en batterij samen onder de grens: eerst laadt de auto zachter, daarna wacht wat het minst belangrijk is.
+- Op de telefoon staat het menu nu als vaste balk onderin, zoals een app.
+
 ## 0.48.0
 - Auto: Zonnestuur meet hoe snel je auto echt laadt (ook dat het boven ± 80% langzamer gaat) en rekent daar de hele tijd mee. De laadkaart laat de gemeten snelheid zien.
 - Vergelijken: vul per laadbeurt in wat de app van je leverancier zegt dat hij kostte (bijv. inclusief Grid Rewards van Tibber); dan telt dat bedrag. Per leverancier staat erbij waar je het vindt.
