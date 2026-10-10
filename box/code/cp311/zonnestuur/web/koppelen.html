@@ -176,6 +176,7 @@ function zsLink(key) {
   if (["p1_serial", "homewizard_p1", "shelly_em", "youless", "dsmr_reader", "esphome_p1", "mqtt_meter", "homey_meter"].includes(key)) return "instellingen#editCard";
   if (["shelly", "shelly_gen1", "homewizard_socket", "tasmota", "esphome"].includes(key)) return "setup#toevoegen";
   if (["domoticz", "openhab", "iobroker"].includes(key)) return "instellingen#sysCard";
+  if (key === "alfen") return "instellingen?toevoegen=alfen#addCard";
   return "instellingen#addCard";
 }
 function routeInfo(r, row) {

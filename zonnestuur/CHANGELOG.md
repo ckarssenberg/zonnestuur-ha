@@ -1,5 +1,11 @@
 # Wijzigingen
 
+## 0.50.0
+- Jaaroverzicht: per maand en per apparaat wat Zonnestuur opleverde, en hoeveel van de prijs van Pro je al terugverdiende.
+- Melding "morgen wordt waarschijnlijk een goedkope dag" als de prijsverwachting (wind, zon) duidelijk lager is dan de afgelopen week.
+- Overdrachtsrapport voor de installateur: wat er gekoppeld is, of het werkt, een controlelijst en de gegevens van de installateur; af te drukken.
+- Alfen-laadpalen rechtstreeks koppelen via Modbus TCP (laadstroom 6–32 A, zonder koppelmotor).
+
 ## 0.49.0
 - Hoofdzekering bewaken: vul bij Instellingen > Meter je aansluiting in (bijv. 3 × 25 A). Zonnestuur houdt auto, warmtepomp, boiler en batterij samen onder de grens: eerst laadt de auto zachter, daarna wacht wat het minst belangrijk is.
 - Op de telefoon staat het menu nu als vaste balk onderin, zoals een app.

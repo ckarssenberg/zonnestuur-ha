@@ -270,7 +270,7 @@ const DRIVER_LABEL = {
   esphome: "ESPHome", mqtt_switch: "MQTT", homey_switch: "Homey · aan/uit", homey_setpoint: "Homey · temperatuur",
   domoticz_switch: "Domoticz · aan/uit", domoticz_setpoint: "Domoticz · temperatuur", openhab_switch: "openHAB · aan/uit",
   openhab_setpoint: "openHAB · temperatuur", iobroker_switch: "ioBroker · aan/uit", iobroker_setpoint: "ioBroker · temperatuur",
-  sg_ready: "SG-ready (2 relais)", ocpp: "Laadpaal · OCPP",
+  sg_ready: "SG-ready (2 relais)", ocpp: "Laadpaal · OCPP", alfen: "Alfen · rechtstreeks",
   ha_switch: "Koppelmotor · schakelaar", ha_start_button: "Koppelmotor · witgoed starten", ha_setpoint: "Koppelmotor · temperatuur", ha_current: "Koppelmotor · laadstroom", ha_power: "Koppelmotor · traploos vermogen",
 };
 const METERS = [["p1_serial", "P1-kabel in dit kastje"], ["homewizard", "HomeWizard P1-meter"], ["shelly_em", "Shelly EM / Pro 3EM"], ["youless", "YouLess (LS120)"],
@@ -279,7 +279,7 @@ const METERS = [["p1_serial", "P1-kabel in dit kastje"], ["homewizard", "HomeWiz
   ["domoticz", "Domoticz", "domoticz"], ["openhab", "openHAB", "openhab"], ["iobroker", "ioBroker", "iobroker"]];
 const ADD_TYPES = [["z2m", "Zigbee-stekker (Zigbee2MQTT)"], ["tasmota", "Tasmota via MQTT"], ["shellymqtt", "Shelly via MQTT"],
   ["mqttfree", "Eigen MQTT-topics"], ["esphome", "ESPHome-schakelaar"], ["homey", "Homey-apparaat"],
-  ["domoticz", "Domoticz-apparaat"], ["openhab", "openHAB-item"], ["iobroker", "ioBroker-datapunt"], ["ocpp", "Laadpaal via OCPP"],
+  ["domoticz", "Domoticz-apparaat"], ["openhab", "openHAB-item"], ["iobroker", "ioBroker-datapunt"], ["ocpp", "Laadpaal via OCPP"], ["alfen", "Alfen-laadpaal (rechtstreeks)"],
   ["sgready", "SG-ready warmtepomp (2 relais)"], ["hapower", "Traploze vermogensregelaar (koppelmotor)"]];
 let SYS = { mqtt: null, homey: null, ocpp: null, domoticz: null, openhab: null, iobroker: null };
 // Domoticz, openHAB en ioBroker: zelfde vorm (adres, eventueel inloggen, zoeken, aanvinken wat Zonnestuur mag sturen)
@@ -1220,7 +1220,7 @@ const GROEPEN = [
   ["geld", "Prijs en doel", ["Energiecontract", "Jouw doel", "Meten wat Zonnestuur oplevert"]],
   ["schermen", "Schermen en meldingen", ["Meldingen en weekrapport", "Huisscherm en radio", "Wandscherm", "Sensoren voor je dashboard"]],
   ["koppelingen", "Koppelingen", ["Andere systemen", "Een merk koppelen", "Auto's via de cloud", "Apparaat toevoegen via een ander systeem", "Koppelmotor", "Eigen domoticaserver"]],
-  ["account", "Pro en hulp", ["Zonnestuur Pro", "Hulp en problemen", "Beveiliging"]],
+  ["account", "Pro en hulp", ["Zonnestuur Pro", "Hulp en problemen", "Installateur", "Beveiliging"]],
 ];
 function groepeer() {
   const root = document.querySelector(".settings"); if (!root) return;
@@ -1434,6 +1434,10 @@ async function settings() {
       <p class="small muted" style="margin-top:-4px">Zie of alles werkt, meld een probleem, en kies of Zonnestuur fouten zelf meldt.</p>
       <a class="btn" href="hulp">Hulp en diagnose</a>
     </section>
+    <section class="card" id="installateurCard"><h2 class="t">Installateur</h2>
+      <p class="small muted" style="margin-top:-4px">Heeft een vakman Zonnestuur ingericht? Op het overdrachtsrapport staat wat er gekoppeld is, of alles werkt, een controlelijst voor de oplevering en de gegevens van de installateur. Af te drukken of als PDF te bewaren.</p>
+      <a class="btn ghost" href="overdracht">Overdrachtsrapport</a>
+    </section>
     <section class="card" id="schermCard"><h2 class="t">Huisscherm en radio</h2>
       <p class="small muted" style="margin-top:-4px">Het Zonnestuur-scherm op je Google Nest Hub of tv, en je favoriete zender op vaste tijden. Ook voor Nest Mini en Google Home (alleen radio).</p>
       <a class="btn" href="huisscherm">Scherm of speaker instellen</a>
@@ -1572,7 +1576,7 @@ async function settings() {
     const t = $("x_type").value, box = $("x_fields");
     const z = SYS.mqtt?.zigbee2mqtt || [], tas = SYS.mqtt?.tasmota || [], sh = SYS.mqtt?.shelly || [], hd = SYS.homey?.devices || [], cps = SYS.ocpp?.points || [];
     const listOr = (id, label, items, ph) => items.length ? `<div class="field"><label for="${id}">${label}</label><select id="${id}">${items.map((x) => `<option>${esc(x)}</option>`).join("")}</select></div>` : f(id, label, "", `placeholder="${ph}"`);
-    const pw = t === "ocpp" ? "" : f("x_pw", "Vermogen als hij aan staat (W)", "2000", 'type="number" step="50"');
+    const pw = t === "ocpp" || t === "alfen" ? "" : f("x_pw", "Vermogen als hij aan staat (W)", "2000", 'type="number" step="50"');
     box.innerHTML = `<div class="row">${
       t === "z2m" ? listOr("x_a", "Apparaat (friendly name)", z.map((x) => x.name), "bijv. boiler_stekker")
       : t === "tasmota" ? listOr("x_a", "Topic", tas, "bijv. tasmota_1A2B3C")
@@ -1583,6 +1587,7 @@ async function settings() {
         + sysSelect("x_pm", "Vermogensmeting (optioneel)", SYS[t]?.powers || [], "", true)
       : t === "homey" ? `<div class="field"><label for="x_a">Apparaat in Homey</label><select id="x_a">${hd.map((x, i) => `<option value="${i}">${esc(x.name)} (${x.driver === "homey_setpoint" ? "temperatuur" : "aan/uit"})</option>`).join("") || "<option>koppel eerst Homey hierboven</option>"}</select></div>`
       : t === "hapower" ? f("x_a", "Vermogen-instelling (number.…)", "", 'placeholder="bijv. number.boiler_vermogen"') + `<div class="field" style="flex:0 1 110px"><label for="x_u">Eenheid</label><select id="x_u"><option>W</option><option>%</option></select></div>` + f("x_b", "Schakelaar (optioneel)", "", 'placeholder="switch.…"') + f("x_c", "Vermogensmeting (optioneel)", "", 'placeholder="sensor.…"')
+      : t === "alfen" ? f("x_a", "IP-adres van de laadpaal", "", 'placeholder="192.168.1.50"') + `<div class="field" style="flex:0 1 100px"><label for="x_ph">Fasen</label><select id="x_ph"><option>1</option><option selected>3</option></select></div>` + f("x_min", "Min. A", "6", 'type="number"') + f("x_max", "Max. A", "16", 'type="number"')
       : t === "ocpp" ? listOr("x_a", "Naam (ID) van de laadpaal", cps.map((c) => c.id), "zoals ingesteld in de laadpaal") + `<div class="field" style="flex:0 1 100px"><label for="x_ph">Fasen</label><select id="x_ph"><option>1</option><option selected>3</option></select></div>` + f("x_min", "Min. A", "6", 'type="number"') + f("x_max", "Max. A", "16", 'type="number"')
       : ""}${pw}</div>
       ${t === "mqttfree" ? `<div class="row">${f("x_d", "Topic met vermogen (optioneel)", "")}${f("x_e", "JSON-veld vermogen", "")}${f("x_on", "Bericht aan", "ON")}${f("x_off", "Bericht uit", "OFF")}</div>` : ""}
@@ -1590,8 +1595,9 @@ async function settings() {
       ${t === "homey" || SYSX[t] ? `<div class="row">${f("x_tn", "Normale temperatuur (°C)", "20", 'type="number" step="0.5"')}${f("x_tb", "Temperatuur bij zon (°C)", "22", 'type="number" step="0.5"')}</div>` : ""}
       ${t === "shellymqtt" ? `<p class="small muted">Zet in de Shelly bij MQTT 'Generic status update over MQTT' aan.</p>` : ""}
       ${(t === "z2m" || t === "tasmota" || t === "shellymqtt" || t === "mqttfree") && !hasSys("mqtt") ? `<p class="small" style="color:var(--warn)">Vul hierboven eerst je MQTT-broker in en sla op.</p>` : ""}
+      ${t === "alfen" ? `<p class="small muted">Laat de installateur in Alfen ACE Service Installer bij Load Balancing kiezen voor "Energy Management System" via Modbus TCP/IP (daarvoor is de licentie Active Load Balancing nodig). Zonnestuur zet dan zelf de laadstroom, en vernieuwt die elke 30 seconden.</p>` : ""}
       ${t === "ocpp" && !CFG.ocpp?.enabled ? `<p class="small" style="color:var(--warn)">Zet hierboven de OCPP-server aan en sla op; verbind daarna de laadpaal.</p>` : ""}`;
-    if (t === "ocpp") $("x_kind").value = "ev";
+    if (t === "ocpp" || t === "alfen") $("x_kind").value = "ev";
     if (t === "sgready") $("x_kind").value = "heatpump";
   };
   $("x_type").onchange = addFields;
@@ -1624,9 +1630,11 @@ async function settings() {
       dev = { ...dev, driver: sd.driver, params: sd.driver.endsWith("_setpoint") ? { device: sd.device, normal_temp: Number(g("x_tn")), boost_temp: Number(g("x_tb")), power: g("x_pm") } : { device: sd.device, power: g("x_pm") } }; }
     else if (t === "ocpp") { const ph = Number(g("x_ph")), mx = Number(g("x_max")) || 16;
       dev = { ...dev, driver: "ocpp", params: { cp_id: g("x_a"), phases: ph, min_a: Number(g("x_min")) || 6, max_a: mx }, power_w: Math.min(25000, mx * 230 * ph) }; }
+    else if (t === "alfen") { const ph = Number(g("x_ph")), mx = Number(g("x_max")) || 16;
+      dev = { ...dev, driver: "alfen", host: g("x_a"), params: { phases: ph, min_a: Number(g("x_min")) || 6, max_a: mx, unit: 1 }, power_w: Math.min(25000, mx * 230 * ph) }; }
     else if (t === "hapower") dev = { ...dev, driver: "ha_power", params: { entity: g("x_a"), unit: g("x_u") || "W", switch_entity: g("x_b"), power_entity: g("x_c"), min_w: 100 } };
     else if (t === "sgready") dev = { ...dev, driver: "sg_ready", params: { a: relaySpec("ra"), b: relaySpec("rb"), force: $("x_force").checked } };
-    const need = { z2m: "x_a", tasmota: "x_a", shellymqtt: "x_a", mqttfree: "x_c", esphome: "x_b", ocpp: "x_a", hapower: "x_a" }[t];
+    const need = { z2m: "x_a", tasmota: "x_a", shellymqtt: "x_a", mqttfree: "x_c", esphome: "x_b", ocpp: "x_a", alfen: "x_a", hapower: "x_a" }[t];
     if (need && !g(need)) { $("x_res").textContent = "Vul eerst in welk apparaat het is."; $(need).focus(); return; }
     if (t === "esphome" && !g("x_a")) { $("x_res").textContent = "Vul het adres van het ESPHome-apparaat in."; return; }
     if (t === "sgready" && (!$("ra_a").value.trim() || !$("rb_a").value.trim())) { $("x_res").textContent = "Vul voor beide relais het adres of de naam in."; return; }
@@ -1700,6 +1708,9 @@ async function settings() {
   const qp = new URLSearchParams(location.search);
   if (qp.get("omvormer") && $("i_link") && [...$("i_link").options].some((o) => o.value === qp.get("omvormer"))) {
     $("i_link").value = qp.get("omvormer"); $("i_link").onchange();
+  }
+  if (qp.get("toevoegen") && $("x_type") && [...$("x_type").options].some((o) => o.value === qp.get("toevoegen"))) {
+    $("x_type").value = qp.get("toevoegen"); $("x_type").onchange();
   }
   if (qp.get("batterij") && $("b_link") && [...$("b_link").options].some((o) => o.value === qp.get("batterij"))) {
     $("b_on").checked = true; $("b_form").hidden = false; $("b_link").value = qp.get("batterij"); $("b_link").onchange();

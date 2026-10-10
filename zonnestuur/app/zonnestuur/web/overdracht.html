@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Overdrachtsrapport · Zonnestuur</title>
+<style>
+/* In een app-webweergave: doorslepen bovenaan mag niet doorgaan naar 'trek omlaag om te verversen' van de app. */
+html, body { overscroll-behavior-y: none; }
+
+  @font-face { font-family: "Inter"; src: url("fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Inter Tight"; src: url("fonts/inter-tight.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  :root {
+    color-scheme: light;
+    --bg: #e8ecef; --card: #ffffff; --line: rgba(14, 17, 22, .08); --ink: #0d1015; --ink-2: #555d69; --ink-3: #868d98;
+    --sun: #b86e00; --sun-ink: #8f5500; --glow-soft: rgba(255, 178, 36, .18); --chip: rgba(14, 17, 22, .045);
+    --good: #1f8a4c; --warn: #b54708;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --bg: #080c10; --card: #10161c; --line: rgba(255, 255, 255, .08); --ink: #f3f5f8; --ink-2: #a2abb7; --ink-3: #6c7582;
+      --sun: #c98500; --sun-ink: #ffc24d; --glow-soft: rgba(255, 178, 36, .14); --chip: rgba(255, 255, 255, .055);
+      --good: #4ade80; --warn: #fdb022;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #080c10; --card: #10161c; --line: rgba(255, 255, 255, .08); --ink: #f3f5f8; --ink-2: #a2abb7; --ink-3: #6c7582;
+    --sun: #c98500; --sun-ink: #ffc24d; --glow-soft: rgba(255, 178, 36, .14); --chip: rgba(255, 255, 255, .055);
+    --good: #4ade80; --warn: #fdb022;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  main { max-width: 640px; margin: 0 auto; padding: max(20px, env(safe-area-inset-top)) 16px 48px; display: grid; gap: 16px; }
+  .top { display: flex; align-items: center; gap: 10px; }
+  .top a { color: var(--ink-2); text-decoration: none; font-size: 14px; font-weight: 600; }
+  .spacer { flex: 1; }
+  .nav { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--ink-2); }
+  .nav button { font: inherit; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+  .nav button:disabled { opacity: .35; cursor: default; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 22px; }
+  .eyebrow { font-size: 12px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--sun-ink); }
+  h1 { font: 650 clamp(26px, 6vw, 34px)/1.15 "Inter Tight", "Inter", sans-serif; letter-spacing: -.02em; margin: 6px 0 0; text-wrap: balance; }
+  .big { font: 650 clamp(44px, 12vw, 64px)/1 "Inter Tight", "Inter", sans-serif; letter-spacing: -.03em; margin-top: 14px; font-variant-numeric: tabular-nums; }
+  .sub { color: var(--ink-2); font-size: 14px; margin-top: 6px; }
+  ul.lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  ul.lines li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; }
+  ul.lines li i { width: 26px; height: 26px; border-radius: 8px; background: var(--glow-soft); color: var(--sun-ink); display: grid; place-items: center; font-style: normal; font-size: 13px; font-weight: 700; }
+  .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; height: 120px; margin-top: 14px; }
+  .day { display: grid; grid-template-rows: 1fr auto auto; gap: 4px; height: 100%; text-align: center; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .day .col { display: flex; align-items: flex-end; justify-content: center; }
+  .day .col span { width: 70%; max-width: 34px; border-radius: 6px 6px 2px 2px; background: var(--sun); min-height: 2px; }
+  .day b { color: var(--ink); font-weight: 650; }
+  .extra { display: flex; flex-wrap: wrap; gap: 8px; }
+  .extra span { font-size: 13px; background: var(--chip); color: var(--ink-2); padding: 5px 10px; border-radius: 999px; }
+  .muted { color: var(--ink-3); font-size: 13px; }
+  .empty { color: var(--ink-2); text-align: center; padding: 30px 0; }
+  .verdict { font: 650 clamp(20px, 5vw, 26px)/1.25 "Inter Tight", "Inter", sans-serif; letter-spacing: -.015em; margin: 10px 0 0; text-wrap: pretty; }
+  .who { color: var(--ink-2); font-size: 14px; margin-top: 4px; }
+  .cmp { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
+  .cmp div { background: var(--chip); border-radius: 14px; padding: 12px; }
+  .cmp span { display: block; font-size: 12px; color: var(--ink-2); line-height: 1.3; }
+  .cmp b { display: block; font: 650 20px/1.2 "Inter Tight", "Inter", sans-serif; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .cmp .win { outline: 2px solid var(--good); }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 14px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 8px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-size: 12px; color: var(--ink-2); font-weight: 600; }
+  td.plus { color: var(--good); font-weight: 650; } td.min { color: var(--warn); font-weight: 650; }
+  .tw { overflow-x: auto; }
+  main > * { min-width: 0; }
+  table.t td, table.t th { white-space: normal; overflow-wrap: anywhere; }
+  .bars { display: flex; align-items: center; gap: 2px; height: 90px; margin-top: 14px; position: relative; }
+  .bars::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--line); }
+  .bars i { flex: 1; display: block; border-radius: 3px; min-width: 3px; }
+  .act { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .btn { font: inherit; font-size: 14px; font-weight: 650; border: 0; border-radius: 999px; padding: 10px 16px; cursor: pointer; background: var(--ink); color: var(--card); }
+  .btn.ghost { background: var(--chip); color: var(--ink); }
+  .vg { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; font-size: 14px; }
+  .vg input, .vg select { font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); width: 120px; }
+  .vg select { width: auto; }
+  .hint { color: var(--ink-3); font-size: 13px; margin-top: 8px; }
+  .rows { margin-top: 14px; border-top: 1px solid var(--line); }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  .row b { font-weight: 650; }
+  .row .r { text-align: right; }
+  .row .plus { color: var(--good); font-weight: 650; } .row .min { color: var(--warn); font-weight: 650; }
+  .row .muted { grid-column: 1 / -1; }
+  .sessie { grid-column: 1 / -1; display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-top: 6px; }
+  .sessie label { display: grid; gap: 4px; font-size: 13px; color: var(--ink-2); }
+  .eur { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+  .eur i { font-style: normal; color: var(--ink-3); padding-left: 10px; }
+  .eur input { font: inherit; font-size: 14px; border: 0; background: transparent; color: var(--ink); padding: 8px 10px 8px 6px; width: 100px; }
+  .sessie .btn { padding: 8px 14px; }
+  h2 { font: 650 17px/1.3 "Inter Tight", "Inter", sans-serif; margin: 18px 0 0; }
+  .check { display: flex; gap: 12px; align-items: flex-start; }
+  .check i { flex: none; width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; font-style: normal; font-weight: 700; background: var(--chip); }
+  .check i.ok { color: var(--good); } .check i.let { color: var(--warn); }
+</style>
+<link rel="stylesheet" href="stijl.css">
+<style>
+  main { max-width: 860px; }
+  .kv { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; margin-top: 12px; font-size: 15px; }
+  .kv dt { color: var(--ink-2); } .kv dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+  table.t { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+  table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.t th { font-size: 12px; color: var(--ink-2); font-weight: 650; }
+  .ok { color: var(--good); font-weight: 700; } .nok { color: var(--warn); font-weight: 700; }
+  .velden { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 12px; }
+  .velden label { display: grid; gap: 4px; font-size: 13px; color: var(--ink-2); }
+  .velden input, .velden textarea { font: inherit; font-size: 15px; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+  .velden textarea { grid-column: 1 / -1; min-height: 70px; }
+  ul.check { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
+  ul.check li::before { content: "☐  "; color: var(--ink-2); }
+  .tw { overflow-x: auto; }
+  @media print { .top, .noprint, .btn { display: none !important; } body { background: #fff; } .card { border: 1px solid #ccc; break-inside: avoid; box-shadow: none; }
+    .velden input, .velden textarea { border: 0; padding: 0; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><a href="instellingen">← Instellingen</a><span class="spacer"></span><button class="btn" onclick="print()">Afdrukken of PDF</button></div>
+  <section class="card"><div class="eyebrow">Overdrachtsrapport</div><h1>Zonnestuur is ingericht</h1>
+    <p class="sub" id="samen">Laden…</p><dl class="kv" id="alg"></dl></section>
+  <section class="card"><div class="eyebrow">Installateur</div>
+    <div class="velden"><label>Naam<input id="i_naam"></label><label>Bedrijf<input id="i_bedrijf"></label><label>Telefoon<input id="i_tel" inputmode="tel"></label><label>E-mail<input id="i_mail" type="email"></label><label>Datum<input id="i_datum" type="date"></label><textarea id="i_notitie" placeholder="Bijzonderheden, bijv. waar de Raspberry Pi hangt, welke groep in de meterkast"></textarea></div>
+    <div class="act noprint"><button class="btn" id="i_ok">Opslaan</button><span class="muted" id="i_res"></span></div></section>
+  <section class="card"><div class="eyebrow">Meter en aansluiting</div><dl class="kv" id="meter"></dl></section>
+  <section class="card"><div class="eyebrow">Apparaten</div><div class="tw"><table class="t" id="apps"></table></div></section>
+  <section class="card" id="batCard" hidden><div class="eyebrow">Thuisbatterij</div><div class="tw"><table class="t" id="bats"></table></div></section>
+  <section class="card"><div class="eyebrow">Energie en instellingen</div><dl class="kv" id="inst"></dl></section>
+  <section class="card"><div class="eyebrow">Controlelijst bij oplevering</div><ul class="check">
+    <li>De meter geeft een waarde en die klopt met het display van de slimme meter.</li>
+    <li>Elk apparaat is één keer getest (Instellingen > Apparaat > Testen).</li>
+    <li>Klaar-tijden en de hoofdzekering zijn met de bewoner doorgenomen.</li>
+    <li>Het energiecontract en de leverancier kloppen.</li>
+    <li>Zonnestuur staat op het beginscherm van de telefoon van de bewoner.</li>
+    <li>De bewoner weet waar Probleem melden zit.</li></ul></section>
+</main>
+<script>
+
+
+// Fouten in dit scherm melden aan Zonnestuur (die filtert en ontdubbelt); netwerkhaperingen tellen niet mee.
+window.zsFout = (function () { let n = 0; return function (msg, where) {
+  msg = String((msg && msg.message) || msg || ""); if (!msg || n++ > 5 || /Failed to fetch|NetworkError|Load failed|AbortError|HTTP 5\d\d|ResizeObserver/i.test(msg)) return;
+  let t = ""; try { t = localStorage.getItem("zs_token") || ""; } catch (e) {}
+  try { fetch("api/fout", { method: "POST", headers: { "Content-Type": "application/json", "X-Token": t }, body: JSON.stringify({ msg: msg.slice(0, 500), where: (String(where || "") + "\n" + location.pathname).slice(0, 3000) }) }).catch(() => {}); } catch (e) {}
+}; })();
+addEventListener("error", (e) => zsFout(e.message, (e.error && e.error.stack) || `${e.filename}:${e.lineno}:${e.colno}`));
+addEventListener("unhandledrejection", (e) => zsFout(e.reason, e.reason && e.reason.stack));
+
+const $ = (id) => document.getElementById(id);
+const nl = (v, d = 0) => (v ?? 0).toLocaleString("nl-NL", { minimumFractionDigits: d, maximumFractionDigits: d });
+const eur = (v) => (v < 0 ? "−" : "") + "€ " + nl(Math.abs(v), 2);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let token = ""; try { token = localStorage.getItem("zs_token") || ""; } catch (e) {}
+try { const t = localStorage.getItem("zs_theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+const api = async (p, body) => { const r = await fetch(p, { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json", ...(token ? { "X-Token": token } : {}) }, body: body ? JSON.stringify(body) : undefined }); return r.json(); };
+const MAAND = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
+const ja = (b) => b ? '<span class="ok">✓ werkt</span>' : '<span class="nok">✕ niet bereikbaar</span>';
+const kv = (rows) => rows.filter((r) => r[1] !== "" && r[1] != null).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("");
+const KOP = { shelly: "Shelly (rechtstreeks)", shelly_gen1: "Shelly (rechtstreeks)", homewizard_socket: "HomeWizard-stekker", tasmota: "Tasmota-stekker",
+  ha_switch: "Koppelmotor: aan/uit", ha_setpoint: "Koppelmotor: temperatuur", ha_current: "Koppelmotor: laadstroom", ha_start_button: "Koppelmotor: start op afstand",
+  ocpp: "Laadpaal via OCPP", evcc: "evcc", mode: "Koppelmotor: stand", setpoint: "Koppelmotor: vermogen", split: "Koppelmotor: laden/ontladen", scripts: "Koppelmotor: scripts",
+  homewizard: "HomeWizard (rechtstreeks)", marstek: "Marstek (rechtstreeks)", zendure: "Zendure (rechtstreeks)", victron: "Victron (rechtstreeks)", sessy: "Sessy (rechtstreeks)",
+  peblar: "Peblar (rechtstreeks)", alfen: "Alfen (rechtstreeks)", p1serial: "P1-kabel", ha: "Koppelmotor" };
+const kop = (k) => KOP[k] || k;
+const MELD = { ha: "telefoon via de koppelmotor", ntfy: "ntfy-app", telegram: "Telegram", email: "e-mail" };
+const SOORT = { boiler: "Boiler", heatpump: "Warmtepomp", ev: "Auto", washer: "Wasmachine", dryer: "Droger", dishwasher: "Vaatwasser", generic: "Apparaat" };
+async function load() {
+  const r = await api("api/overdracht");
+  const nok = r.apparaten.filter((a) => !a.werkt).length + r.batterijen.filter((b) => !b.werkt).length + (r.meter.werkt ? 0 : 1);
+  $("samen").textContent = nok ? `${nok} onderdeel${nok === 1 ? "" : "en"} nog niet bereikbaar. Zie hieronder.` : `Alles werkt: meter, ${r.apparaten.length} apparat${r.apparaten.length === 1 ? "" : "en"}${r.batterijen.length ? " en de thuisbatterij" : ""}.`;
+  $("alg").innerHTML = kv([["Datum", new Date(r.datum).toLocaleString("nl-NL", { dateStyle: "long", timeStyle: "short" })], ["Versie", esc(r.versie)], ["Soort", { box: "Zonnestuur op Raspberry Pi", addon: "Zonnestuur in de koppelmotor", los: "Zonnestuur" }[r.vorm] || esc(r.vorm)],
+    ["Installatie-ID", esc(r.installatie_id)], ["Licentie", { pro: "Pro", trial: "Proef", basic: "Basis" }[r.licentie] || esc(r.licentie)],
+    ["Openstaand", r.problemen.length ? r.problemen.map(esc).join("<br>") : '<span class="ok">niets</span>']]);
+  $("meter").innerHTML = kv([["Meter", esc(r.meter.soort === "homewizard" ? "HomeWizard P1-meter" : kop(r.meter.soort))], ["Adres", esc(r.meter.adres)], ["Status", ja(r.meter.werkt) + (r.meter.nu_w != null ? ` · nu ${nl(r.meter.nu_w)} W` : "")], ["Hoofdzekering", esc(r.hoofdzekering || "niet ingesteld")]]);
+  $("apps").innerHTML = "<thead><tr><th>Apparaat</th><th>Koppeling</th><th>Klaar om</th><th>Status</th></tr></thead><tbody>" + r.apparaten.map((a) => `<tr><td><b>${esc(a.naam)}</b><br><span class="muted">${esc(SOORT[a.soort] || a.soort)} · ${nl(a.vermogen_w)} W · prioriteit ${a.prioriteit}</span></td><td>${esc(kop(a.koppeling))}<br><span class="muted">${esc(a.adres)}</span></td><td>${esc((a.klaar_om || []).join(", ") || "–")}</td><td>${ja(a.werkt)}${a.melding ? `<br><span class="muted">${esc(a.melding)}</span>` : ""}</td></tr>`).join("") + "</tbody>";
+  if (r.batterijen.length) { $("batCard").hidden = false;
+    $("bats").innerHTML = "<thead><tr><th>Batterij</th><th>Koppeling</th><th>Sturing</th><th>Status</th></tr></thead><tbody>" + r.batterijen.map((b) => `<tr><td><b>${esc(b.naam)}</b><br><span class="muted">${nl(b.kwh, 1)} kWh${b.soc != null ? ` · nu ${nl(b.soc)}%` : ""}</span></td><td>${esc(kop(b.koppeling))}</td><td>${b.sturing === "zonnestuur" ? "Zonnestuur" : b.sturing === "meekijken" ? `${esc(b.leverancier || "leverancier")} (Zonnestuur kijkt mee)` : "afwisselend"}${b.doel ? ` · doel ${esc(b.doel)}` : ""}</td><td>${ja(b.werkt)}</td></tr>`).join("") + "</tbody>"; }
+  const pc = r.contract.prijscontrole || {};
+  $("inst").innerHTML = kv([["Contract", r.contract.soort === "dynamic" ? "Dynamisch" : "Vast of variabel"], ["Leverancier", esc(r.contract.leverancier || "–")],
+    ["Prijscontrole", r.contract.prijssensor ? (pc.n ? `${nl(Math.abs(pc.verschil || 0) * 100, 1)} ct verschil met de leverancier (${pc.n} kwartieren)` : "loopt") : "geen prijssensor"],
+    ["Zonnepanelen", r.zon.panelen ? `${nl(r.zon.kwp, 1)} kWp` : "geen"], ["Omvormer", r.omvormer ? `${esc(r.omvormer.koppeling)}${r.omvormer.kan_begrenzen ? " · kan begrenzen" : ""}` : "niet gekoppeld"],
+    ["Meldingen", r.meldingen.length ? esc(r.meldingen.map((m) => MELD[m] || m).join(", ")) : "uit"]]);
+  const I = r.installateur || {};
+  $("i_naam").value = I.naam || ""; $("i_bedrijf").value = I.bedrijf || ""; $("i_tel").value = I.telefoon || ""; $("i_mail").value = I.email || "";
+  $("i_datum").value = I.datum || new Date().toISOString().slice(0, 10); $("i_notitie").value = I.notitie || "";
+}
+$("i_ok").onclick = async () => {
+  const body = { naam: $("i_naam").value, bedrijf: $("i_bedrijf").value, telefoon: $("i_tel").value, email: $("i_mail").value, datum: $("i_datum").value, notitie: $("i_notitie").value };
+  const r = await api("api/overdracht", body); $("i_res").textContent = r.ok ? "Opgeslagen" : (r.error || "Niet gelukt");
+};
+load().catch((e) => { $("samen").textContent = "Het rapport kon niet geladen worden."; zsFout(e); });
+</script>
+</body>
+</html>
