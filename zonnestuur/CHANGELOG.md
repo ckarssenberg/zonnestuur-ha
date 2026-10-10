@@ -1,5 +1,8 @@
 # Wijzigingen
 
+## 0.47.2
+- Prijsverwachting: haalt eerst de recentste dagen op en leert opnieuw zodra er meer historie is, zodat hij na de installatie sneller goed voorspelt.
+
 ## 0.47.1
 - Thuisbatterij, "Meer instellingen": elke instelling in een eigen blok met uitleg in gewone woorden, schakelaars in plaats van vinkjes en een samenvatting van wat er nu ingesteld staat.
 - Nieuw deel "Voor de installateur" met uitleg bij de piekgrens, de verbinding en de sturing via de koppelmotor.
