@@ -1,5 +1,8 @@
 # Wijzigingen
 
+## 0.50.2
+- Telefoon: tikken op een uur in de prijsgrafiek toont weer de prijs (werkte op de iPhone niet meer). Boven de grafiek staat nu "Tik op een uur om de prijs te zien".
+
 ## 0.50.1
 - Telefoon: je kunt nu rustig over de grafieken (prijzen, planning) heen scrollen. De uitleg bij een uur verschijnt pas als je er bewust op tikt; tik ergens anders om hem weer weg te halen.
 

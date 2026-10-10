@@ -403,6 +403,8 @@ html, body { overscroll-behavior-y: none; }
   .legend span { display: inline-flex; align-items: center; gap: 7px; }
   .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
   .sw.line { height: 0; width: 14px; border-top: 2px dashed var(--ink-3); border-radius: 0; }
+  .tik-hint { display: none; margin: 10px 0 0; font-size: 13px; color: var(--ink-2); }
+  @media (hover: none), (pointer: coarse) { .tik-hint { display: block; } }
   .tip { position: absolute; pointer-events: none; background: var(--card-solid); border: 1px solid var(--card-line);
          border-radius: 12px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 14px 34px -12px rgba(0,0,0,.4);
          white-space: nowrap; opacity: 0; transition: opacity .12s; z-index: 5; }
@@ -865,6 +867,7 @@ html, body { overscroll-behavior-y: none; }
     <section class="card c-plan" aria-labelledby="priceTitle">
       <div class="title-row"><div><div class="eyebrow">Stroomprijs en planning</div><h2 class="sec" id="priceTitle">Prijs en planning</h2></div><span class="t-end"><span class="small muted" id="priceNote"></span><a class="help-q" href="help#prijzen" aria-label="Uitleg over de prijzen">?</a></span></div>
       <div class="price-stats" id="priceStats"></div>
+      <p class="tik-hint">Tik op een uur om de prijs te zien.</p>
       <div class="chart" id="priceChart"><svg id="priceSvg" role="img" aria-label="Stroomprijs per uur vandaag en morgen, inclusief belastingen"></svg><div class="tip" id="priceTip"></div></div>
       <div class="chart" id="laneChart"><svg id="laneSvg" role="img" aria-label="Planning per apparaat en batterij"></svg><div class="tip" id="laneTip"></div></div>
       <div class="legend" id="priceLegend">
@@ -1913,10 +1916,13 @@ document.addEventListener("pointermove", (e) => {
   if (TT.touch && (Math.abs(e.clientX - TT.x) > 10 || Math.abs(e.clientY - TT.y) > 10)) { TT.moved = true; TT.pending = null; }
 }, true);
 document.addEventListener("pointercancel", () => { TT.moved = true; TT.pending = null; }, true);
-document.addEventListener("click", () => {
+// Op de iPhone komt er bij een tik op een grafiek geen "click"; daarom bij het loslaten tonen.
+document.addEventListener("pointerup", (e) => {
+  if (e.pointerType === "mouse") return;
+  if (Math.abs(e.clientX - TT.x) > 10 || Math.abs(e.clientY - TT.y) > 10) TT.moved = true;
   const p = TT.pending; TT.pending = null;
-  if (p && TT.touch && !TT.moved && Date.now() - TT.t < 800) showTipNow(...p);
-});
+  if (p && !TT.moved && Date.now() - TT.t < 1000) showTipNow(...p);
+}, true);
 window.addEventListener("scroll", () => { if (TT.touch) { TT.pending = null; hideTips(); } }, { passive: true });
 function showTip(tip, box, x, html) {
   if (TT.touch) { TT.pending = [tip, box, x, html]; return; }
@@ -2005,7 +2011,7 @@ function drawToday() {
       <div class="row"><i class="sw line" style="border-color:var(--sun-ink)"></i>Gepland<em>${nl((plan[t.getHours()] || 0) / 1000, 2)} kW</em></div>`);
   };
   hit.addEventListener("pointermove", (e) => { if (!TT.touch) onMove(e); });
-  hit.addEventListener("click", (e) => { if (TT.touch) onMove(e); });
+  hit.addEventListener("pointerdown", (e) => { if (e.pointerType !== "mouse") onMove(e); });
   hit.addEventListener("pointerleave", () => { if (TT.touch) return; tip.style.opacity = 0; cross.setAttribute("opacity", 0); });
 }
 
@@ -2407,7 +2413,7 @@ function drawLearned() {
       <div class="row"><i class="sw" style="background:var(--batt)"></i>Weekend<em>${we[h] != null ? nl(we[h]) + " W" : "–"}</em></div>`);
   };
   hit.addEventListener("pointermove", (e) => { if (!TT.touch) onMove(e); });
-  hit.addEventListener("click", (e) => { if (TT.touch) onMove(e); });
+  hit.addEventListener("pointerdown", (e) => { if (e.pointerType !== "mouse") onMove(e); });
   hit.addEventListener("pointerleave", () => { if (TT.touch) return; tip.style.opacity = 0; cross.setAttribute("opacity", 0); dots.forEach((d) => d.setAttribute("opacity", 0)); });
 }
 let LEARN_KEY = "";
