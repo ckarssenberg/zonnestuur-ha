@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#e9eef2" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#0d151d" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Zonnestuur huisscherm</title>
+<style>
+/* In een app-webweergave: doorslepen bovenaan mag niet doorgaan naar 'trek omlaag om te verversen' van de app. */
+html, body { overscroll-behavior-y: none; }
+
+  @font-face { font-family: "Inter"; src: url("fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Inter Tight"; src: url("fonts/inter-tight.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  :root {
+    color-scheme: light;
+    --bg: #e8ecef; --card: rgba(255,255,255,.82); --card-solid: #fff; --line: rgba(14,17,22,.08);
+    --shadow: 0 1px 2px rgba(14,17,22,.04), 0 8px 28px -12px rgba(14,17,22,.12);
+    --ink: #0e1116; --ink-2: #5c6470; --ink-3: #8a919b; --field: #fff;
+    --sun: #e08600; --sun-ink: #9a5b00; --sun-soft: rgba(255,178,36,.16); --net: #2f5bdb;
+    --good: #1f8a4c; --good-soft: rgba(31,138,76,.12); --warn: #b54708; --warn-soft: rgba(181,71,8,.10);
+    --chip: rgba(14,17,22,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --bg: #080c10; --card: rgba(255,255,255,.045); --card-solid: #11151b; --line: rgba(255,255,255,.09);
+      --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 20px 50px -30px rgba(0,0,0,.8);
+      --ink: #f2f4f7; --ink-2: #a3acb8; --ink-3: #6f7885; --field: rgba(255,255,255,.04);
+      --sun: #ffb224; --sun-ink: #ffb224; --sun-soft: rgba(255,178,36,.14); --net: #5b8cff;
+      --good: #4ade80; --good-soft: rgba(74,222,128,.12); --warn: #fdb022; --warn-soft: rgba(253,176,34,.12);
+      --chip: rgba(255,255,255,.06);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #080c10; --card: rgba(255,255,255,.045); --card-solid: #11151b; --line: rgba(255,255,255,.09);
+    --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 20px 50px -30px rgba(0,0,0,.8);
+    --ink: #f2f4f7; --ink-2: #a3acb8; --ink-3: #6f7885; --field: rgba(255,255,255,.04);
+    --sun: #ffb224; --sun-ink: #ffb224; --sun-soft: rgba(255,178,36,.14); --net: #5b8cff;
+    --good: #4ade80; --good-soft: rgba(74,222,128,.12); --warn: #fdb022; --warn-soft: rgba(253,176,34,.12);
+    --chip: rgba(255,255,255,.06);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+         font: 15.5px/1.55 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  .t { font-family: "Inter Tight", "Inter", system-ui, sans-serif; letter-spacing: -.02em; }
+  main { max-width: 760px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px 48px; }
+  .top { display: flex; align-items: center; gap: 12px; padding: 6px 2px 18px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; text-decoration: none; color: inherit; }
+  .brand img { width: 28px; height: 28px; border-radius: 8px; }
+  .spacer { flex: 1; }
+  .top a.link { color: var(--ink-2); text-decoration: none; font-size: 14px; font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 38px); line-height: 1.1; margin: 0 0 8px; text-wrap: balance; }
+  h2 { font-size: 18px; margin: 0 0 8px; }
+  .lead { color: var(--ink-2); margin: 0 0 18px; font-size: 16px; max-width: 62ch; }
+  .muted { color: var(--ink-2); } .small { font-size: 13.5px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 20px; box-shadow: var(--shadow); margin-top: 14px; }
+  .status { display: flex; gap: 10px; align-items: flex-start; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 6px; flex: none; background: var(--ink-3); }
+  .dot.ok { background: var(--good); } .dot.wait { background: var(--sun); } .dot.bad { background: var(--warn); }
+  input, select, textarea { width: 100%; font: inherit; font-size: 16px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--field); color: var(--ink); }
+  input[type="checkbox"] { width: 20px; height: 20px; padding: 0; accent-color: var(--sun); }
+  label { font-weight: 600; font-size: 14px; }
+  .field { display: grid; gap: 6px; margin-bottom: 14px; }
+  .hint { font-size: 12.5px; color: var(--ink-3); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 4px; }
+  #cats { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+  #cats button { flex: none; }
+  .chips button { font: inherit; font-size: 13.5px; font-weight: 550; padding: 7px 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--card-solid); color: var(--ink-2); cursor: pointer; }
+  .chips button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn { font: inherit; font-weight: 600; font-size: 15px; border: 0; cursor: pointer; padding: 11px 20px; border-radius: 999px;
+         color: #1a1204; background: linear-gradient(180deg, #ffc44d, #ff9a1a); text-decoration: none; display: inline-flex; gap: 8px; align-items: center; }
+  .btn.ghost { background: var(--chip); color: var(--ink); }
+  .btn.small { padding: 7px 13px; font-size: 13.5px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--net); outline-offset: 2px; }
+  .err { color: var(--warn); font-size: 14px; }
+  .ok { color: var(--good); font-weight: 600; }
+  .spin { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid var(--line); border-top-color: var(--sun); animation: spin .8s linear infinite; display: inline-block; vertical-align: -3px; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+  .list { display: grid; gap: 10px; margin-top: 10px; }
+  .dev { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 12px 14px; border-radius: 18px; background: var(--card-solid); border: 1px solid var(--line); }
+  .dev .ic { width: 44px; height: 44px; border-radius: 13px; background: var(--chip); display: grid; place-items: center; grid-row: 1 / span 2; }
+  .dev .ic svg { width: 24px; height: 24px; stroke: var(--ink-2); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .dev b { font-weight: 650; overflow-wrap: anywhere; }
+  .dev .m { font-size: 13px; color: var(--ink-2); grid-column: 2; overflow-wrap: anywhere; }
+  .dev .go { grid-column: 3; grid-row: 1 / span 2; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .dev .acts2 { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  @media (max-width: 560px) { .dev { grid-template-columns: 44px minmax(0, 1fr); } .dev .go { grid-column: 1 / -1; grid-row: auto; justify-content: flex-start; margin-top: 6px; } }
+  .note { display: flex; gap: 10px; padding: 12px 14px; border-radius: 16px; background: var(--chip); font-size: 14px; margin-top: 10px; }
+  .note.warn { background: var(--warn-soft); }
+  .note.good { background: var(--good-soft); }
+  .tog { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 8px; margin-top: 8px; }
+  .tog label { display: flex; gap: 10px; align-items: flex-start; padding: 11px 12px; border-radius: 14px; background: var(--card-solid); border: 1px solid var(--line); font-weight: 500; cursor: pointer; }
+  .tog label b { display: block; font-weight: 650; font-size: 14.5px; }
+  .tog label span { font-size: 12.5px; color: var(--ink-2); font-weight: 400; }
+  .tog input { margin-top: 2px; flex: none; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > .field { flex: 1 1 140px; }
+  .days { display: flex; gap: 6px; flex-wrap: wrap; }
+  .days button { font: inherit; font-size: 13.5px; font-weight: 600; width: 44px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: var(--card-solid); color: var(--ink-2); cursor: pointer; }
+  .days button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .seg { display: inline-flex; background: var(--chip); border-radius: 999px; padding: 3px; gap: 2px; }
+  .seg button { white-space: nowrap; font: inherit; font-size: 14px; font-weight: 600; border: 0; background: none; color: var(--ink-2); padding: 7px 14px; border-radius: 999px; cursor: pointer; }
+  .seg button.on { background: var(--card-solid); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .zl { display: grid; gap: 6px; margin-top: 10px; max-height: 360px; overflow: auto; overscroll-behavior: contain; padding-right: 2px; }
+  .z { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 14px; border: 1px solid var(--line); background: var(--card-solid); }
+  .z.on { border-color: var(--sun); box-shadow: 0 0 0 1px var(--sun) inset; }
+  .z img, .z .ph { width: 36px; height: 36px; border-radius: 9px; object-fit: cover; background: var(--chip); }
+  .z b { font-weight: 650; font-size: 14.5px; overflow-wrap: anywhere; }
+  .z small { display: block; font-size: 12px; color: var(--ink-3); }
+  .z .zb { display: flex; gap: 6px; }
+  .z.off { opacity: .5; }
+  .chosen { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 16px; background: var(--sun-soft); margin-top: 6px; }
+  .chosen b { font-weight: 650; }
+  .chosen .muted { font-size: 13px; overflow-wrap: anywhere; }
+  input[type="range"] { padding: 0; accent-color: var(--sun); height: 32px; background: none; border: 0; }
+  .prev { margin-top: 12px; border-radius: 16px; overflow: hidden; background: #000; position: relative; aspect-ratio: 1024 / 600; }
+  .prev iframe { position: absolute; left: 0; top: 0; width: 1024px; height: 600px; border: 0; transform-origin: 0 0; pointer-events: none; }
+  .sub { font-size: 15px; font-weight: 650; margin: 20px 0 4px; }
+  .acts { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; align-items: center; }
+  .dev.sel { border-color: var(--sun); }
+</style>
+<link rel="stylesheet" href="stijl.css">
+</head>
+<body>
+<main>
+  <header class="top">
+    <a class="brand" href="./"><img src="icon.svg" alt="">Zonnestuur</a>
+    <div class="spacer"></div>
+    <a class="link" href="instellingen">Instellingen</a>
+  </header>
+  <h1 class="t">Huisscherm</h1>
+  <p class="lead">Zet het Zonnestuur-scherm op een Google Nest Hub of tv met Chromecast, en laat je favoriete zender spelen op de tijden die jij kiest. Op een Nest Mini, Nest Audio of Google Home speelt alleen de radio.</p>
+
+  <section class="card" id="state"><div class="small muted"><span class="spin"></span>Even kijken welke apparaten er zijn…</div></section>
+
+  <section class="card" id="mine" hidden><h2 class="t">Jouw schermen en speakers</h2><div class="list" id="mineList"></div></section>
+
+  <section class="card" id="devs" hidden><h2 class="t">Apparaat toevoegen</h2>
+    <p class="small muted" style="margin:-4px 0 0">Google-apparaten die Zonnestuur in je huis heeft gevonden.</p>
+    <div class="list" id="devList"></div></section>
+
+  <section class="card" id="ed" hidden>
+    <h2 class="t" id="edTitle">Instellen</h2>
+    <div class="row">
+      <div class="field"><label for="e_naam">Naam</label><input id="e_naam" maxlength="40"></div>
+      <div class="field" style="flex:0 0 auto"><label>Soort</label><div class="seg" role="group" aria-label="Soort apparaat" id="e_soort">
+        <button type="button" data-v="1">Met scherm</button><button type="button" data-v="0">Alleen geluid</button></div></div>
+    </div>
+
+    <div id="e_schermdeel">
+      <div class="sub">Wat staat er op het scherm</div>
+      <div class="tog" id="e_blokken"></div>
+      <div id="e_nieuws"></div>
+      <div class="sub">Wanneer staat het scherm aan</div>
+      <div class="seg" role="group" aria-label="Wanneer" id="e_altijd"><button type="button" data-v="1">Altijd</button><button type="button" data-v="0">Tussen vaste tijden</button></div>
+      <div class="row" id="e_tijden" style="margin-top:10px">
+        <div class="field"><label for="e_van">Van</label><input id="e_van" type="time" value="06:30"></div>
+        <div class="field"><label for="e_tot">Tot</label><input id="e_tot" type="time" value="23:00"></div>
+      </div>
+      <div class="prev" id="prevBox" aria-label="Voorbeeld van het scherm"><iframe id="prev" title="Voorbeeld van het scherm" tabindex="-1"></iframe></div>
+      <p class="hint" style="margin-top:6px">Voorbeeld met je stroomprijzen. Weer, afval, agenda en witgoed zie je op het scherm zelf.</p>
+    </div>
+
+    <div class="sub">Radio</div>
+    <div id="e_gekozen"></div>
+    <div class="field" style="margin-top:10px"><label for="e_zoek">Zender zoeken</label>
+      <input id="e_zoek" type="search" placeholder="Bijv. Qmusic, Radio 2, 538, Sky Radio" autocomplete="off"></div>
+    <div class="zl" id="e_zenders"></div>
+    <details style="margin-top:10px"><summary class="small muted" style="cursor:pointer">Eigen streamadres invullen</summary>
+      <div class="row" style="margin-top:8px"><div class="field" style="flex:2 1 260px"><label for="e_url">Streamadres</label><input id="e_url" type="url" placeholder="https://…"></div>
+        <div class="field"><label for="e_znaam">Naam zender</label><input id="e_znaam" maxlength="40"></div></div>
+      <button class="btn ghost small" type="button" id="e_urlok">Deze zender gebruiken</button>
+    </details>
+
+    <div id="e_radiodeel">
+      <div class="row" style="margin-top:14px">
+        <div class="field"><label for="e_aan">Radio aan om</label><input id="e_aan" type="time"></div>
+        <div class="field"><label for="e_uit">Radio uit om</label><input id="e_uit" type="time"></div>
+      </div>
+      <p class="hint" style="margin:-8px 0 10px">Laat leeg als de radio niet vanzelf aan of uit moet.</p>
+      <label>Op deze dagen</label><div class="days" id="e_dagen" style="margin-top:6px"></div>
+      <div class="field" style="margin-top:14px"><label for="e_vol">Volume <span id="e_volv" class="muted"></span></label><input id="e_vol" type="range" min="5" max="100" step="5"></div>
+      <label class="small" id="e_knopl" style="display:flex;gap:10px;align-items:center;font-weight:500"><input type="checkbox" id="e_knop"> Knop Radio aan / Radio uit op het scherm</label>
+    </div>
+
+    <div class="acts">
+      <button class="btn" id="e_save">Opslaan en instellen</button>
+      <button class="btn ghost" id="e_cancel" type="button">Annuleren</button>
+      <span id="e_msg" class="small" role="status"></span>
+    </div>
+  </section>
+  <audio id="luister" preload="none"></audio>
+</main>
+
+<script>
+// Fouten in dit scherm melden aan Zonnestuur (die filtert en ontdubbelt); netwerkhaperingen tellen niet mee.
+window.zsFout = (function () { let n = 0; return function (msg, where) {
+  msg = String((msg && msg.message) || msg || ""); if (!msg || n++ > 5 || /Failed to fetch|NetworkError|Load failed|AbortError|HTTP 5\d\d|ResizeObserver/i.test(msg)) return;
+  let t = ""; try { t = localStorage.getItem("zs_token") || ""; } catch (e) {}
+  try { fetch("api/fout", { method: "POST", headers: { "Content-Type": "application/json", "X-Token": t }, body: JSON.stringify({ msg: msg.slice(0, 500), where: (String(where || "") + "\n" + location.pathname).slice(0, 3000) }) }).catch(() => {}); } catch (e) {}
+}; })();
+addEventListener("error", (e) => zsFout(e.message, (e.error && e.error.stack) || `${e.filename}:${e.lineno}:${e.colno}`));
+addEventListener("unhandledrejection", (e) => zsFout(e.reason, e.reason && e.reason.stack));
+
+try { const t = localStorage.getItem("zs_theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const safeUrl = (u) => /^https?:\/\//.test(String(u || "")) ? String(u) : "";
+let token = ""; try { token = localStorage.getItem("zs_token") || ""; } catch (e) {}
+async function api(path, opts = {}) {
+  opts.headers = Object.assign({ "X-Token": token, "Content-Type": "application/json" }, opts.headers || {});
+  const r = await fetch(path, opts);
+  if (r.status === 401) { const t = window.prompt ? prompt("Wachtwoord voor Zonnestuur") : ""; token = t || ""; try { localStorage.setItem("zs_token", token); } catch (e) {} return api(path, opts); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.error) throw new Error(d.error || "Er ging iets mis (" + r.status + ")");
+  return d;
+}
+const post = (path, body) => api(path, { method: "POST", body: JSON.stringify(body || {}) });
+
+const BLOKKEN = [
+  ["prijs", "Stroomprijs per uur", "de balk met goedkope en dure uren"],
+  ["weer", "Weer", "temperatuur en hoe lang het droog blijft"],
+  ["afval", "Afval", "welke container aan de weg moet"],
+  ["witgoed", "Wasmachine en droger", "wanneer de was klaar is"],
+  ["agenda", "Agenda", "de eerstvolgende afspraak van vandaag"],
+  ["auto", "Auto", "laadt hij, en hoe vol is de accu"],
+  ["besparing", "Besparing", "wat Zonnestuur deze maand bespaarde"],
+  ["nieuws", "Nieuws", "koppen uit je nieuwsfeeds"],
+];
+const DAGEN = [["mon", "ma"], ["tue", "di"], ["wed", "wo"], ["thu", "do"], ["fri", "vr"], ["sat", "za"], ["sun", "zo"]];
+const ICON = {
+  scherm: '<rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M8 20h8M12 16.5V20"/>',
+  speaker: '<rect x="6" y="3" width="12" height="18" rx="3"/><circle cx="12" cy="14" r="3.2"/><circle cx="12" cy="7.2" r=".8"/>',
+};
+let OV = null, ED = null, ZEND = [], CARDS = null;
+
+function stateCard() {
+  const el = $("state"), notes = [];
+  if (!OV.cast) {
+    notes.push(`<div class="note warn"><div>Google Cast is nog niet gekoppeld, dus er zijn nog geen Google-apparaten gevonden.
+      <div style="margin-top:10px"><button class="btn small" id="castBtn">Google Cast koppelen</button></div></div></div>`);
+  } else if (!OV.apparaten.length) {
+    notes.push(`<div class="note">Nog geen Google-apparaten gevonden. Staat je Nest of Chromecast aan en zit hij op hetzelfde wifi-netwerk als Zonnestuur? Het zoeken kan een paar minuten duren.</div>`);
+  }
+  if (OV.https && !OV.https.ok) {
+    notes.push(`<div class="note warn"><div><b>Het scherm heeft een beveiligd adres nodig.</b> Een Nest Hub laadt het Zonnestuur-scherm alleen via een beveiligd adres (https), bijvoorbeeld met een cloudverbinding of een eigen https-adres. De radio werkt ook zonder.</div></div>`);
+  } else if (OV.https && OV.https.ok) {
+    notes.push(`<div class="note good"><div>Klaar voor het scherm: bereikbaar via ${esc(OV.https.via)}.</div></div>`);
+  }
+  el.innerHTML = `<h2 class="t">Google Nest en Chromecast</h2>${notes.join("")}`;
+  const b = $("castBtn");
+  if (b) b.onclick = async () => {
+    b.disabled = true; b.innerHTML = '<span class="spin"></span>Koppelen…';
+    try { await post("api/huisscherm/cast"); setTimeout(laad, 4000); } catch (e) { b.disabled = false; b.textContent = "Opnieuw proberen"; el.insertAdjacentHTML("beforeend", `<p class="err">${esc(e.message)}</p>`); }
+  };
+}
+
+function devRow(d, acts, sub) {
+  return `<div class="dev"><div class="ic"><svg viewBox="0 0 24 24">${d.scherm ? ICON.scherm : ICON.speaker}</svg></div>
+    <b>${esc(d.naam)}</b><div class="m">${sub}</div><div class="go">${acts}</div></div>`;
+}
+function render() {
+  stateCard();
+  const mine = OV.schermen || [];
+  $("mine").hidden = !mine.length;
+  $("mineList").innerHTML = mine.map((s) => {
+    const r = s.radio || {};
+    const wat = s.scherm ? (s.van && s.tot ? `Scherm ${s.van}–${s.tot}` : "Scherm altijd aan") : "Alleen radio";
+    const rad = r.url ? `${esc(r.naam || "Radio")}${r.aan ? ` · aan ${r.aan}` : ""}${r.uit ? ` · uit ${r.uit}` : ""}` : "geen radio";
+    const app = OV.apparaten.find((a) => a.entity === s.entity);
+    const off = app && app.state === "unavailable" ? ' · <span style="color:var(--warn)">niet bereikbaar</span>' : "";
+    return devRow(s, `<button class="btn small ghost" data-edit="${esc(s.id)}">Aanpassen</button>`,
+      `${wat} · ${rad}${off}`).replace('</div></div>', `</div><div class="acts2">
+        ${s.scherm ? `<button class="btn small ghost" data-tonen="${esc(s.id)}">Nu op het scherm</button>` : ""}
+        ${r.url ? `<button class="btn small ghost" data-radio="${esc(s.id)}" data-aan="1">Radio aan</button><button class="btn small ghost" data-radio="${esc(s.id)}" data-aan="0">Radio uit</button>` : ""}
+        <button class="btn small ghost" data-weg="${esc(s.id)}" style="margin-left:auto">Verwijderen</button></div></div>`);
+  }).join("");
+  const vrij = OV.apparaten.filter((a) => !mine.some((s) => s.entity === a.entity));
+  $("devs").hidden = !OV.cast || !vrij.length;
+  $("devList").innerHTML = vrij.map((a) => devRow(a, `<button class="btn small" data-new="${esc(a.entity)}">Instellen</button>`,
+    `${esc(a.model || "Google Cast")}${OV.apparaten.filter((x) => x.naam === a.naam).length > 1 ? ` · ${esc(a.entity.split(".")[1])}` : ""}${a.state === "unavailable" ? " · niet bereikbaar" : ""}`)).join("");
+}
+
+async function laad() {
+  try { OV = await api("api/huisscherm"); render(); }
+  catch (e) { $("state").innerHTML = `<h2 class="t">Google Nest en Chromecast</h2><p class="err">${esc(e.message)}</p>`; }
+}
+
+document.addEventListener("click", async (ev) => {
+  const t = ev.target.closest("button"); if (!t) return;
+  if (t.dataset.new) { const a = OV.apparaten.find((x) => x.entity === t.dataset.new); open({ entity: a.entity, naam: a.naam, scherm: a.scherm }); }
+  else if (t.dataset.edit) open(JSON.parse(JSON.stringify(OV.schermen.find((s) => s.id === t.dataset.edit))));
+  else if (t.dataset.tonen) await doe(t, "api/huisscherm/tonen", { id: t.dataset.tonen }, "Komt er binnen een halve minuut op");
+  else if (t.dataset.radio) await doe(t, "api/huisscherm/radio", { id: t.dataset.radio, aan: t.dataset.aan === "1" }, t.dataset.aan === "1" ? "Radio staat aan" : "Radio staat uit");
+  else if (t.dataset.weg) {
+    if (!confirm("Dit scherm verwijderen? Zonnestuur haalt ook de automatisering en het dashboard weg.")) return;
+    await doe(t, "api/huisscherm/verwijder", { id: t.dataset.weg }, "Verwijderd"); laad();
+  }
+});
+async function doe(btn, path, body, ok) {
+  const txt = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>' + esc(txt);
+  try { await post(path, body); btn.textContent = ok; setTimeout(() => { btn.textContent = txt; btn.disabled = false; }, 2500); }
+  catch (e) { btn.textContent = txt; btn.disabled = false; alert(e.message); }
+}
+
+// ---------------------------------------------------------------- bewerken
+function open(s) {
+  ED = Object.assign({ scherm: true, van: "", tot: "", blokken: {}, nieuws: [], radio: {} }, s);
+  ED.radio = Object.assign({ naam: "", url: "", aan: "", uit: "", dagen: DAGEN.map((d) => d[0]), volume: 20, knop: true }, ED.radio || {});
+  BLOKKEN.forEach(([k]) => { if (ED.blokken[k] == null) ED.blokken[k] = true; });
+  if (!s.id && !ED.nieuws.length) ED.nieuws = (OV.nieuws || []).slice(0, 2).map((n) => n.entity);
+  $("edTitle").textContent = s.id ? `${s.naam} aanpassen` : `${s.naam} instellen`;
+  $("e_naam").value = ED.naam;
+  $("ed").hidden = false; $("e_msg").textContent = "";
+  $("e_blokken").innerHTML = BLOKKEN.map(([k, t, d]) => `<label><input type="checkbox" data-blok="${k}" ${ED.blokken[k] ? "checked" : ""}><div><b>${t}</b><span>${d}</span></div></label>`).join("");
+  const nw = OV.nieuws || [];
+  $("e_nieuws").innerHTML = nw.length ? `<div class="sub" style="font-size:14px">Nieuwsfeeds</div><div class="tog">${nw.map((n) => `<label><input type="checkbox" data-nws="${esc(n.entity)}" ${ED.nieuws.includes(n.entity) ? "checked" : ""}><div><b>${esc(n.naam)}</b></div></label>`).join("")}</div>`
+    : `<p class="hint" style="margin-top:8px">Nieuws op het scherm? Voeg een nieuwsfeed toe met de koppeling Feedreader (bijv. van de NOS), dan kun je hem hier kiezen.</p>`;
+  $("e_van").value = ED.van || "06:30"; $("e_tot").value = ED.tot || "23:00";
+  $("e_aan").value = ED.radio.aan || ""; $("e_uit").value = ED.radio.uit || "";
+  $("e_vol").value = ED.radio.volume; $("e_knop").checked = ED.radio.knop !== false;
+  segs(); dagen(); gekozen(); zoek("");
+  $("ed").scrollIntoView({ behavior: "smooth", block: "start" });
+  preview();
+}
+function segs() {
+  for (const b of $("e_soort").children) b.classList.toggle("on", (b.dataset.v === "1") === !!ED.scherm);
+  const altijd = !(ED.van && ED.tot);
+  for (const b of $("e_altijd").children) b.classList.toggle("on", (b.dataset.v === "1") === altijd);
+  $("e_tijden").hidden = altijd;
+  $("e_schermdeel").hidden = !ED.scherm;
+  $("e_knopl").hidden = !ED.scherm;
+  $("e_volv").textContent = ED.radio.volume + "%";
+}
+$("e_soort").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; ED.scherm = b.dataset.v === "1"; segs(); renderZenders(); preview(); };
+$("e_altijd").onclick = (e) => { const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.v === "1") { ED.van = ED.tot = ""; } else { ED.van = $("e_van").value || "06:30"; ED.tot = $("e_tot").value || "23:00"; } segs(); };
+$("e_van").onchange = () => { ED.van = $("e_van").value; }; $("e_tot").onchange = () => { ED.tot = $("e_tot").value; };
+$("e_vol").oninput = () => { ED.radio.volume = +$("e_vol").value; segs(); };
+$("e_blokken").onchange = (e) => { const k = e.target.dataset.blok; if (k) { ED.blokken[k] = e.target.checked; preview(); } };
+$("e_nieuws").onchange = (e) => { const n = e.target.dataset.nws; if (!n) return; ED.nieuws = ED.nieuws.filter((x) => x !== n); if (e.target.checked) ED.nieuws.push(n); };
+function dagen() {
+  $("e_dagen").innerHTML = DAGEN.map(([k, l]) => `<button type="button" data-dag="${k}" class="${ED.radio.dagen.includes(k) ? "on" : ""}" aria-pressed="${ED.radio.dagen.includes(k)}">${l}</button>`).join("");
+}
+$("e_dagen").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; const k = b.dataset.dag;
+  ED.radio.dagen = ED.radio.dagen.includes(k) ? ED.radio.dagen.filter((x) => x !== k) : [...ED.radio.dagen, k]; dagen(); };
+
+// ---- zenders
+function gekozen() {
+  const r = ED.radio;
+  $("e_gekozen").innerHTML = r.url ? `<div class="chosen"><div style="flex:1;min-width:0"><b>${esc(r.naam || "Eigen zender")}</b><div class="muted">${esc(r.url)}</div></div>
+      <button class="btn small ghost" type="button" id="e_geen">Geen radio</button></div>` : `<p class="small muted" style="margin:0">Nog geen zender gekozen.</p>`;
+  const g = $("e_geen"); if (g) g.onclick = () => { ED.radio.url = ""; ED.radio.naam = ""; gekozen(); renderZenders(); };
+  $("e_radiodeel").hidden = !r.url;
+  preview();
+}
+let zt;
+$("e_zoek").oninput = () => { clearTimeout(zt); zt = setTimeout(() => zoek($("e_zoek").value), 350); };
+async function zoek(q) {
+  $("e_zenders").innerHTML = '<p class="small muted"><span class="spin"></span>Zenders zoeken…</p>';
+  try { const r = await api("api/huisscherm/zenders?q=" + encodeURIComponent(q)); ZEND = r.zenders || []; renderZenders(r.bron); }
+  catch (e) { $("e_zenders").innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+}
+function renderZenders(bron) {
+  if (!ZEND.length) { $("e_zenders").innerHTML = '<p class="small muted">Geen zender gevonden. Probeer een andere naam, of vul hieronder zelf een streamadres in.</p>'; return; }
+  $("e_zenders").innerHTML = ZEND.map((z, i) => {
+    const blok = ED.scherm && !z.https;
+    const logo = safeUrl(z.logo) ? `<img src="${esc(z.logo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph'}))">` : '<div class="ph"></div>';
+    return `<div class="z ${ED.radio.url === z.url ? "on" : ""} ${blok ? "off" : ""}">${logo}<div><b>${esc(z.naam)}</b><small>${blok ? "speelt niet op een scherm (geen beveiligde stream)" : [z.land, z.kbps ? z.kbps + " kbps" : ""].filter(Boolean).join(" · ")}</small></div>
+      <div class="zb"><button class="btn small ghost" type="button" data-luister="${i}" aria-label="Luister naar ${esc(z.naam)}">▶</button>${blok ? "" : `<button class="btn small" type="button" data-kies="${i}">Kies</button>`}</div></div>`;
+  }).join("") + (bron === "reserve" ? '<p class="hint">De zenderlijst online is nu niet bereikbaar; dit is een vaste lijst.</p>' : "");
+}
+let SPEELT = null;
+$("e_zenders").onclick = (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.kies) { const z = ZEND[+b.dataset.kies]; ED.radio.url = z.url; ED.radio.naam = z.naam;
+    if (!ED.radio.aan && !ED.radio.uit && ED.scherm) { ED.radio.aan = "07:00"; ED.radio.uit = "17:00"; $("e_aan").value = "07:00"; $("e_uit").value = "17:00"; }
+    gekozen(); renderZenders(); }
+  if (b.dataset.luister) {
+    const a = $("luister"), z = ZEND[+b.dataset.luister];
+    document.querySelectorAll("[data-luister]").forEach((x) => { x.textContent = "▶"; });
+    if (SPEELT === z.url) { a.pause(); SPEELT = null; return; }
+    a.src = z.url; a.volume = 0.6; a.play().then(() => { b.textContent = "■"; SPEELT = z.url; }).catch(() => { b.textContent = "✕"; });
+  }
+};
+$("e_urlok").onclick = () => { const u = $("e_url").value.trim(); if (!/^https?:\/\//.test(u)) { $("e_msg").innerHTML = '<span class="err">Een streamadres begint met http:// of https://</span>'; return; }
+  ED.radio.url = u; ED.radio.naam = $("e_znaam").value.trim() || "Eigen zender"; gekozen(); };
+
+// ---- voorbeeld (de echte kaart, in een venster van 1024×600)
+async function preview() {
+  if (!ED || !ED.scherm) return;
+  const fr = $("prev"), box = $("prevBox");
+  fr.style.transform = `scale(${box.clientWidth / 1024})`;
+  if (!CARDS) { try { CARDS = await api("api/cards"); } catch (e) { return; } }
+  const d = fr.contentDocument;
+  if (!d.querySelector("zonnestuur-hub-card")) {
+    d.open(); d.write('<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%;background:#000;overflow:hidden}</style></head><body></body></html>'); d.close();
+    const s = d.createElement("script"); s.src = new URL("cards/zonnestuur-cards.js", location.href).href;
+    s.onload = () => draw(); d.head.appendChild(s);
+    d.defaultView.customElements || null;
+    d.body.appendChild(d.createElement("zonnestuur-hub-card"));
+    return;
+  }
+  draw();
+}
+function draw() {
+  const d = $("prev").contentDocument, c = d.querySelector("zonnestuur-hub-card");
+  if (!c || !c.setConfig) return;
+  const b = ED.blokken, cfg = { licht: true, radio_knop: ED.radio.knop !== false, radio_entity: "input_text.voorbeeld", radio_stream: ED.radio.url || undefined, radio_name: ED.radio.naam || undefined };
+  for (const k of ["afval", "weer", "witgoed", "agenda", "besparing", "prijs", "auto"]) if (!b[k]) cfg[k] = false;
+  c.setConfig(cfg);
+  c.hass = { states: { "sensor.zonnestuur": { state: "x", last_updated: String(Date.now()), attributes: CARDS }, "input_text.voorbeeld": { state: "" } }, callService: () => Promise.resolve() };
+}
+addEventListener("resize", () => { const box = $("prevBox"); if (box) $("prev").style.transform = `scale(${box.clientWidth / 1024})`; });
+
+$("e_cancel").onclick = () => { $("ed").hidden = true; ED = null; $("luister").pause(); };
+$("e_save").onclick = async () => {
+  ED.naam = $("e_naam").value.trim() || ED.naam;
+  ED.radio.aan = $("e_aan").value; ED.radio.uit = $("e_uit").value; ED.radio.knop = $("e_knop").checked;
+  if (ED.scherm && ED.van && ED.tot) { ED.van = $("e_van").value; ED.tot = $("e_tot").value; }
+  const btn = $("e_save"); btn.disabled = true; $("e_msg").innerHTML = '<span class="spin"></span>Instellen…';
+  try {
+    const r = await post("api/huisscherm/opslaan", ED);
+    $("luister").pause();
+    if (r.scherm.scherm) { try { await post("api/huisscherm/tonen", { id: r.scherm.id }); } catch (e) {} }
+    $("e_msg").innerHTML = `<span class="ok">Klaar.${r.scherm.scherm ? " Het scherm komt er binnen een halve minuut op." : ""}</span>`;
+    setTimeout(() => { $("ed").hidden = true; ED = null; laad(); }, 1800);
+  } catch (e) { $("e_msg").innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  btn.disabled = false;
+};
+laad();
+</script>
+</body>
+</html>

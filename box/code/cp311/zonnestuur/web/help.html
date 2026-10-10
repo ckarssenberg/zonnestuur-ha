@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Uitleg · Zonnestuur</title>
+<style>
+/* In een app-webweergave: doorslepen bovenaan mag niet doorgaan naar 'trek omlaag om te verversen' van de app. */
+html, body { overscroll-behavior-y: none; }
+
+  @font-face { font-family: "Inter"; src: url("fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Inter Tight"; src: url("fonts/inter-tight.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  :root { color-scheme: light; --bg: #e8ecef; --card: #ffffff; --line: rgba(14, 21, 28, .07); --ink: #0e151c; --ink-2: #47525e; --ink-3: #6a7480;
+          --glow: #ffb000; --glow-soft: rgba(255, 176, 0, .16); --save: #0a7f55; --chip: rgba(14, 21, 28, .045); }
+  @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) { color-scheme: dark; --bg: #080c10; --card: #10161c; --line: rgba(255, 255, 255, .07);
+          --ink: #eef2f5; --ink-2: #a3adb8; --ink-3: #8a95a1; --glow-soft: rgba(255, 176, 0, .14); --save: #3ddc97; --chip: rgba(255, 255, 255, .055); } }
+  :root[data-theme="dark"] { color-scheme: dark; --bg: #080c10; --card: #10161c; --line: rgba(255, 255, 255, .07);
+          --ink: #eef2f5; --ink-2: #a3adb8; --ink-3: #8a95a1; --glow-soft: rgba(255, 176, 0, .14); --save: #3ddc97; --chip: rgba(255, 255, 255, .055); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  main { max-width: 1080px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px 64px; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 32px; }
+  header { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 6px; }
+  header a { color: var(--ink-2); text-decoration: none; font-weight: 600; font-size: 14px; }
+  h1 { font: 650 clamp(34px, 5vw, 52px)/1.02 "Inter Tight", Inter, sans-serif; letter-spacing: -.04em; margin: 18px 0 6px; grid-column: 1 / -1; }
+  .lead { grid-column: 1 / -1; color: var(--ink-2); margin: 0; max-width: 60ch; font-size: 17px; }
+  nav { position: sticky; top: 16px; align-self: start; display: grid; gap: 2px; font-size: 14px; }
+  nav a { color: var(--ink-2); text-decoration: none; padding: 6px 10px; border-radius: 10px; }
+  nav a:hover, nav a.on { background: var(--card); color: var(--ink); }
+  article { display: grid; gap: 16px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 24px 26px; scroll-margin-top: 16px; }
+  section:target { box-shadow: 0 0 0 3px var(--glow-soft); }
+  h2 { font: 650 22px/1.2 "Inter Tight", Inter, sans-serif; letter-spacing: -.025em; margin: 0 0 10px; }
+  p { margin: 0 0 10px; max-width: 68ch; } p:last-child { margin-bottom: 0; }
+  ul { margin: 0 0 10px; padding-left: 20px; max-width: 66ch; } li { margin: 4px 0; }
+  b { font-weight: 650; }
+  .key { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; margin: 8px 0; }
+  .key i { width: 14px; height: 14px; border-radius: 4px; margin-top: 5px; }
+  .calc { background: var(--chip); border-radius: 14px; padding: 14px 16px; font-size: 15px; }
+  .calc p { margin: 0 0 6px; }
+  a { color: var(--ink); }
+  @media (max-width: 760px) {
+    main { grid-template-columns: 1fr; gap: 16px; padding: 12px 12px 48px; }
+    h1 { font-size: 34px; margin: 10px 0 0; } .lead { font-size: 16px; }
+    nav { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 6px; margin: 0 -12px; padding: 8px 12px;
+          background: var(--bg); scrollbar-width: none; }
+    nav a { flex: none; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 7px 12px; font-size: 13px; white-space: nowrap; }
+    section { padding: 18px 16px; border-radius: 18px; scroll-margin-top: 56px; }
+    h2 { font-size: 20px; } body { font-size: 15px; }
+  }
+</style>
+<link rel="stylesheet" href="stijl.css">
+</head>
+<body>
+<main>
+  <header><a href="./">← Dashboard</a><a href="hulp">Probleem melden</a><a href="instellingen">Instellingen</a></header>
+  <h1>Zo werkt Zonnestuur</h1>
+  <p class="lead">Zonnestuur zet je apparaten aan op het beste moment: als je eigen zon over is, of als stroom het goedkoopst is. Alles draait bij jou thuis, zonder cloud. Nieuw hier? Bekijk de <a href="kennismaking">kennismaking</a> (2 minuten, met video).</p>
+  <nav aria-label="Onderwerpen">
+    <a href="#nu">Bovenaan het dashboard</a><a href="#besparing">Besparing: zo rekenen we</a><a href="#tips">Tips</a><a href="#plan">Planning</a>
+    <a href="#prijzen">Prijzen per kwartier</a><a href="#apparaten">Apparaten bijsturen</a><a href="#witgoed">Wasmachine en droger</a><a href="#auto">Auto laden</a>
+    <a href="#warmte">Warm water en verwarming</a><a href="#koppelen">Merk koppelen</a><a href="#omvormer">Omvormer</a><a href="#batterij">Thuisbatterij</a><a href="#vergelijken">Leverancier vergelijken</a><a href="#nettarief">Nettarief 2029</a><a href="#logboek">Logboek</a><a href="#contract">Contract vergelijken</a>
+    <a href="#hub">Huisscherm</a><a href="#widgets">Telefoonwidget</a><a href="#meldingen">Meldingen</a><a href="#privacy">Privacy en veiligheid</a>
+  </nav>
+  <article>
+    <section id="nu"><h2>Bovenaan het dashboard</h2>
+      <p>Het oordeel zegt of nu een goed moment is om stroom te gebruiken:</p>
+      <div class="key"><i style="background:#0a7f55"></i><span><b>Goed moment</b>: zon over of een van de goedkoopste kwartieren van vandaag.</span></div>
+      <div class="key"><i style="background:#8a95a1"></i><span><b>Neutraal</b>: kan, maar straks is het beter. Erachter staat wanneer.</span></div>
+      <div class="key"><i style="background:#c2382f"></i><span><b>Liever wachten</b>: stroom hoort nu bij de duurste van de dag.</span></div>
+      <p>Daaronder staat wat Zonnestuur deze maand bespaarde, met maximaal drie tips die nu het meeste opleveren.</p>
+    </section>
+    <section id="besparing"><h2>Besparing: zo rekenen we</h2>
+      <p>Zonnestuur vergelijkt elke kWh die een apparaat gebruikt met wat dezelfde kWh had gekost zonder sturing:</p>
+      <ul><li><b>Met zonnepanelen</b>: een kWh uit je eigen zon kost alleen de gemiste terugleververgoeding. Wat het scheelt is de prijs die je anders had betaald.</li>
+        <li><b>Zonder zonnepanelen</b>: de besparing is het verschil tussen de gemiddelde prijs van die dag en de prijs op het moment dat het apparaat draaide.</li>
+        <li><b>Thuisbatterij</b>: wat je met de batterij betaalde tegenover zonder batterij, inclusief laadverlies en slijtage.</li>
+        <li><b>Panelen begrenzen</b> bij een negatieve prijs telt ook mee.</li></ul>
+      <div class="calc" id="calc">Bedragen laden…</div>
+    </section>
+    <section id="tips"><h2>Tips</h2>
+      <p>Tips komen uit je eigen meterdata van de laatste twee weken. Het bedrag per jaar is een schatting: wat de tip ongeveer oplevert als je hem opvolgt.</p>
+      <p>Is vandaag duidelijk zonniger (of goedkoper) dan de komende dagen, dan krijg je 's ochtends de tip om de was of de auto vandaag te doen.</p>
+    </section>
+    <section id="plan"><h2>Planning</h2>
+      <p>De kaart <b>Komende 24 uur</b> laat zien wanneer elk apparaat en de batterij gaan draaien, waarom, en wat het ongeveer kost. Het plan schuift mee als er nieuwe prijzen of een nieuwe zonvoorspelling komen, maar een gestart blok wordt niet meer verplaatst.</p>
+      <p>Zonnestuur plant met een voorzichtige zonvoorspelling als iets op tijd klaar moet: liever een goedkoop uur extra dan een koude douche.</p>
+    </section>
+    <section id="prijzen"><h2>Prijzen per kwartier</h2>
+      <p>Sinds oktober 2025 verschilt de stroomprijs per kwartier. De grafiek toont vier smalle balken per uur. De auto, elektrische boilers en de batterij plannen per kwartier; witgoed start op het goedkoopste kwartier binnen het geplande uur.</p>
+      <div class="key"><i style="background:#2a78d6"></i><span>Goedkoop: onder het gemiddelde van de dag.</span></div>
+      <div class="key"><i style="background:#8a9199"></i><span>Normaal.</span></div>
+      <div class="key"><i style="background:repeating-linear-gradient(45deg,rgba(255,255,255,.55) 0 2px,transparent 2px 5px),#e34948"></i><span>Duur (ook gestreept, zodat je het zonder kleur ziet).</span></div>
+      <p>De stippellijn in de grafiek is de geplande stand van je thuisbatterij.</p>
+    </section>
+    <section id="apparaten"><h2>Apparaten bijsturen</h2>
+      <ul><li><b>Automatisch</b>: Zonnestuur beslist.</li><li><b>Nu aan</b>: twee uur aan, daarna weer automatisch.</li><li><b>Vandaag overslaan</b>: tot morgen uit.</li></ul>
+      <p>Onder elke kaart staat waarom het apparaat aan of uit staat, en na afloop hoeveel stroom het gebruikte en wat het scheelde.</p>
+    </section>
+    <section id="witgoed"><h2>Wasmachine en droger</h2>
+      <p>Vul de machine, kies het programma (op de machine, in de app van de fabrikant of in Zonnestuur) en zet hem op <b>start op afstand</b>. Zonnestuur start hem op het goedkoopste of zonnigste moment en stuurt een melding. Een gestart programma breekt Zonnestuur nooit af.</p>
+      <p>Bij Miele ziet Zonnestuur ook wanneer de was klaar is, hoeveel kWh hij gebruikte en hoe vol de TwinDos-reservoirs zijn.</p>
+    </section>
+    <section id="auto"><h2>Auto laden</h2>
+      <p>De laadkaart toont je auto aan de laadpaal. Zit de stekker erin, dan lichten de kabel en de puntjes op; tijdens het laden lopen de puntjes naar de auto. De band in de auto is de accu: het zwarte streepje is je doel, het oranje streepje je minimum.</p>
+      <ul><li><b>Vol om</b>: hoe laat hij klaar moet zijn.</li><li><b>Laden tot</b>: tot welk percentage (minder dan 100% is beter voor de accu).</li>
+        <li><b>Altijd minstens</b>: daaronder laadt hij meteen, wat het ook kost.</li><li><b>Prijs</b>: nooit duurder laden dan dit (behalve onder je minimum).</li></ul>
+      <p><b>Laden op wat je rijdt</b>: kies bij Laadinstellingen "wat ik rijd" en vul je kilometers per werkdag en weekenddag in. Zonnestuur rekent uit hoeveel er nodig is om thuis te komen met je minimum (plus 10% marge) en laadt niet meer dan dat. Bij kou kost rijden meer stroom (verwarming, koude accu): bij 0 °C ± 20% meer. Hij gebruikt de weersverwachting van die dag.</p>
+      <p>Met zonnepanelen laadt hij bij weinig zon op 1 fase (vanaf ± 1,4 kW) en bij veel zon op 3 fasen, als je laadpaal dat kan.</p>
+    </section>
+    <section id="warmte"><h2>Warm water en verwarming</h2>
+      <p>Bij zon of goedkope stroom zet Zonnestuur de temperatuur hoger, zodat de warmte wordt opgeslagen. Warmer stoken kost rendement, dus dat gebeurt alleen als het prijsverschil groot genoeg is. In de duurste uren kan hij de temperatuur iets lager zetten. Voorwaarden (bijvoorbeeld niet tijdens ontvochtigen) stel je per apparaat in.</p>
+    </section>
+    <section id="koppelen"><h2>Een merk koppelen</h2>
+      <p>Onder <b>Instellingen &gt; Een merk koppelen</b> (of direct op de pagina Koppelen) zoek je het merk van je apparaat: warmtepomp, airco, laadpaal, auto, witgoed, stekker. Je ziet meteen hoe het werkt en wat je eventueel extra nodig hebt, bijvoorbeeld een Zigbee-dongle of een instelling die de installateur moet aanzetten. Met <b>Koppelen</b> start je het, zonder Zonnestuur te verlaten.</p>
+      <ul><li><b>Rechtstreeks</b>: Zonnestuur praat zelf met het apparaat.</li>
+        <li><b>Via de koppelmotor</b>: Zonnestuur heeft een ingebouwde koppelmotor die honderden merken kent. Soms log je in bij de fabrikant; dat venster opent vanzelf.</li>
+        <li><b>Matter en Zigbee</b>: Matter-apparaten koppel je met de code op het apparaat. Voor Zigbee, en voor Matter over Thread, steek je een dongle in de Box.</li>
+        <li><b>Met de laadpaal</b>: elke auto kan zo. Zonnestuur stuurt de laadpaal en zorgt dat de auto op tijd klaar is; het leert vanzelf hoe lang laden meestal duurt. Kan je automerk het percentage zelf doorgeven, dan koppel je dat erbij.</li>
+        <li><b>Met stekker of relais</b>: werkt altijd, voor apparaten zonder eigen koppeling.</li></ul>
+      <p>Na het koppelen kies je bij <b>Apparaat toevoegen</b> wat Zonnestuur ermee moet doen.</p>
+    </section>
+    <section id="omvormer"><h2>Omvormer</h2>
+      <p>Met je omvormer gekoppeld weet Zonnestuur precies wat je panelen nu opwekken, en stelt hij de zonvoorspelling bij voor jouw dak. Bij een negatieve terugleverprijs knijpt hij de omvormer af tot je eigen verbruik; daarna gaat hij vanzelf terug naar vol vermogen.</p>
+      <p>Rechtstreeks, zonder koppelmotor: <b>Fronius, SMA, SolarEdge, Huawei, GoodWe</b> (hybride), <b>Sungrow, Kostal</b>, <b>Hoymiles</b> via OpenDTU of AhoyDTU, <b>APsystems EZ1, Victron</b> en elk merk met SunSpec Modbus. <b>Enphase</b> en <b>SolaX</b> leest hij alleen uit. Kies het merk onder Instellingen &gt; Omvormer en druk op <b>Test verbinding</b>; bij elk merk staat wat je in de omvormer moet aanzetten.</p>
+      <p>Had de installateur al een eigen exportgrens, dan zet Zonnestuur die na het begrenzen precies zo terug. Valt Zonnestuur weg terwijl hij begrenst, dan laat hij de omvormer bij de volgende start los.</p>
+    </section>
+    <section id="batterij"><h2>Thuisbatterij</h2>
+      <p>Elk kwartier maakt Zonnestuur een plan voor de komende 48 uur: zelf gebruiken, vasthouden voor de dure uren, of laden van het net als dat loont na laadverlies en slijtage. Levert slim plannen minder dan een paar cent op, dan gebruikt hij de batterij gewoon zelf. Bij stoppen krijgt de batterij zijn eigen regeling terug.</p>
+      <p><b>Rechtstreeks</b> stuurt Zonnestuur deze batterijen rechtstreeks, alles binnen je eigen netwerk: <b>HomeWizard Plug-In Battery</b> (koppelen met de knop van de P1-meter), <b>Marstek Venus</b> (lokale API aanzetten in de app), <b>Zendure SolarFlow/Hyper</b> (lokale zenSDK) en <b>Victron</b> met ESS (Modbus TCP op de GX). Kies het merk onder Instellingen &gt; Thuisbatterij &gt; Koppeling en druk op <b>Test verbinding</b>.</p>
+      <p><b>Je doel</b> kies je bij Instellingen &gt; Thuisbatterij: <b>slim</b> (eigen zon eerst, handelen als het duidelijk loont), <b>zelfvoorzienend</b> (alleen eigen zon) of <b>maximaal verdienen</b>. Met een dynamisch contract kan hij ook <b>verkopen aan het net</b> als terugleveren tijdelijk veel oplevert, bijvoorbeeld bij een prijspiek op een winteravond. Hij verkoopt alleen wat je zelf niet nodig hebt tot de volgende goedkope uren. Alle instellingen (minimum, reserve, laden van het net, slijtage) kun je zelf aanpassen.</p>
+      <p>Het plan houdt rekening met het weer: Zonnestuur leert hoeveel meer stroom jouw huis gebruikt als het kouder is (zie <b>Geleerd</b>) en gebruikt de temperatuurverwachting om het verbruik van vandaag en morgen te schatten.</p>
+    </section>
+    <section id="vergelijken"><h2>Stuurt je leverancier het goed?</h2>
+      <p>Stuurt Zonneplan, Frank, Tibber of een andere leverancier je thuisbatterij, of laadt Tibber of Jedlix je auto? Laat Zonnestuur dan meekijken (Instellingen &gt; Thuisbatterij &gt; "Wie stuurt de batterij?", of "Meekijken bij slim laden"). Zonnestuur stuurt dan niets, maar speelt elke dag na wat hij zelf had gedaan: met alleen wat hij op dat moment kon weten, en uitgevoerd op wat er echt gebeurde. Op de pagina <a href="vergelijk">Vergelijken</a> zie je per maand wat je leverancier deed, wat Zonnestuur had gedaan en het verschil. Vul daar ook in wat je leverancier uitbetaalde, dan is de vergelijking eerlijk.</p>
+      <p>Na een week krijg je advies: laat Zonnestuur sturen, laat het zo, of kies een combinatie (bijvoorbeeld Zonnestuur in de zomer en je leverancier in de winter). Met een Sessy wisselt Zonnestuur zelf; bij andere merken krijg je een melding wanneer je de sturing van je leverancier aan of uit moet zetten.</p>
+    </section>
+    <section id="nettarief"><h2>Nettarief vanaf 2029</h2>
+      <p>De ACM wil dat je vanaf 1 januari 2029 voor stroom uit het net een nettarief betaalt dat per uur verschilt (voorstel van 8 oktober 2026). In de zomer (april t/m september) is stroom uit het net tussen 10 en 17 uur dan vrij van nettarief; op winteravonden van 17 tot 22 uur is het het duurst. Op teruglevering zit geen nettarief.</p>
+      <p>Zonnestuur rekent daar vanaf 2029 vanzelf mee: de batterij, de auto en de boiler ontwijken de dure uren. Bij Instellingen &gt; Contract kun je het hoogste tarief aanpassen of het uitzetten. Het voorstel kan nog veranderen; dan passen we het aan.</p>
+    </section>
+    <section id="logboek"><h2>Logboek</h2>
+      <p>Elke schakeling met de reden, de prijs op dat moment en na afloop het verbruik. "Klaar" betekent dat een apparaat zijn programma heeft afgemaakt.</p>
+    </section>
+    <section id="contract"><h2>Contract vergelijken</h2>
+      <p>Zonnestuur rekent je echte afname en teruglevering per uur door met de tarieven van leveranciers voor 2027, inclusief terugleverkosten, en laat zien wat je de afgelopen 30 dagen bij elk had betaald. Dit is een schatting, geen advies.</p>
+    </section>
+    <section id="hub"><h2>Huisscherm op je Google Nest Hub of tablet</h2>
+      <p>Op een Nest Hub of tablet laat Zonnestuur groot zien of stroom nu goedkoop is, de prijs per uur en het weer, leesbaar van de bank. Je muziek of radio speelt gewoon door. Stel het in op de pagina <a href="huisscherm">Huisscherm</a>.</p>
+    </section>
+    <section id="widgets"><h2>Widget op je telefoon</h2>
+      <p>Open <a href="widget">Telefoonwidget</a> in de browser van je telefoon en kies "Zet op beginscherm". Je ziet dan in één oogopslag of het een goed moment is, de prijs nu en wat je deze maand bespaarde.</p>
+    </section>
+    <section id="meldingen"><h2>Meldingen</h2>
+      <p>Meldingen gaan naar je telefoon (via een app, Telegram of e-mail): wanneer de was start, tips, en als er iets mis is. Aan of uit bij Instellingen.</p>
+    </section>
+    <section id="privacy"><h2>Privacy en veiligheid</h2>
+      <p>Zonnestuur draait bij jou thuis. Je meterdata gaan niet naar een cloud. Alleen de stroomprijzen en de weersvoorspelling worden opgehaald, en een paar keer per dag gaat er een seintje dat Zonnestuur draait (zonder persoonlijke gegevens, uit te zetten bij Hulp). Valt Zonnestuur uit, dan werken je apparaten gewoon op hun eigen instellingen.</p>
+    </section>
+  </article>
+</main>
+<script>
+// Fouten in dit scherm melden aan Zonnestuur (die filtert en ontdubbelt); netwerkhaperingen tellen niet mee.
+window.zsFout = (function () { let n = 0; return function (msg, where) {
+  msg = String((msg && msg.message) || msg || ""); if (!msg || n++ > 5 || /Failed to fetch|NetworkError|Load failed|AbortError|HTTP 5\d\d|ResizeObserver/i.test(msg)) return;
+  let t = ""; try { t = localStorage.getItem("zs_token") || ""; } catch (e) {}
+  try { fetch("api/fout", { method: "POST", headers: { "Content-Type": "application/json", "X-Token": t }, body: JSON.stringify({ msg: msg.slice(0, 500), where: (String(where || "") + "\n" + location.pathname).slice(0, 3000) }) }).catch(() => {}); } catch (e) {}
+}; })();
+addEventListener("error", (e) => zsFout(e.message, (e.error && e.error.stack) || `${e.filename}:${e.lineno}:${e.colno}`));
+addEventListener("unhandledrejection", (e) => zsFout(e.reason, e.reason && e.reason.stack));
+
+let token = ""; try { token = localStorage.getItem("zs_token") || ""; const t = localStorage.getItem("zs_theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+fetch("api/howcalc", { headers: token ? { "X-Token": token } : {} }).then((r) => r.json()).then((h) => {
+  const nl = (x) => esc(x).replace(/(\d)\.(\d)/g, "$1,$2");
+  document.getElementById("calc").innerHTML = (h.lines || []).map((l) => `<p>${nl(l)}</p>`).join("")
+    + ((h.per_device || []).length ? `<p><b>Zonder Zonnestuur</b> gaan we per apparaat uit van:</p><ul>${h.per_device.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : "")
+    + (h.bill ? `<p>${nl(h.bill[0])}</p>` : "");
+}).catch(() => { document.getElementById("calc").textContent = "De bedragen konden niet geladen worden."; });
+const links = [...document.querySelectorAll("nav a")];
+const mark = () => { const id = location.hash.slice(1); links.forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + id)); };
+addEventListener("hashchange", mark); mark();
+</script>
+</body>
+</html>

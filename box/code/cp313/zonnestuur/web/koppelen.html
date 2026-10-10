@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#e9eef2" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#0d151d" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Zonnestuur koppelen</title>
+<style>
+/* In een app-webweergave: doorslepen bovenaan mag niet doorgaan naar 'trek omlaag om te verversen' van de app. */
+html, body { overscroll-behavior-y: none; }
+
+  @font-face { font-family: "Inter"; src: url("fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Inter Tight"; src: url("fonts/inter-tight.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  :root {
+    color-scheme: light;
+    --bg: #e8ecef; --card: rgba(255,255,255,.82); --card-solid: #fff; --line: rgba(14,17,22,.08);
+    --shadow: 0 1px 2px rgba(14,17,22,.04), 0 8px 28px -12px rgba(14,17,22,.12);
+    --ink: #0e1116; --ink-2: #5c6470; --ink-3: #8a919b; --field: #fff;
+    --sun: #e08600; --sun-ink: #9a5b00; --sun-soft: rgba(255,178,36,.16); --net: #2f5bdb;
+    --good: #1f8a4c; --good-soft: rgba(31,138,76,.12); --warn: #b54708; --warn-soft: rgba(181,71,8,.10);
+    --chip: rgba(14,17,22,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --bg: #080c10; --card: rgba(255,255,255,.045); --card-solid: #11151b; --line: rgba(255,255,255,.09);
+      --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 20px 50px -30px rgba(0,0,0,.8);
+      --ink: #f2f4f7; --ink-2: #a3acb8; --ink-3: #6f7885; --field: rgba(255,255,255,.04);
+      --sun: #ffb224; --sun-ink: #ffb224; --sun-soft: rgba(255,178,36,.14); --net: #5b8cff;
+      --good: #4ade80; --good-soft: rgba(74,222,128,.12); --warn: #fdb022; --warn-soft: rgba(253,176,34,.12);
+      --chip: rgba(255,255,255,.06);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #080c10; --card: rgba(255,255,255,.045); --card-solid: #11151b; --line: rgba(255,255,255,.09);
+    --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 20px 50px -30px rgba(0,0,0,.8);
+    --ink: #f2f4f7; --ink-2: #a3acb8; --ink-3: #6f7885; --field: rgba(255,255,255,.04);
+    --sun: #ffb224; --sun-ink: #ffb224; --sun-soft: rgba(255,178,36,.14); --net: #5b8cff;
+    --good: #4ade80; --good-soft: rgba(74,222,128,.12); --warn: #fdb022; --warn-soft: rgba(253,176,34,.12);
+    --chip: rgba(255,255,255,.06);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+         font: 15.5px/1.55 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  .t { font-family: "Inter Tight", "Inter", system-ui, sans-serif; letter-spacing: -.02em; }
+  main { max-width: 760px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px 48px; }
+  .top { display: flex; align-items: center; gap: 12px; padding: 6px 2px 18px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; text-decoration: none; color: inherit; }
+  .brand img { width: 28px; height: 28px; border-radius: 8px; }
+  .spacer { flex: 1; }
+  .top a.link { color: var(--ink-2); text-decoration: none; font-size: 14px; font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 38px); line-height: 1.1; margin: 0 0 8px; text-wrap: balance; }
+  h2 { font-size: 18px; margin: 0 0 8px; }
+  .lead { color: var(--ink-2); margin: 0 0 18px; font-size: 16px; max-width: 62ch; }
+  .muted { color: var(--ink-2); } .small { font-size: 13.5px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 20px; box-shadow: var(--shadow); margin-top: 14px; }
+  .status { display: flex; gap: 10px; align-items: flex-start; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 6px; flex: none; background: var(--ink-3); }
+  .dot.ok { background: var(--good); } .dot.wait { background: var(--sun); } .dot.bad { background: var(--warn); }
+  input, select, textarea { width: 100%; font: inherit; font-size: 16px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--field); color: var(--ink); }
+  input[type="checkbox"] { width: 20px; height: 20px; padding: 0; accent-color: var(--sun); }
+  label { font-weight: 600; font-size: 14px; }
+  .field { display: grid; gap: 6px; margin-bottom: 14px; }
+  .hint { font-size: 12.5px; color: var(--ink-3); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 4px; }
+  #cats { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+  #cats button { flex: none; }
+  .chips button { font: inherit; font-size: 13.5px; font-weight: 550; padding: 7px 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--card-solid); color: var(--ink-2); cursor: pointer; }
+  .chips button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn { font: inherit; font-weight: 600; font-size: 15px; border: 0; cursor: pointer; padding: 11px 20px; border-radius: 999px;
+         color: #1a1204; background: linear-gradient(180deg, #ffc44d, #ff9a1a); text-decoration: none; display: inline-flex; gap: 8px; align-items: center; }
+  .btn.ghost { background: var(--chip); color: var(--ink); }
+  .btn.small { padding: 7px 13px; font-size: 13.5px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--net); outline-offset: 2px; }
+  .results { display: grid; gap: 10px; margin-top: 14px; }
+  details.brandrow { background: var(--card-solid); border: 1px solid var(--line); border-radius: 18px; }
+  details.brandrow[open] { border-color: var(--ink-3); }
+  details.brandrow summary { list-style: none; cursor: pointer; padding: 14px 16px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; }
+  details.brandrow summary::-webkit-details-marker { display: none; }
+  .bname { font-weight: 650; }
+  .bmeta { font-size: 13px; color: var(--ink-2); grid-column: 1; overflow-wrap: anywhere; }
+  .pill { font-size: 12px; font-weight: 650; padding: 5px 10px; border-radius: 999px; background: var(--chip); color: var(--ink-2); white-space: nowrap; grid-column: 2; grid-row: 1 / span 2; }
+  .pill.direct { background: var(--good-soft); color: var(--good); }
+  .pill.motor { background: rgba(47,91,219,.12); color: var(--net); }
+  .pill.cloud { background: var(--sun-soft); color: var(--sun-ink); }
+  .routes { border-top: 1px solid var(--line); padding: 4px 16px 14px; display: grid; gap: 4px; }
+  .route { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; align-items: center; padding: 12px 0; border-bottom: 1px dashed var(--line); }
+  .route:last-child { border-bottom: 0; }
+  .route .rt { font-weight: 650; font-size: 14.5px; }
+  .route .rn, .route .rs { font-size: 13.5px; color: var(--ink-2); grid-column: 1; }
+  .route .rn b { color: var(--ink); } .route .rs a { color: var(--net); font-weight: 600; }
+  .route .go { grid-column: 2; grid-row: 1 / span 3; }
+  .tag { font-size: 11.5px; font-weight: 600; color: var(--ink-3); margin-left: 6px; }
+  @media (max-width: 560px) { .route { grid-template-columns: minmax(0, 1fr); } .route .go { grid-column: 1; grid-row: auto; margin-top: 6px; } }
+  .panel { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: grid; place-items: center; padding: 16px; z-index: 20; }
+  .panel .box { background: var(--card-solid); border-radius: 22px; padding: 22px; width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; box-shadow: 0 30px 80px -20px rgba(0,0,0,.5); }
+  .panel .acts { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+  .err { color: var(--warn); font-size: 14px; }
+  .ok { color: var(--good); font-weight: 600; }
+  .spin { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid var(--line); border-top-color: var(--sun); animation: spin .8s linear infinite; display: inline-block; vertical-align: -3px; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+  .entries { display: grid; gap: 6px; margin-top: 8px; }
+  .entry { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+  .entry span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .count { font-size: 13px; color: var(--ink-3); margin-top: 12px; }
+  .more { margin: 12px auto 0; display: block; }
+</style>
+<link rel="stylesheet" href="stijl.css">
+</head>
+<body>
+<main>
+  <header class="top">
+    <a class="brand" href="./"><img src="icon.svg" alt="">Zonnestuur</a>
+    <div class="spacer"></div>
+    <a class="link" href="instellingen">Instellingen</a>
+  </header>
+  <h1 class="t">Koppelen</h1>
+  <p class="lead">Zoek het merk van je apparaat. Je ziet meteen wat er nodig is, en met één knop koppel je het. Alles blijft in Zonnestuur.</p>
+
+  <section class="card" id="state"><div class="status"><span class="dot wait"></span><div class="small muted">Even kijken wat er al gekoppeld is…</div></div></section>
+
+  <div class="card">
+    <div class="field" style="margin:0"><label for="q">Merk of apparaat</label>
+      <input id="q" type="search" placeholder="Bijv. Daikin, Tesla, Miele, Shelly, warmtepomp" autocomplete="off"></div>
+    <div class="chips" id="cats"></div>
+    <p class="count" id="count"></p>
+  </div>
+  <div class="results" id="results"></div>
+  <button class="btn ghost more" id="more" hidden>Meer tonen</button>
+</main>
+
+<div class="panel" id="panel" hidden><div class="box" role="dialog" aria-modal="true" aria-labelledby="p_title">
+  <h2 class="t" id="p_title"></h2><div id="p_body"></div><p class="err" id="p_err" role="alert"></p>
+  <div class="acts" id="p_acts"></div>
+</div></div>
+
+<script>
+// Fouten in dit scherm melden aan Zonnestuur (die filtert en ontdubbelt); netwerkhaperingen tellen niet mee.
+window.zsFout = (function () { let n = 0; return function (msg, where) {
+  msg = String((msg && msg.message) || msg || ""); if (!msg || n++ > 5 || /Failed to fetch|NetworkError|Load failed|AbortError|HTTP 5\d\d|ResizeObserver/i.test(msg)) return;
+  let t = ""; try { t = localStorage.getItem("zs_token") || ""; } catch (e) {}
+  try { fetch("api/fout", { method: "POST", headers: { "Content-Type": "application/json", "X-Token": t }, body: JSON.stringify({ msg: msg.slice(0, 500), where: (String(where || "") + "\n" + location.pathname).slice(0, 3000) }) }).catch(() => {}); } catch (e) {}
+}; })();
+addEventListener("error", (e) => zsFout(e.message, (e.error && e.error.stack) || `${e.filename}:${e.lineno}:${e.colno}`));
+addEventListener("unhandledrejection", (e) => zsFout(e.reason, e.reason && e.reason.stack));
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let token = ""; try { token = localStorage.getItem("zs_token") || ""; } catch (e) {}
+async function api(path, opts = {}) {
+  opts.headers = Object.assign({ "X-Token": token, "Content-Type": "application/json" }, opts.headers || {});
+  const r = await fetch(path, opts);
+  if (r.status === 401) { const t = window.prompt ? prompt("Wachtwoord voor Zonnestuur") : ""; token = t || ""; try { localStorage.setItem("zs_token", token); } catch (e) {} return api(path, opts); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || "Er ging iets mis (" + r.status + ")");
+  if (d.type === "error") throw new Error(d.error);
+  return d;
+}
+const post = (path, body) => api(path, { method: "POST", body: JSON.stringify(body || {}) });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+let LIST = [], OV = {}, CAT = "", LIMIT = 40;
+const ZS_LINK = {
+  inverter: ["sunspec", "fronius", "sma", "solaredge", "huawei", "goodwe", "sungrow", "kostal", "opendtu", "ahoydtu", "apsystems", "enphase", "solax", "victron"],
+};
+function zsLink(key) {
+  if (ZS_LINK.inverter.includes(key)) return `instellingen?omvormer=${key}#feedCard`;
+  if (key === "laadpaal") return "setup#toevoegen";
+  if (key.startsWith("bat_")) return `instellingen?batterij=${key.slice(4)}#batCard`;
+  if (["p1_serial", "homewizard_p1", "shelly_em", "youless", "dsmr_reader", "esphome_p1", "mqtt_meter", "homey_meter"].includes(key)) return "instellingen#editCard";
+  if (["shelly", "shelly_gen1", "homewizard_socket", "tasmota", "esphome"].includes(key)) return "setup#toevoegen";
+  if (["domoticz", "openhab", "iobroker"].includes(key)) return "instellingen#sysCard";
+  return "instellingen#addCard";
+}
+function routeInfo(r, row) {
+  const [k, arg] = [r.route.split(":")[0], r.route.split(":").slice(1).join(":")];
+  const t = {
+    zonnestuur: ["Rechtstreeks met Zonnestuur", "direct"], ha: ["Via de koppelmotor", "motor"],
+    hacs: ["Via een extra koppeling (Zonnestuur installeert die)", "motor"], matter: ["Matter", "motor"], zigbee: ["Zigbee", "motor"],
+    evcc: [`Via evcc (${arg})`, "motor"], enode: ["Via de cloud (Enode)", "cloud"], relais: ["Met een relais of slimme stekker", ""],
+    meten: ["Meten met een slimme stekker", ""],
+  }[k] || [r.route, ""];
+  if (r.route === "zonnestuur:laadpaal") return { kind: k, arg, label: "Met de laadpaal, zonder de auto uit te lezen", cls: "direct" };
+  if (r.handmatig) return { kind: k, arg, label: "Nog niet met een knop", cls: "" };
+  return { kind: k, arg, label: t[0], cls: t[1] };
+}
+// Enode (betaald) alleen als je zelf een Enode-account hebt ingevuld; anders de gratis routes.
+const ENODE_DOET = { vehicle: "accupercentage uitlezen en laden starten en stoppen", charger: "laden starten en stoppen", hvac: "aan, uit en temperatuur",
+  battery: "laden en ontladen", inverter: "opwek uitlezen" };
+function routesOf(r) {
+  const extra = OV.enode ? (r.enode || []).map((k) => ({ route: "enode:" + k, zeker: true, sturen: ENODE_DOET[k] || "",
+    nodig: "Je eigen Enode-account (Instellingen → Auto's en laadpalen via de cloud)" })) : [];
+  return [...(r.routes || []), ...extra];
+}
+const PILL = { "met de laadpaal": ["Met de laadpaal", "direct"], "rechtstreeks": ["Rechtstreeks", "direct"], "via de koppelmotor": ["Koppelbaar", "motor"], "via de cloud (Enode)": ["Via de cloud", "cloud"], "met stekker of relais": ["Met stekker", ""], "met hulp": ["Met hulp", ""] };
+
+function connected(r) {
+  const i = routeInfo(r);
+  if (i.kind === "ha") return (OV.domains || []).includes(i.arg);
+  if (i.kind === "hacs") { const c = (OV.custom || {})[i.arg]; return !!c && (OV.domains || []).includes(c.domain); }
+  if (i.kind === "matter") return (OV.domains || []).includes("matter");
+  if (i.kind === "zigbee") return (OV.domains || []).includes("zha");
+  return false;
+}
+
+function stateCard() {
+  const m = OV.motor, el = $("state");
+  let dot = "ok", txt = "";
+  if (OV.mode === "motor") txt = `Koppelmotor draait in de Box. ${(OV.entries || []).length} koppelingen actief.`;
+  else if (OV.mode === "addon") txt = `Koppelmotor actief. ${(OV.entries || []).length} koppelingen actief.`;
+  else if (OV.mode === "ha") txt = `Gekoppeld met je eigen koppelmotor. ${(OV.entries || []).length} koppelingen actief.`;
+  else if (m && m.present) { dot = "wait"; txt = "De koppelmotor in de Box start op (de eerste keer duurt dat een paar minuten). Rechtstreekse koppelingen werken al."; }
+  else { dot = "wait"; txt = "Rechtstreekse koppelingen werken. Voor de andere merken is de koppelmotor nodig: die zit in de Zonnestuur Box."; }
+  const ents = (OV.entries || []).filter((e) => !["matter", "otbr", "thread", "sun", "met", "radio_browser", "google_translate", "shopping_list", "go2rtc", "backup"].includes(e.domain));
+  const dongles = (m && m.dongles) || [];
+  el.innerHTML = `<div class="status"><span class="dot ${dot}"></span><div style="flex:1;min-width:0"><div class="small">${esc(txt)}</div>
+    ${OV.error ? `<div class="small err">${esc(OV.error)}</div>` : ""}
+    ${ents.length ? `<details style="margin-top:8px"><summary class="small muted">Gekoppelde merken (${ents.length})</summary><div class="entries">${ents.map((e) =>
+      `<div class="entry"><span>${esc(e.title || e.domain)} <span class="tag">${esc(e.domain)}${e.state && e.state !== "loaded" ? " · " + esc(e.state) : ""}</span></span><button class="btn ghost small" data-rm="${esc(e.entry_id)}">Ontkoppelen</button></div>`).join("")}</div></details>` : ""}
+    ${dongles.length ? `<details style="margin-top:8px"><summary class="small muted">Aangesloten dongles (${dongles.length})</summary><div class="entries">${dongles.map((d) =>
+      `<div class="entry"><span>${esc(d.name)}${d.kind ? ` <span class="tag">${esc(d.kind)}</span>` : ""}</span><button class="btn ghost small" data-thread="${esc(d.path)}">Gebruik voor Thread</button></div>`).join("")}</div></details>` : ""}
+  </div></div>`;
+  el.querySelectorAll("[data-rm]").forEach((b) => b.onclick = async () => {
+    b.disabled = true; try { await post("api/koppel/remove", { entry_id: b.dataset.rm }); await load(); } catch (e) { alertPanel(e.message); }
+  });
+  el.querySelectorAll("[data-thread]").forEach((b) => b.onclick = async () => {
+    b.disabled = true; try { await post("api/koppel/thread", { path: b.dataset.thread }); b.textContent = "Thread aan"; } catch (e) { alertPanel(e.message); }
+  });
+}
+
+function render() {
+  const q = $("q").value.trim().toLowerCase();
+  const words = q.split(/\s+/).filter(Boolean);
+  const order = { groot: 0, middel: 1, klein: 2 };
+  const rows = LIST.filter((r) => (!CAT || r.categorie === CAT) && words.every((w) => (r.merk + " " + r.producten + " " + r.categorie).toLowerCase().includes(w)))
+    .sort((a, b) => (order[a.aandeel_nl] ?? 3) - (order[b.aandeel_nl] ?? 3) || a.merk.localeCompare(b.merk));
+  $("count").textContent = rows.length === LIST.length ? `${LIST.length} merken en apparaten. De meest voorkomende staan bovenaan.` : `${rows.length} gevonden.`;
+  $("results").innerHTML = rows.slice(0, LIMIT).map((r, i) => {
+    const p = PILL[r.zonnestuur] || ["", ""];
+    const on = routesOf(r).some(connected);
+    return `<details class="brandrow"><summary><span class="bname">${esc(r.merk)}</span>
+      <span class="pill ${on ? "direct" : p[1]}">${on ? "Gekoppeld" : esc(p[0])}</span>
+      <span class="bmeta">${esc(r.categorie)} · ${esc(r.producten)}</span></summary>
+      <div class="routes">${routesOf(r).map((rt, j) => {
+        const info = routeInfo(rt, r);
+        const tech = "";
+        return `<div class="route"><div class="rt">${j === 0 ? "" : "Of: "}${esc(info.label)}${tech}${rt.zeker === false ? '<span class="tag">nog niet bevestigd</span>' : ""}${connected(rt) ? '<span class="tag ok">gekoppeld</span>' : ""}</div>
+          <div class="rn"><b>Nodig:</b> ${esc(rt.nodig || "niets extra")}</div>
+          ${rt.sturen ? `<div class="rs">Zonnestuur kan dan: ${esc(rt.sturen)}</div>` : ""}
+          ${rt.handmatig ? `<div class="rs"><b>Met de hand:</b> ${esc(rt.uitleg || "dit kan nog niet met een knop")}${safeUrl(rt.link) ? ` <a href="${esc(rt.link)}" target="_blank" rel="noopener">Uitleg</a>` : ""}</div>` : ""}
+          <div class="go">${goButton(info, LIST.indexOf(r), j, rt)}</div></div>`;
+      }).join("")}</div></details>`;
+  }).join("");
+  $("more").hidden = rows.length <= LIMIT;
+  $("results").querySelectorAll("[data-go]").forEach((b) => b.onclick = () => { const [ri, j] = b.dataset.go.split(",").map(Number); go(LIST[ri], routesOf(LIST[ri])[j]); });
+}
+function goButton(info, ri, j, rt) {
+  if (rt && rt.handmatig) return "";                 // geen config-flow: kan niet met een knop (zie de uitleg)
+  if (info.kind === "zonnestuur") return `<a class="btn small" href="${zsLink(info.arg)}">Instellen</a>`;
+  if (info.kind === "relais" || info.kind === "meten") return `<a class="btn ghost small" href="setup#toevoegen">Stekker toevoegen</a>`;
+  return `<button class="btn small" data-go="${ri},${j}">Koppelen</button>`;
+}
+
+// ---------- paneel ----------
+let FLOW = null, BRAND = "";
+function panel(title, body, acts) {
+  $("panel").hidden = false; $("p_title").textContent = title; $("p_body").innerHTML = body; $("p_err").textContent = "";
+  $("p_acts").innerHTML = "";
+  (acts || [["Sluiten", closePanel, "ghost"]]).forEach(([label, fn, cls]) => {
+    const b = document.createElement("button"); b.className = "btn " + (cls || ""); b.textContent = label; b.onclick = fn; $("p_acts").appendChild(b);
+  });
+}
+function busy(text) { panel($("p_title").textContent || "Koppelen", `<p><span class="spin"></span>${esc(text)}</p>`, [["Sluiten", closePanel, "ghost"]]); }
+function alertPanel(msg) { panel("Dat lukte niet", `<p>${esc(msg)}</p>`); }
+async function closePanel() {
+  if (FLOW && FLOW.flow_id) { try { await post("api/koppel/abort", { flow_id: FLOW.flow_id }); } catch (e) {} }
+  FLOW = null; $("panel").hidden = true; load();
+}
+
+async function go(row, rt) {
+  const info = routeInfo(rt, row);
+  BRAND = row.merk;
+  try {
+    if (info.kind === "ha") { panel(row.merk, `<p><span class="spin"></span>Koppeling starten…</p>`); showStep(await post("api/koppel/start", { route: rt.route })); return; }
+    if (info.kind === "hacs") {
+      const have = (OV.custom || {})[info.arg];
+      if (have) { panel(row.merk, `<p><span class="spin"></span>Koppeling starten…</p>`); showStep(await post("api/koppel/start", { route: "ha:" + have.domain })); return; }
+      panel(row.merk, `<p>Hiervoor installeert Zonnestuur een extra koppeling (<b>${esc(info.arg)}</b>) en herstart de koppelmotor. Dat duurt 1 tot 3 minuten (op een Raspberry Pi soms wat langer).</p><p class="small muted">Nodig: ${esc(rt.nodig || "niets extra")}</p>`,
+        [["Annuleren", closePanel, "ghost"], ["Installeren en koppelen", async () => {
+          try { const r = await post("api/koppel/start", { route: rt.route }); const res = await job(r.job, row.merk);
+            panel(row.merk, `<p><span class="spin"></span>Koppeling starten… De eerste keer kan dat een minuut duren.</p>`);
+            showStep(await post("api/koppel/start", { route: "ha:" + res.domain })); }
+          catch (e) { $("p_err").textContent = e.message; }
+        }]]);
+      return;
+    }
+    if (info.kind === "matter") {
+      panel(`${row.merk} via Matter`, `<p>Pak de Matter-code van het apparaat of de verpakking: de cijfers onder de QR-code (11 of 21 cijfers), of de tekst die begint met <b>MT:</b>.</p>
+        <p class="small muted">Nodig: ${esc(rt.nodig || "niets extra")}</p><div class="field"><label for="m_code">Matter-code</label><input id="m_code" inputmode="text" autocomplete="off"></div>
+        <details><summary class="small muted">Nieuw wifi-apparaat? Wifi-gegevens</summary>
+          <p class="small muted">Een nieuw Matter-apparaat dat via wifi werkt, krijgt deze gegevens via bluetooth van de Box.</p>
+          <div class="field"><label for="m_ssid">Wifi-naam</label><input id="m_ssid" autocomplete="off"></div>
+          <div class="field"><label for="m_pw">Wifi-wachtwoord</label><input id="m_pw" type="password" autocomplete="off"></div></details>`,
+        [["Annuleren", closePanel, "ghost"], ["Koppelen", async () => {
+          try { const r = await post("api/koppel/matter", { code: $("m_code").value, ssid: $("m_ssid").value.trim(), password: $("m_pw").value }); await job(r.job, row.merk); done(row.merk); } catch (e) { $("p_err").textContent = e.message; }
+        }]]);
+      return;
+    }
+    if (info.kind === "zigbee") {
+      const r = await post("api/koppel/start", { route: "zigbee" });
+      if (r.type === "permit") { panel(`${row.merk} via Zigbee`, `<p>${esc(r.description)}</p><p class="small muted">Nodig: ${esc(rt.nodig || "")}</p>`, [["Klaar", () => done(row.merk)]]); return; }
+      showStep(r); return;
+    }
+    if (info.kind === "evcc") return evccForm(row, rt, info);
+    if (info.kind === "enode") {
+      panel(`${row.merk} via de cloud`, `<p>Zonnestuur gebruikt hiervoor Enode, een dienst die met veel merken officieel mag praten. Je logt in bij ${esc(row.merk)} en geeft toestemming.</p><p class="small muted">Nodig: ${esc(rt.nodig || "")}</p>`,
+        [["Annuleren", closePanel, "ghost"], ["Inloggen bij " + row.merk, async () => {
+          try { const r = await post("api/koppel/start", { route: rt.route, vendor: "" }); openUrl(r.url); enodeChoose(info.arg, row.merk); }
+          catch (e) { $("p_err").textContent = e.message; }
+        }]]);
+    }
+  } catch (e) { alertPanel(e.message); }
+}
+
+async function job(id, title) {
+  for (;;) {
+    const j = await api("api/koppel/job/" + id);
+    if (j.status === "klaar") return j.result || {};
+    if (j.status === "fout") throw new Error(j.error);
+    panel(title, `<p><span class="spin"></span>${esc(j.step || "Bezig…")}</p>`, [["Op de achtergrond laten doorgaan", () => { $("panel").hidden = true; }, "ghost"]]);
+    await sleep(2500);
+  }
+}
+function done(title, extra) {
+  FLOW = null;
+  panel(title, `<p class="ok">Gekoppeld.</p><p class="muted">${extra ? esc(extra) + " " : ""}Kies nu wat Zonnestuur ermee moet doen: de nieuwe apparaten staan klaar bij <b>Apparaat toevoegen</b>.</p>`,
+    [["Sluiten", closePanel, "ghost"], ["Apparaat toevoegen", () => { location.href = "setup#toevoegen"; }]]);
+}
+
+const safeUrl = (u) => /^https?:\/\//i.test(String(u || "")) ? String(u) : "";
+function openUrl(u) { const s = safeUrl(u); if (s) window.open(s, "_blank", "noopener"); }
+function fieldHtml(f, err) {
+  const id = "f_" + String(f.name).replace(/[^\w-]/g, "_"), v = f.default ?? "";
+  const lab = `<label for="${id}">${esc(f.label)}${f.required ? "" : ' <span class="tag">optioneel</span>'}</label>`;
+  const help = f.help ? `<span class="hint">${esc(f.help)}</span>` : "";
+  const e = err ? `<span class="err small">${esc(err)}</span>` : "";
+  if (f.kind === "boolean") return `<div class="field"><label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="${id}" ${v ? "checked" : ""}> ${esc(f.label)}</label>${help}${e}</div>`;
+  if (f.kind === "select" || f.kind === "multi") return `<div class="field">${lab}<select id="${id}" ${f.kind === "multi" ? "multiple" : ""}>${(f.options || []).map(([ov, ol]) => `<option value="${esc(ov)}" ${String(ov) === String(v) || (Array.isArray(v) && v.includes(ov)) ? "selected" : ""}>${esc(ol)}</option>`).join("")}</select>${help}${e}</div>`;
+  if (f.kind === "textarea") return `<div class="field">${lab}<textarea id="${id}" rows="4">${esc(v)}</textarea>${help}${e}</div>`;
+  const type = f.kind === "password" ? "password" : f.kind === "number" ? "number" : "text";
+  return `<div class="field">${lab}<input id="${esc(id)}" type="${type}" ${f.step ? `step="${esc(f.step)}"` : ""} value="${esc(v)}" autocomplete="off">${help}${e}</div>`;
+}
+function readFields(fields) {
+  const out = {};
+  fields.forEach((f) => {
+    const el = $("f_" + String(f.name).replace(/[^\w-]/g, "_")); if (!el) return;
+    if (f.kind === "boolean") out[f.name] = el.checked;
+    else if (f.kind === "multi") out[f.name] = [...el.selectedOptions].map((o) => o.value);
+    else if (f.kind === "select") { const o = (f.options || []).find(([ov]) => String(ov) === el.value); out[f.name] = o ? o[0] : el.value; }
+    else out[f.name] = el.value;
+  });
+  return out;
+}
+async function showStep(r) {
+  FLOW = r;
+  const title = r.title || BRAND || (r.domain || "").replace(/_/g, " ");
+  if (r.type === "form") {
+    const errs = r.errors || {}, names = (r.fields || []).map((f) => f.name);
+    // fouten die niet bij een veld horen (algemeen, of een veld dat Zonnestuur niet toont) bovenaan
+    const los = Object.entries(errs).filter(([k]) => !names.includes(k)).map(([k, v]) => k === "base" ? v : `${k.replace(/_/g, " ")}: ${v}`);
+    panel(title || "Koppelen", `${r.description ? `<p class="muted">${esc(r.description).replace(/\n/g, "<br>")}</p>` : ""}${los.map((t) => `<p class="err">${esc(t)}</p>`).join("")}${(r.fields || []).map((f) => fieldHtml(f, errs[f.name])).join("")}`,
+      [["Annuleren", closePanel, "ghost"], ["Verder", async () => {
+        try { showStep(await post("api/koppel/step", { domain: r.domain, flow_id: r.flow_id, values: readFields(r.fields || []) })); } catch (e) { $("p_err").textContent = e.message; }
+      }]]);
+  } else if (r.type === "menu") {
+    panel(title || "Kies", `${r.description ? `<p class="muted">${esc(r.description)}</p>` : ""}<div class="chips">${(r.options || []).map(([v, l]) => `<button data-menu="${esc(v)}">${esc(l)}</button>`).join("")}</div>`);
+    $("p_body").querySelectorAll("[data-menu]").forEach((b) => b.onclick = async () => {
+      try { showStep(await post("api/koppel/step", { domain: r.domain, flow_id: r.flow_id, values: { next_step_id: b.dataset.menu } })); } catch (e) { $("p_err").textContent = e.message; }
+    });
+  } else if (r.type === "external") {
+    panel(title || "Inloggen", `<p>${esc(r.description)}</p><p class="small muted">Vraagt een pagina om het adres van je installatie? Vul dan ${OV.mode === "motor" ? `<b>${esc(location.protocol + "//" + location.hostname + ":8123")}</b>` : "het adres in waarop je installatie opent"}.</p><p><span class="spin"></span>Wachten tot je bent ingelogd…</p>`,
+      [["Annuleren", closePanel, "ghost"], ["Inlogvenster openen", () => openUrl(r.url)]]);
+    openUrl(r.url);
+    poll(r);
+  } else if (r.type === "progress") {
+    panel(title || "Bezig", `<p><span class="spin"></span>${esc(r.description || "Even geduld…")}</p>`); poll(r);
+  } else if (r.type === "create_entry") { done(r.title || "Gekoppeld");
+  } else if (r.type === "abort" && ["missing_credentials", "missing_configuration", "oauth_implementation_unavailable", "no_implementations"].includes(r.reason)) {
+    FLOW = null;
+    panel(title, `<p>${esc(BRAND || "Dit merk")} werkt via een inlog bij de fabrikant. Daarvoor moet Zonnestuur bij de fabrikant zijn aangemeld; dat regelen wij centraal en komt vanzelf beschikbaar.</p>
+      <p class="muted small">Heb je zelf ontwikkelaarsgegevens van ${esc(BRAND || "de fabrikant")} (client ID en geheim)? Vul ze hier in, dan kun je nu al koppelen. Gebruik als terugstuuradres <b>https://my.home-assistant.io/redirect/oauth</b>.</p>
+      <div class="field"><label for="c_id">Client ID</label><input id="c_id" autocomplete="off"></div>
+      <div class="field"><label for="c_sec">Client secret</label><input id="c_sec" type="password" autocomplete="off"></div>`,
+      [["Sluiten", closePanel, "ghost"], ["Opslaan en koppelen", async () => {
+        try { showStep(await post("api/koppel/credentials", { domain: r.domain, client_id: $("c_id").value.trim(), client_secret: $("c_sec").value.trim() })); }
+        catch (e) { $("p_err").textContent = e.message; }
+      }]]);
+  } else if (r.type === "abort") {
+    FLOW = null;
+    const known = ["already_configured", "single_instance_allowed", "already_in_progress"].includes(r.reason);
+    panel(title || "Koppelen", `<p class="${known ? "ok" : ""}">${esc(r.description || r.reason)}</p>`);
+  } else { alertPanel(r.error || "Onverwacht antwoord"); }
+}
+async function poll(r) {
+  const me = r.flow_id;
+  for (let i = 0; i < 400 && FLOW && FLOW.flow_id === me; i++) {
+    await sleep(3000);
+    try { const n = await api(`api/koppel/flow?domain=${encodeURIComponent(r.domain)}&flow_id=${encodeURIComponent(me)}`); if (n.type !== r.type) return showStep(n); }
+    catch (e) { $("p_err").textContent = e.message; return; }
+  }
+}
+
+// ---------- evcc ----------
+function evccForm(row, rt, info) {
+  const kind = row.categorie === "Elektrische auto" ? "vehicle" : "charger";
+  const fields = kind === "vehicle"
+    ? [["user", "E-mailadres van je account bij het merk", "text"], ["password", "Wachtwoord", "password"], ["vin", "Chassisnummer (VIN, optioneel)", "text"]]
+    : [["host", "IP-adres van de laadpaal", "text"], ["user", "Gebruiker (als die er is)", "text"], ["password", "Wachtwoord (als dat er is)", "password"], ["ski", "SKI (alleen bij EEBUS)", "text"]];
+  panel(`${row.merk} via evcc`, `<p class="small muted">Nodig: ${esc(rt.nodig || "")}</p>${fields.map(([n, l, t]) => `<div class="field"><label for="e_${n}">${esc(l)}</label><input id="e_${n}" type="${t}" autocomplete="off"></div>`).join("")}
+    <div class="field"><label for="e_sp">evcc-sponsortoken <span class="tag">optioneel; sommige merken</span></label><input id="e_sp" autocomplete="off"></div>`,
+    [["Annuleren", closePanel, "ghost"], ["Koppelen", async () => {
+      const params = {}; fields.forEach(([n]) => { const v = $("e_" + n).value.trim(); if (v) params[n] = v; });
+      try {
+        const r = await post("api/koppel/evcc", { kind, template: info.arg, params, title: row.merk, sponsortoken: $("e_sp").value.trim() });
+        const res = await job(r.job, row.merk);
+        await post("api/koppel/device", { source: "evcc", loadpoint: res.loadpoint, name: row.merk });
+        done(row.merk, res.soc != null ? `Laadniveau nu ${Math.round(res.soc)}%.` : "");
+      } catch (e) { $("p_err").textContent = e.message; }
+    }]]);
+}
+
+// ---------- Enode ----------
+async function enodeChoose(kind, title) {
+  panel(title || "Kies je apparaat", `<p><span class="spin"></span>Na het inloggen verschijnen je apparaten hier.</p>`, [["Sluiten", closePanel, "ghost"]]);
+  for (let i = 0; i < 100 && !$("panel").hidden; i++) {
+    try {
+      const r = await api("api/koppel/enode/devices?kind=" + encodeURIComponent(kind));
+      if ((r.devices || []).length) {
+        const readOnly = kind === "hvac" || kind === "inverter";
+        panel(title || "Kies je apparaat", `${readOnly ? '<p class="muted">Gekoppeld. Zonnestuur leest dit apparaat uit via Enode; sturen gaat via de andere route bij dit merk.</p>' : ""}<div class="entries">${r.devices.map((d) => `<div class="entry"><span>${esc(d.name)}${d.soc != null ? ` <span class="tag">${Math.round(d.soc)}%</span>` : ""}</span>${readOnly ? "" : `<button class="btn small" data-en="${esc(d.id)}" data-name="${esc(d.name)}">Toevoegen</button>`}</div>`).join("")}</div>`);
+        const src = { charger: "enode_charger", vehicle: "enode_vehicle", battery: "enode_battery" }[kind];
+        $("p_body").querySelectorAll("[data-en]").forEach((b) => b.onclick = async () => {
+          try { const r2 = await post("api/koppel/device", { source: src, id: b.dataset.en, name: b.dataset.name }); done(b.dataset.name, r2.note || ""); }
+          catch (e) { $("p_err").textContent = e.message; }
+        });
+        return;
+      }
+    } catch (e) { $("p_err").textContent = e.message; return; }
+    await sleep(4000);
+  }
+}
+
+// ---------- laden ----------
+async function load() {
+  try { OV = await api("api/koppel"); } catch (e) { OV = { error: e.message }; }
+  stateCard(); render();
+}
+(async () => {
+  try { LIST = await (await fetch("koppellijst.json")).json(); } catch (e) { LIST = []; }
+  const cats = [...new Set(LIST.map((r) => r.categorie))].sort();
+  $("cats").innerHTML = `<button class="on" data-c="">Alles</button>` + cats.map((c) => `<button data-c="${esc(c)}">${esc(c)}</button>`).join("");
+  $("cats").querySelectorAll("button").forEach((b) => b.onclick = () => { CAT = b.dataset.c; LIMIT = 40; $("cats").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); render(); });
+  $("q").oninput = () => { LIMIT = 40; render(); };
+  $("more").onclick = () => { LIMIT += 60; render(); };
+  const qp = new URLSearchParams(location.search); if (qp.get("q")) $("q").value = qp.get("q");
+  render();
+  await load();
+  const m = location.hash.match(/^#enode-(\w+)/); if (m) enodeChoose(m[1]);
+})();
+</script>
+</body>
+</html>

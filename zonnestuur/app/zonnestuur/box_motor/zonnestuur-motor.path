@@ -1,0 +1,11 @@
+[Unit]
+Description=Zonnestuur motor: onderdelen aan/uit volgen
+
+[Path]
+PathChanged=/var/lib/zonnestuur/motor/profiles
+PathChanged=/var/lib/zonnestuur/motor/motor.env
+PathChanged=/var/lib/zonnestuur/evcc/evcc.yaml
+Unit=zonnestuur-motor-restart.service
+
+[Install]
+WantedBy=multi-user.target

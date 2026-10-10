@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#e9eef2" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#0d151d" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Zonnestuur hulp</title>
+<style>
+/* In een app-webweergave: doorslepen bovenaan mag niet doorgaan naar 'trek omlaag om te verversen' van de app. */
+html, body { overscroll-behavior-y: none; }
+
+  @font-face { font-family: "Inter"; src: url("fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Inter Tight"; src: url("fonts/inter-tight.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  :root {
+    color-scheme: light;
+    --bg: #e8ecef; --card: rgba(255,255,255,.82); --card-solid: #fff; --line: rgba(14,17,22,.08);
+    --shadow: 0 1px 2px rgba(14,17,22,.04), 0 8px 28px -12px rgba(14,17,22,.12);
+    --ink: #0e1116; --ink-2: #5c6470; --ink-3: #8a919b; --field: #fff;
+    --sun: #e08600; --sun-ink: #9a5b00; --sun-soft: rgba(255,178,36,.16); --net: #2f5bdb;
+    --good: #1f8a4c; --good-soft: rgba(31,138,76,.12); --warn: #b54708; --warn-soft: rgba(181,71,8,.10);
+    --chip: rgba(14,17,22,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --bg: #080c10; --card: rgba(255,255,255,.045); --card-solid: #11151b; --line: rgba(255,255,255,.09);
+      --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 20px 50px -30px rgba(0,0,0,.8);
+      --ink: #f2f4f7; --ink-2: #a3acb8; --ink-3: #6f7885; --field: rgba(255,255,255,.04);
+      --sun: #ffb224; --sun-ink: #ffb224; --sun-soft: rgba(255,178,36,.14); --net: #5b8cff;
+      --good: #4ade80; --good-soft: rgba(74,222,128,.12); --warn: #fdb022; --warn-soft: rgba(253,176,34,.12);
+      --chip: rgba(255,255,255,.06);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #080c10; --card: rgba(255,255,255,.045); --card-solid: #11151b; --line: rgba(255,255,255,.09);
+    --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 20px 50px -30px rgba(0,0,0,.8);
+    --ink: #f2f4f7; --ink-2: #a3acb8; --ink-3: #6f7885; --field: rgba(255,255,255,.04);
+    --sun: #ffb224; --sun-ink: #ffb224; --sun-soft: rgba(255,178,36,.14); --net: #5b8cff;
+    --good: #4ade80; --good-soft: rgba(74,222,128,.12); --warn: #fdb022; --warn-soft: rgba(253,176,34,.12);
+    --chip: rgba(255,255,255,.06);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+         font: 15.5px/1.55 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  .t { font-family: "Inter Tight", "Inter", system-ui, sans-serif; letter-spacing: -.02em; }
+  main { max-width: 760px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px 48px; }
+  .top { display: flex; align-items: center; gap: 12px; padding: 6px 2px 18px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; text-decoration: none; color: inherit; }
+  .brand img { width: 28px; height: 28px; border-radius: 8px; }
+  .spacer { flex: 1; }
+  .top a.link { color: var(--ink-2); text-decoration: none; font-size: 14px; font-weight: 600; }
+  h1 { font-size: clamp(28px, 5vw, 38px); line-height: 1.1; margin: 0 0 8px; text-wrap: balance; }
+  h2 { font-size: 18px; margin: 0 0 8px; }
+  .lead { color: var(--ink-2); margin: 0 0 18px; font-size: 16px; max-width: 62ch; }
+  .muted { color: var(--ink-2); } .small { font-size: 13.5px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 20px; box-shadow: var(--shadow); margin-top: 14px; }
+  .status { display: flex; gap: 10px; align-items: flex-start; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 6px; flex: none; background: var(--ink-3); }
+  .dot.ok { background: var(--good); } .dot.wait { background: var(--sun); } .dot.bad { background: var(--warn); }
+  input, select, textarea { width: 100%; font: inherit; font-size: 16px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--field); color: var(--ink); }
+  input[type="checkbox"] { width: 20px; height: 20px; padding: 0; accent-color: var(--sun); }
+  label { font-weight: 600; font-size: 14px; }
+  .field { display: grid; gap: 6px; margin-bottom: 14px; }
+  .hint { font-size: 12.5px; color: var(--ink-3); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 4px; }
+  #cats { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+  #cats button { flex: none; }
+  .chips button { font: inherit; font-size: 13.5px; font-weight: 550; padding: 7px 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--card-solid); color: var(--ink-2); cursor: pointer; }
+  .chips button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn { font: inherit; font-weight: 600; font-size: 15px; border: 0; cursor: pointer; padding: 11px 20px; border-radius: 999px;
+         color: #1a1204; background: linear-gradient(180deg, #ffc44d, #ff9a1a); text-decoration: none; display: inline-flex; gap: 8px; align-items: center; }
+  .btn.ghost { background: var(--chip); color: var(--ink); }
+  .btn.small { padding: 7px 13px; font-size: 13.5px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--net); outline-offset: 2px; }
+  .err { color: var(--warn); font-size: 14px; }
+  .ok { color: var(--good); font-weight: 600; }
+  .spin { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid var(--line); border-top-color: var(--sun); animation: spin .8s linear infinite; display: inline-block; vertical-align: -3px; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+  .checks { display: grid; gap: 2px; margin-top: 6px; }
+  .chk { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 2px 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .chk:last-child { border-bottom: 0; }
+  .chk i { width: 12px; height: 12px; border-radius: 50%; margin-top: 6px; background: var(--good); }
+  .chk.warn i { background: var(--sun); } .chk.bad i { background: var(--warn); }
+  .chk b { font-weight: 650; }
+  .chk span { grid-column: 2; font-size: 14px; color: var(--ink-2); overflow-wrap: anywhere; }
+  textarea { min-height: 130px; resize: vertical; }
+  pre { background: var(--chip); border-radius: 12px; padding: 12px; font-size: 12px; max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .sw { display: flex; gap: 12px; align-items: flex-start; padding: 6px 0; cursor: pointer; font-weight: 500; }
+  .sw input { margin-top: 3px; flex: none; }
+  .sw b { display: block; font-weight: 650; }
+  .sw span { font-size: 13.5px; color: var(--ink-2); }
+  .acts { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+</style>
+<link rel="stylesheet" href="stijl.css">
+</head>
+<body>
+<main>
+  <header class="top">
+    <a class="brand" href="./"><img src="icon.svg" alt="">Zonnestuur</a>
+    <div class="spacer"></div>
+    <a class="link" href="instellingen">Instellingen</a>
+  </header>
+  <h1 class="t">Hulp en diagnose</h1>
+  <p class="lead">Hier zie je of alles werkt. Gaat er iets mis, of heb je een idee of vraag? Laat het hieronder weten.</p>
+
+  <section class="card" id="stat"><h2 class="t">Hoe gaat het</h2><div class="checks" id="checks"><p class="small muted"><span class="spin"></span>Controleren…</p></div></section>
+
+  <section class="card" id="meld"><h2 class="t">Feedback geven</h2>
+    <p class="small muted" style="margin:0">Alles wat je hier stuurt, lezen we zelf. Proefhuizen helpen zo Zonnestuur beter te maken.</p>
+    <div class="chips" id="soort" role="radiogroup" aria-label="Waar gaat het over?">
+      <button type="button" role="radio" data-soort="probleem" class="on" aria-checked="true">Er gaat iets mis</button>
+      <button type="button" role="radio" data-soort="idee" aria-checked="false">Ik heb een idee</button>
+      <button type="button" role="radio" data-soort="vraag" aria-checked="false">Ik heb een vraag</button>
+    </div>
+    <div class="field" style="margin-top:10px"><label for="m_tekst" id="m_label">Wat gaat er mis?</label>
+      <textarea id="m_tekst" maxlength="4000" placeholder="Bijv. de boiler ging vanochtend niet aan, terwijl de stroom goedkoop was."></textarea></div>
+    <div class="field"><label for="m_contact">Hoe kunnen we je bereiken? <span class="muted" style="font-weight:400">(niet verplicht)</span></label>
+      <input id="m_contact" maxlength="200" placeholder="E-mailadres of telefoonnummer" autocomplete="email"></div>
+    <details id="m_diag"><summary class="small muted" style="cursor:pointer">Bekijk wat er wordt meegestuurd</summary>
+      <p class="small muted">Je versie, je apparaten (zonder namen van netwerken of adressen), de status en de laatste logregels. Wachtwoorden, tokens, e-mailadressen en IP-adressen worden eruit gefilterd.</p>
+      <pre id="diag">Laden…</pre></details>
+    <p class="small muted" id="m_alleen" hidden>Alleen je tekst en de versie van Zonnestuur worden meegestuurd.</p>
+    <div class="acts" style="margin-top:14px"><button class="btn" id="m_send">Versturen</button><span id="m_msg" class="small" role="status"></span></div>
+  </section>
+
+  <section class="card"><h2 class="t">Contact met Zonnestuur</h2>
+    <label class="sw"><input type="checkbox" id="auto"><div><b>Stuur fouten automatisch naar Zonnestuur</b>
+      <span>Alleen wat er technisch misging en in welke versie, zonder persoonlijke gegevens. Zo kunnen we fouten oplossen voordat je ze merkt.</span></div></label>
+    <label class="sw"><input type="checkbox" id="seintje"><div><b>Laat weten dat Zonnestuur draait</b>
+      <span>Een paar keer per dag: installatie-ID, versie, Add-on of Box, proef/Pro/Basis en welke soort apparaten (boiler, auto, …). Geen namen, adressen of meterstanden. Zo weten we hoeveel huizen Zonnestuur gebruiken, en kunnen we je proefperiode verlengen.</span></div></label>
+    <label class="sw"><input type="checkbox" id="test"><div><b>Nieuwe versies als eerste krijgen</b>
+      <span>Voor proefhuizen: je krijgt verbeteringen eerder, en meldt zo sneller wat er nog niet goed gaat.</span></div></label>
+    <span id="a_msg" class="small" role="status"></span>
+  </section>
+</main>
+<script>
+try { const t = localStorage.getItem("zs_theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let token = ""; try { token = localStorage.getItem("zs_token") || ""; } catch (e) {}
+async function api(path, opts = {}) {
+  opts.headers = Object.assign({ "X-Token": token, "Content-Type": "application/json" }, opts.headers || {});
+  const r = await fetch(path, opts);
+  if (r.status === 401) { const t = window.prompt ? prompt("Wachtwoord voor Zonnestuur") : ""; token = t || ""; try { localStorage.setItem("zs_token", token); } catch (e) {} return api(path, opts); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.error) throw new Error(d.error || "Er ging iets mis (" + r.status + ")");
+  return d;
+}
+const post = (path, body) => api(path, { method: "POST", body: JSON.stringify(body || {}) });
+
+function checks(d) {
+  const out = [];
+  const add = (ok, titel, tekst) => out.push(`<div class="chk ${ok === true ? "" : ok === "warn" ? "warn" : "bad"}"><i></i><b>${esc(titel)}</b><span>${esc(tekst)}</span></div>`);
+  add(d.meter_online !== false, "Slimme meter", d.meter_online === false ? "Geen metingen. Controleer of de meter (of de sensor in de koppelmotor) nog stroom en wifi heeft." : "Meet gewoon.");
+  add(d.ha !== "geen" ? true : "warn", "Koppelmotor", { "add-on": "De koppelmotor draait.", motor: "De ingebouwde koppelmotor draait.", eigen: "Gekoppeld met je eigen koppelmotor.", geen: "Niet gekoppeld; dat is alleen nodig voor apparaten die via de koppelmotor gaan." }[d.ha] || d.ha);
+  for (const a of d.apparaten || []) {
+    const ok = a.online ? true : /wacht/.test(a.waarom || "") ? true : "bad";
+    add(ok, a.naam || a.id, a.online ? (a.waarom || "werkt") : /wacht/.test(a.waarom || "") ? a.waarom : `Niet bereikbaar${a.waarom ? ": " + a.waarom : ""}. Staat het apparaat aan en op het netwerk?`);
+  }
+  const fails = (d.gezondheid || {}).failed_today || 0;
+  add(fails ? "warn" : true, "Schakelen vandaag", fails ? `${fails} keer lukte schakelen niet; Zonnestuur probeerde het opnieuw.` : `${(d.gezondheid || {}).switches_today || 0} keer geschakeld, zonder problemen.`);
+  const f = d.fouten || [];
+  add(f.length ? "warn" : true, "Fouten in Zonnestuur", f.length ? `Laatste: ${f[0].msg} (${f[0].at})` : "Geen fouten sinds de laatste start.");
+  add(true, "Versie", `${d.versie}${d.kanaal === "test" ? " (testkanaal)" : ""}`);
+  $("checks").innerHTML = out.join("");
+}
+let CFG = null;
+async function laad() {
+  try { const d = await api("api/diagnose"); checks(d); $("diag").textContent = JSON.stringify(d, null, 1); }
+  catch (e) { $("checks").innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+  try { CFG = await api("api/config"); $("auto").checked = CFG.fouten_melden !== false; $("seintje").checked = CFG.seintje !== false; $("test").checked = CFG.kanaal === "test"; } catch (e) {}
+}
+async function bewaar() {
+  if (!CFG) return;
+  CFG.fouten_melden = $("auto").checked; CFG.seintje = $("seintje").checked; CFG.kanaal = $("test").checked ? "test" : "stabiel";
+  try { await post("api/config", CFG); $("a_msg").innerHTML = '<span class="ok">Opgeslagen</span>'; } catch (e) { $("a_msg").innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  setTimeout(() => { $("a_msg").textContent = ""; }, 2500);
+}
+$("auto").onchange = bewaar; $("seintje").onchange = bewaar; $("test").onchange = bewaar;
+const SOORT = {
+  probleem: ["Wat gaat er mis?", "Bijv. de boiler ging vanochtend niet aan, terwijl de stroom goedkoop was.", "Beschrijf kort wat er mis is."],
+  idee: ["Wat is je idee?", "Bijv. ik zou ook mijn vaatwasser willen laten wachten op de zon.", "Schrijf kort je idee op."],
+  vraag: ["Wat is je vraag?", "Bijv. waarom ging de boiler vandaag om 14:00 aan?", "Schrijf kort je vraag op."],
+};
+let soort = "probleem";
+function kies(k) {
+  if (!SOORT[k]) return;
+  soort = k;
+  document.querySelectorAll("#soort button").forEach((b) => { const on = b.dataset.soort === k; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); });
+  $("m_label").textContent = SOORT[k][0]; $("m_tekst").placeholder = SOORT[k][1];
+  $("m_diag").hidden = k !== "probleem"; $("m_alleen").hidden = k === "probleem"; $("m_msg").textContent = "";
+}
+document.querySelectorAll("#soort button").forEach((b) => { b.onclick = () => kies(b.dataset.soort); });
+$("m_send").onclick = async () => {
+  const b = $("m_send"), t = $("m_tekst").value.trim();
+  if (!t) { $("m_msg").innerHTML = `<span class="err">${SOORT[soort][2]}</span>`; $("m_tekst").focus(); return; }
+  b.disabled = true; $("m_msg").innerHTML = '<span class="spin"></span>Versturen…';
+  try {
+    const r = await post("api/melding", { tekst: t, contact: $("m_contact").value.trim(), soort });
+    $("m_msg").innerHTML = `<span class="ok">Verstuurd${r.nummer ? ` (nummer ${esc(r.nummer)})` : ""}. Dank je wel!</span>`;
+    $("m_tekst").value = "";
+  } catch (e) { $("m_msg").innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  b.disabled = false;
+};
+{ const q = new URLSearchParams(location.search).get("soort"); if (q) kies(q);
+  if (location.hash === "#meld") setTimeout(() => { $("meld").scrollIntoView({ block: "start" }); }, 50); }
+laad();
+</script>
+</body>
+</html>

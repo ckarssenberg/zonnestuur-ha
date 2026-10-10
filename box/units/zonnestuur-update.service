@@ -1,0 +1,11 @@
+[Unit]
+Description=Zonnestuur - nieuwe versie ophalen en installeren
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=PYTHONPATH=/opt/zonnestuur/current
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -m zonnestuur.updater
+TimeoutStartSec=15min

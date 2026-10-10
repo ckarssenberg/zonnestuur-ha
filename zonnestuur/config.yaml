@@ -1,0 +1,28 @@
+name: Zonnestuur
+version: "0.46.3"
+slug: zonnestuur
+description: Laat boiler, warmtepomp en auto draaien op je eigen zonnestroom
+url: https://github.com/zonnestuur/zonnestuur-ha
+arch:
+  - aarch64
+  - amd64
+  - armv7
+init: false
+startup: application
+boot: auto
+host_network: true          # nodig om P1-meters en slimme stekkers in je netwerk te vinden
+ingress: true
+ingress_port: 0            # Home Assistant kiest zelf een vrije poort (8099 is vaak al bezet)
+panel_icon: mdi:solar-power-variant
+panel_title: Zonnestuur
+homeassistant_api: true     # geeft een token om apparaten via Home Assistant te sturen
+hassio_api: true            # om de toegewezen ingress-poort op te vragen
+map:
+  - type: homeassistant_config   # kaarten in /config/www/zonnestuur, en integraties installeren (Koppelen)
+    read_only: false
+services:
+  - mqtt:want               # gebruikt automatisch de Mosquitto-broker als die er is
+options:
+  log_level: info
+schema:
+  log_level: list(debug|info|warning)

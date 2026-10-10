@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Wifi instellen · Zonnestuur</title>
+<style>
+/* In een app-webweergave: doorslepen bovenaan mag niet doorgaan naar 'trek omlaag om te verversen' van de app. */
+html, body { overscroll-behavior-y: none; }
+
+  @font-face { font-family: "Inter"; src: url("fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Inter Tight"; src: url("fonts/inter-tight.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  :root {
+    color-scheme: light;
+    --bg: #f3f2ec; --card: #fff; --line: rgba(14,17,22,.09); --ink: #0e1116; --ink-2: #5c6470; --ink-3: #8a919b;
+    --sun: #e08600; --sun-soft: rgba(255,178,36,.16); --good: #1f8a4c; --warn: #b54708; --warn-soft: rgba(181,71,8,.10);
+    --chip: rgba(14,17,22,.05); --field: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #07090c; --card: #11151b; --line: rgba(255,255,255,.09); --ink: #f2f4f7; --ink-2: #a3acb8; --ink-3: #6f7885;
+      --sun: #ffb224; --sun-soft: rgba(255,178,36,.14); --good: #4ade80; --warn: #fdb022; --warn-soft: rgba(253,176,34,.12);
+      --chip: rgba(255,255,255,.06); --field: rgba(255,255,255,.04);
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  main { max-width: 480px; margin: 0 auto; padding: max(20px, env(safe-area-inset-top)) 16px 40px; display: grid; gap: 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; }
+  .brand img { width: 28px; height: 28px; border-radius: 8px; }
+  h1 { font: 650 26px/1.2 "Inter Tight", "Inter", system-ui, sans-serif; letter-spacing: -.02em; margin: 4px 0 0; text-wrap: balance; }
+  p { margin: 0; color: var(--ink-2); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 8px; }
+  .net { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 12px; border: 0; border-radius: 14px;
+         background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .net:hover, .net:focus-visible { background: var(--chip); outline: none; }
+  .net.on { background: var(--sun-soft); }
+  .net .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+  .bars { display: flex; align-items: flex-end; gap: 2px; height: 14px; }
+  .bars i { width: 4px; border-radius: 1px; background: var(--ink-3); opacity: .3; }
+  .bars i.f { opacity: 1; }
+  .lock { width: 14px; height: 14px; color: var(--ink-3); }
+  label { display: grid; gap: 6px; font-weight: 550; font-size: 14.5px; }
+  input { font: inherit; padding: 13px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--field); color: var(--ink); }
+  input:focus-visible { outline: 2px solid var(--sun); outline-offset: 1px; }
+  .btn { font: 600 16px/1 "Inter", system-ui, sans-serif; padding: 15px 18px; border-radius: 14px; border: 0;
+         background: var(--sun); color: #1b1200; cursor: pointer; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .alert { padding: 12px 14px; border-radius: 14px; background: var(--warn-soft); color: var(--warn); font-weight: 550; }
+  .done { display: grid; gap: 10px; }
+  .done b { color: var(--ink); }
+  .addr { font: 600 18px/1.3 ui-monospace, "SF Mono", Menlo, monospace; color: var(--ink); }
+  .muted { color: var(--ink-3); font-size: 14px; }
+  form { display: grid; gap: 14px; }
+</style>
+<link rel="stylesheet" href="stijl.css">
+</head>
+<body>
+<main>
+  <div class="brand"><img src="icon.svg" alt="">Zonnestuur</div>
+  <div>
+    <h1 id="h">Met welke wifi moet de Box verbinden?</h1>
+  </div>
+  <p id="intro">Kies je eigen wifi-netwerk en vul het wachtwoord in. Daarna verbindt de Box daarmee en kun je hem openen vanaf elk apparaat in huis.</p>
+  <div class="alert" id="err" hidden></div>
+
+  <form id="form">
+    <div class="card" id="list" role="listbox" aria-label="Wifi-netwerken"></div>
+    <label id="ssidRow" hidden>Naam van het netwerk
+      <input id="ssid" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="32">
+    </label>
+    <label id="pwRow">Wachtwoord
+      <input id="pw" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="63">
+    </label>
+    <button class="btn" id="go" type="submit" disabled>Verbinden</button>
+    <p class="muted">Het wachtwoord gaat alleen naar de Box, niet naar internet.</p>
+  </form>
+
+  <div class="done" id="done" hidden>
+    <p><b>De Box verbindt nu met <span id="doneSsid"></span>.</b></p>
+    <p>Je telefoon verliest zo de verbinding met "Zonnestuur-instellen"; dat hoort zo. Verbind je telefoon weer met je eigen wifi en open over een minuut:</p>
+    <p class="addr">http://zonnestuur.local</p>
+    <p class="muted">Verschijnt "Zonnestuur-instellen" weer? Dan lukte het niet. Verbind er opnieuw mee; je ziet dan wat er misging.</p>
+  </div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+let chosen = null, other = false;
+const lockSvg = '<svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+function bars(sig) {
+  const n = sig >= 75 ? 4 : sig >= 55 ? 3 : sig >= 35 ? 2 : 1;
+  return '<span class="bars" aria-hidden="true">' + [5, 8, 11, 14].map((h, i) => `<i style="height:${h}px" class="${i < n ? "f" : ""}"></i>`).join("") + "</span>";
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function render(nets) {
+  const list = $("#list");
+  list.innerHTML = nets.map((n, i) => `<button type="button" class="net" data-i="${i}" role="option">${bars(n.signal)}<span class="n">${esc(n.ssid)}</span>${n.secure ? lockSvg : ""}</button>`).join("")
+    + `<button type="button" class="net" data-other="1" role="option"><span class="n">Ander netwerk…</span></button>`;
+  list.querySelectorAll(".net").forEach(b => b.addEventListener("click", () => {
+    list.querySelectorAll(".net").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    other = !!b.dataset.other;
+    chosen = other ? null : nets[+b.dataset.i];
+    $("#ssidRow").hidden = !other;
+    $("#pwRow").hidden = !other && chosen && !chosen.secure;
+    (other ? $("#ssid") : $("#pw")).focus();
+    check();
+  }));
+}
+function check() {
+  const ssid = other ? $("#ssid").value.trim() : (chosen && chosen.ssid);
+  const needPw = other || (chosen && chosen.secure);
+  const pw = $("#pw").value;
+  $("#go").disabled = !ssid || (needPw && pw.length > 0 && pw.length < 8) || (!other && needPw && !pw);
+}
+$("#ssid").addEventListener("input", check);
+$("#pw").addEventListener("input", check);
+$("#form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const ssid = other ? $("#ssid").value.trim() : chosen.ssid;
+  $("#go").disabled = true;
+  try {
+    const r = await fetch("api/wifi", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ssid, password: $("#pw").hidden ? "" : $("#pw").value }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Er ging iets mis");
+    $("#form").hidden = true; $("#intro").hidden = true; $("#err").hidden = true;
+    $("#doneSsid").textContent = ssid; $("#done").hidden = false; $("#h").textContent = "Bijna klaar";
+  } catch (err) {
+    $("#err").textContent = err.message; $("#err").hidden = false; $("#go").disabled = false;
+  }
+});
+fetch("api/wifi").then(r => r.json()).then(d => {
+  if (d.error) { $("#err").textContent = d.error; $("#err").hidden = false; }
+  render(d.networks || []);
+}).catch(() => render([]));
+</script>
+</body>
+</html>

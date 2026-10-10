@@ -1,0 +1,113 @@
+# Bouwt het SD-kaartbeeld van de Zonnestuur Box en zet het bij de releases van deze repository.
+# Start vanzelf als box.json verandert (nieuwe Box-versie), of met de hand via Actions > Zonnestuur Box > Run workflow.
+name: Zonnestuur Box
+
+on:
+  push:
+    branches: [main]
+    paths: [box.json]
+  workflow_dispatch:
+    inputs:
+      proef:
+        description: "Proefversie met SSH-sleutel (geheim BOX_SSH_KEY) voor beheer op afstand in het thuisnetwerk"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Raspberry Pi OS Lite (64-bit) ophalen en controleren
+        run: |
+          URL="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://downloads.raspberrypi.com/raspios_lite_arm64_latest)"
+          echo "Beeld: $URL"
+          echo "RASPIOS_URL=$URL" >> "$GITHUB_ENV"
+          curl -fsSL -o raspios.img.xz "$URL"
+          curl -fsSL "$URL.sha256" | awk '{print $1"  raspios.img.xz"}' | sha256sum -c -
+
+      - name: Gereedschap voor de motor (arm64 via qemu)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-user-static binfmt-support
+          docker run --privileged --rm tonistiigi/binfmt --install arm64
+
+      - name: Beeld bouwen
+        env:
+          BOX_SSH_KEY: ${{ inputs.proef && secrets.BOX_SSH_KEY || '' }}
+        run: |
+          # het beeld krijgt het versienummer van de code die erin gaat (box.json bepaalt alleen wat bestaande Boxen ophalen)
+          V="$(cat box/code/cp311/zonnestuur/VERSION 2>/dev/null || python3 -c 'import json; print(json.load(open("box.json"))["test"])')"
+          SUFFIX=""
+          if [ -n "$BOX_SSH_KEY" ]; then SUFFIX="-proef"; fi
+          NAME="zonnestuur-box-$V$SUFFIX.img.xz"
+          echo "V=$V" >> "$GITHUB_ENV"
+          echo "NAME=$NAME" >> "$GITHUB_ENV"
+          # vertaalde code per Python-versie (box/code/cp3XX); oudere repository-indeling: het leesbare pakket
+          PKG=box/code; [ -d "$PKG" ] || PKG=zonnestuur/app/zonnestuur
+          sudo --preserve-env=BOX_SSH_KEY box/build-image.sh raspios.img.xz "$NAME" "$PKG" box/units
+          ls -lh "$NAME"
+
+      - name: Controleren wat er in het beeld staat
+        run: |
+          xz -dc "$NAME" > check.img
+          LOOP="$(sudo losetup -Pf --show check.img)"
+          sudo mkdir -p /mnt/r /mnt/b
+          sudo mount -o ro "${LOOP}p2" /mnt/r
+          sudo mount -o ro "${LOOP}p1" /mnt/b
+          set -x
+          test "$(readlink /mnt/r/opt/zonnestuur/current)" = "releases/$V"
+          C=/mnt/r/opt/zonnestuur/current/zonnestuur
+          grep -qx "$V" "$C/VERSION" 2>/dev/null || grep -q "__version__ = \"$V\"" "$C/__init__.py"
+          # is de code in de repository vertaald, dan mag er ook in het beeld geen leesbare broncode staan
+          if [ -d box/code ] && [ -z "$(find box/code -name '*.py' | head -1)" ]; then ! find "$C" -name '*.py' | grep -q .; fi
+          test -L /mnt/r/etc/systemd/system/multi-user.target.wants/zonnestuur.service
+          test -L /mnt/r/etc/systemd/system/multi-user.target.wants/zonnestuur-net.service
+          test -L /mnt/r/etc/systemd/system/timers.target.wants/zonnestuur-update.timer
+          test -x /mnt/r/usr/bin/nmcli
+          test -x /mnt/r/usr/bin/python3
+          test -f /mnt/r/opt/zonnestuur/motor/compose.yaml
+          test -L /mnt/r/etc/systemd/system/multi-user.target.wants/zonnestuur-motor.service
+          grep -q zonnestuur /mnt/r/etc/hostname
+          grep -q 'dialout:.*zonnestuur' /mnt/r/etc/group
+          grep -q ieee80211_regdom=NL /mnt/b/cmdline.txt
+          ls /mnt/b/user-data /mnt/b/userconf.txt 2>/dev/null || true
+          # de code laden met de Python van het beeld zelf (via qemu), want de bytecode hoort bij die versie
+          sudo chroot /mnt/r /usr/bin/python3 -c "import sys; sys.path.insert(0, '/opt/zonnestuur/current'); import zonnestuur.app, zonnestuur.netsetup, zonnestuur.updater, zonnestuur.failsafe; print('code laadt met', sys.version.split()[0])"
+          sudo umount /mnt/r /mnt/b
+          sudo losetup -d "$LOOP"
+          rm check.img
+
+      - name: Beeld klaarzetten (niet openbaar)
+        # Het SD-kaartbeeld staat niet in deze openbare repository, maar als release in de afgeschermde bron.
+        # Kopers krijgen een persoonlijke downloadlink via api.zonnestuur.nl/download (zie beheerpagina).
+        env:
+          GH_TOKEN: ${{ secrets.ZS_RELEASE_TOKEN }}
+          PRIVE: zonnestuur/zonnestuur
+        run: |
+          if [ -z "$GH_TOKEN" ]; then echo "::error title=Geheim ontbreekt::Zet ZS_RELEASE_TOKEN (Contents: lezen en schrijven op zonnestuur/zonnestuur) bij Settings > Secrets > Actions"; exit 1; fi
+          TAG="box-$V"
+          NOTES="SD-kaartbeeld Zonnestuur $V (Raspberry Pi 4 of 5, 4 GB of meer, microSD van minimaal 16 GB). Gebouwd uit: $RASPIOS_URL"
+          gh release view "$TAG" -R "$PRIVE" >/dev/null 2>&1 || gh release create "$TAG" -R "$PRIVE" --title "Zonnestuur SD-kaart $V" --notes "$NOTES" --target main
+          gh release upload "$TAG" "$NAME" "$NAME.sha256" -R "$PRIVE" --clobber
+          # alleen de laatste 3 SD-kaartbeelden bewaren
+          gh release list -R "$PRIVE" --limit 100 --json tagName,createdAt --jq '[.[] | select(.tagName|startswith("box-"))] | sort_by(.createdAt) | reverse | .[3:] | .[].tagName' \
+            | while read -r T; do echo "weg: $T"; gh release delete "$T" -R "$PRIVE" --yes --cleanup-tag || true; done
+
+      - name: Oude openbare releases opruimen
+        # Vroeger stonden de beelden openbaar in deze repository: die gaan allemaal weg.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 200 --json tagName --jq '.[].tagName' | while read -r T; do
+            echo "weg: $T"; gh release delete "$T" --yes --cleanup-tag || true
+          done
+          git fetch --tags --force -q origin || true
+          git tag -l 'box-*' | while read -r T; do git push -q origin --delete "refs/tags/$T" || true; done

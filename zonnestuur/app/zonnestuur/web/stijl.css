@@ -1,0 +1,90 @@
+/* Huisstijl van zonnestuur.nl, over elke pagina van de app heen (na de eigen stijl van de pagina geladen).
+   Daglicht-grijs, inkt, zon-geel en goedkoop-blauw; Inter Tight voor koppen; strakke vlakken met een haarlijn. */
+:root {
+  --zs-dag: #e9eef2; --zs-vlak: #ffffff; --zs-ink: #13202b; --zs-ink2: #4a5764; --zs-ink3: #6b7784; --zs-lijn: rgba(19, 32, 43, .10);
+  --zs-zon: #ffb224; --zs-blauw: #2f6bdb; --zs-zacht: rgba(19, 32, 43, .05);
+  --bg: var(--zs-dag); --card: var(--zs-vlak); --card-hi: var(--zs-vlak); --card-solid: var(--zs-vlak); --field: var(--zs-vlak);
+  --card-line: var(--zs-lijn); --line: var(--zs-lijn); --rule: var(--zs-lijn);
+  --shadow: 0 0 0 1px var(--zs-lijn);
+  --ink: var(--zs-ink); --ink-2: var(--zs-ink2); --ink-3: var(--zs-ink3);
+  --net: var(--zs-blauw); --cheap: var(--zs-blauw); --glow: var(--zs-zon);
+  --chip: var(--zs-zacht); --seg: rgba(19, 32, 43, .06); --seg-on: var(--zs-vlak);
+  --aura-1: transparent; --aura-2: transparent; --aura-3: transparent;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --zs-dag: #0d151d; --zs-vlak: #15202b; --zs-ink: #eef3f7; --zs-ink2: #a8b4bf; --zs-ink3: #8693a0; --zs-lijn: rgba(238, 243, 247, .10);
+    --zs-blauw: #5b8cff; --zs-zacht: rgba(238, 243, 247, .06);
+    --bg: var(--zs-dag); --card: var(--zs-vlak); --card-hi: var(--zs-vlak); --card-solid: var(--zs-vlak); --field: rgba(238, 243, 247, .04);
+    --card-line: var(--zs-lijn); --line: var(--zs-lijn); --rule: var(--zs-lijn); --shadow: 0 0 0 1px var(--zs-lijn);
+    --ink: var(--zs-ink); --ink-2: var(--zs-ink2); --ink-3: var(--zs-ink3);
+    --net: var(--zs-blauw); --cheap: var(--zs-blauw); --chip: var(--zs-zacht); --seg: rgba(238, 243, 247, .07); --seg-on: rgba(238, 243, 247, .14);
+    --aura-1: transparent; --aura-2: transparent; --aura-3: transparent;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --zs-dag: #0d151d; --zs-vlak: #15202b; --zs-ink: #eef3f7; --zs-ink2: #a8b4bf; --zs-ink3: #8693a0; --zs-lijn: rgba(238, 243, 247, .10);
+  --zs-blauw: #5b8cff; --zs-zacht: rgba(238, 243, 247, .06);
+  --bg: var(--zs-dag); --card: var(--zs-vlak); --card-hi: var(--zs-vlak); --card-solid: var(--zs-vlak); --field: rgba(238, 243, 247, .04);
+  --card-line: var(--zs-lijn); --line: var(--zs-lijn); --rule: var(--zs-lijn); --shadow: 0 0 0 1px var(--zs-lijn);
+  --ink: var(--zs-ink); --ink-2: var(--zs-ink2); --ink-3: var(--zs-ink3);
+  --net: var(--zs-blauw); --cheap: var(--zs-blauw); --chip: var(--zs-zacht); --seg: rgba(238, 243, 247, .07); --seg-on: rgba(238, 243, 247, .14);
+  --aura-1: transparent; --aura-2: transparent; --aura-3: transparent;
+}
+
+/* ---- ondergrond en vlakken ---- */
+body { background: var(--zs-dag) !important; background-image: none !important; color: var(--zs-ink); }
+.card, section.card, article.card, .panel .box { background: var(--zs-vlak); border: 0; box-shadow: 0 0 0 1px var(--zs-lijn);
+  -webkit-backdrop-filter: none; backdrop-filter: none; }
+.card { border-radius: 24px; }
+
+/* ---- koppen: groot, vet, strak, zoals op de website ---- */
+h1, .headline { font-family: "Inter Tight", "Inter", system-ui, sans-serif; font-weight: 760; letter-spacing: -.03em; word-spacing: .1em; text-wrap: balance; }
+main > h1, main > header + h1 { font-size: clamp(36px, 6vw, 60px); line-height: 1; margin-top: 22px; }
+.lead { color: var(--zs-ink2); }
+h2.t, .card h2.t, .sec, .card h2 { font-family: "Inter Tight", "Inter", system-ui, sans-serif; letter-spacing: -.025em; word-spacing: .06em; font-weight: 720; }
+.sec-head { border-bottom: 2px solid var(--zs-ink); padding-bottom: 12px; margin-bottom: 6px; }
+.sec-head h2 { font: 740 clamp(28px, 3.4vw, 40px)/1.05 "Inter Tight", "Inter", sans-serif !important; letter-spacing: -.03em !important; word-spacing: .08em; }
+
+/* ---- knoppen: inkt als hoofdknop, omlijnd als tweede keus ---- */
+.btn { background: var(--zs-ink) !important; color: var(--zs-dag) !important; box-shadow: none; border: 0; font-weight: 650; }
+.btn:hover { transform: translateY(-1px); }
+.btn.ghost, .btn.uit { background: transparent !important; color: var(--zs-ink) !important; box-shadow: inset 0 0 0 1.5px var(--zs-ink); }
+.btn:disabled { opacity: .45; transform: none; }
+.btn-line { border-radius: 999px; }
+.btn-line.on-sun, .evc-go { background: var(--zs-ink) !important; color: var(--zs-dag) !important; border-color: var(--zs-ink) !important; }
+.evc-go.uit { background: transparent !important; color: var(--zs-ink) !important; box-shadow: inset 0 0 0 1.5px var(--zs-ink); }
+.btn-soft { border-radius: 999px; }
+
+/* ---- keuzeknoppen ---- */
+.seg { border-radius: 999px; }
+.seg button { border-radius: 999px; }
+.seg button.active, .seg button.on, .chips button.on, .days button.on { background: var(--zs-ink) !important; color: var(--zs-dag) !important; border-color: var(--zs-ink) !important; box-shadow: none; }
+.dev .seg button { border-radius: 999px; }
+.secnav a.on, .secnav a[aria-current] { background: var(--zs-ink) !important; color: var(--zs-dag) !important; }
+
+/* ---- invoer ---- */
+input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea { border: 1.5px solid var(--zs-lijn); border-radius: 14px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; border-color: var(--zs-blauw);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--zs-blauw) 20%, transparent); }
+input[type=checkbox], input[type=radio] { accent-color: var(--zs-blauw); }
+:focus-visible { outline-color: var(--zs-blauw); }
+
+/* ---- kleine onderdelen ---- */
+.brand { font-family: "Inter Tight", "Inter", sans-serif; font-weight: 700; letter-spacing: -.02em; }
+.pill.motor, .tag.ok { color: var(--zs-blauw); }
+a { text-underline-offset: 3px; }
+
+/* ---- dashboard ---- */
+.c-hero::before { display: none; }
+/* het bovenste blok is (door .card hierboven) een kaart met ronde hoeken: genoeg ruimte zodat de datum niet in de hoek valt */
+.card.c-hero { padding: 24px 26px; }
+@media (max-width: 700px) {
+  .card.c-hero { padding: 18px 16px; }
+  /* stroomschema: onderste naam en waarde (net) en de pauzeknop helemaal binnen het blok */
+  .card.c-hero .hero-grid .flow { margin-bottom: 8px; }
+  .card.c-hero .flowpause { right: 0; }
+}
+.headline { font-size: clamp(34px, 4.8vw, 62px) !important; line-height: 1 !important; }

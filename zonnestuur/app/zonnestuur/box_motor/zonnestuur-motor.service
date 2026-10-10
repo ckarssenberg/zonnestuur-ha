@@ -1,0 +1,13 @@
+[Unit]
+Description=Zonnestuur motor (ingebouwde Home Assistant voor koppelingen)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/zonnestuur/motor/motor.sh
+TimeoutStartSec=1800
+
+[Install]
+WantedBy=multi-user.target

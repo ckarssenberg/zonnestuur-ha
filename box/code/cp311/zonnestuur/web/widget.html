@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Zonnestuur">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Zonnestuur nu</title>
+<style>
+/* In een app-webweergave: doorslepen bovenaan mag niet doorgaan naar 'trek omlaag om te verversen' van de app. */
+html, body { overscroll-behavior-y: none; }
+
+  @font-face { font-family: "Inter"; src: url("fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Inter Tight"; src: url("fonts/inter-tight.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  /* Klein en snel: het antwoord op "is dit een goed moment?" plus wat er hierna gebeurt. Voor op het beginscherm
+     van je telefoon of als webpagina-kaart op een dashboard. Ververst elke 30 seconden. */
+  :root {
+    color-scheme: light;
+    --bg: #e8ecef; --card: #ffffff; --line: #e4e2da; --ink: #0d1015; --ink-2: #555d69; --ink-3: #6b727d;
+    --good: #17845a; --good-bg: #e1f3ea; --meh: #8a4b00; --meh-bg: #fdf0db; --wait: #b42b23; --wait-bg: #fbe4e1;
+    --batt: #0d9488; --sun: #b86e00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #080c10; --card: #10161c; --line: #1e242d; --ink: #f3f5f8; --ink-2: #a2abb7; --ink-3: #8a93a0;
+      --good: #4ade80; --good-bg: rgba(74, 222, 128, .12); --meh: #ffcf73; --meh-bg: rgba(255, 178, 36, .12); --wait: #ff8a80; --wait-bg: rgba(239, 100, 97, .14);
+      --batt: #2dd4bf; --sun: #ffb224;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #080c10; --card: #10161c; --line: #1e242d; --ink: #f3f5f8; --ink-2: #a2abb7; --ink-3: #8a93a0;
+    --good: #4ade80; --good-bg: rgba(74, 222, 128, .12); --meh: #ffcf73; --meh-bg: rgba(255, 178, 36, .12); --wait: #ff8a80; --wait-bg: rgba(239, 100, 97, .14);
+    --batt: #2dd4bf; --sun: #ffb224;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  main { max-width: 460px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); display: grid; gap: 12px; }
+  .num { font-family: "Inter Tight", "Inter", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; }
+  .verdict { display: flex; gap: 12px; align-items: center; }
+  .badge { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; flex: none; }
+  .badge svg { width: 26px; height: 26px; }
+  .goed .badge { background: var(--good-bg); color: var(--good); }
+  .neutraal .badge { background: var(--meh-bg); color: var(--meh); }
+  .wachten .badge { background: var(--wait-bg); color: var(--wait); }
+  .word { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+  .sub { color: var(--ink-2); font-size: 13.5px; margin-top: 2px; }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 14px; }
+  .stat { background: var(--bg); border-radius: 12px; padding: 10px 12px; }
+  .stat b { display: block; font-size: 20px; }
+  #saved { color: var(--save, #0a7f55); }
+  .stat span { color: var(--ink-2); font-size: 12.5px; }
+  h2 { font: 650 17px/1.2 "Inter Tight", Inter, sans-serif; letter-spacing: -.02em; margin: 0 0 6px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: grid; grid-template-columns: 92px 1fr; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  li:first-child { border-top: 0; }
+  li .t { color: var(--ink-2); }
+  .tip { font-size: 14px; }
+  .foot { display: flex; justify-content: space-between; color: var(--ink-3); font-size: 12px; }
+  .foot a { color: inherit; }
+  .empty { color: var(--ink-2); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <section class="card" id="now" aria-live="polite">
+    <div class="verdict"><div class="badge" id="badge" aria-hidden="true"></div>
+      <div><div class="word" id="word">Even kijken…</div><div class="sub" id="why"></div></div></div>
+    <div class="stats">
+      <div class="stat"><b class="num" id="price">–</b><span>stroomprijs nu</span></div>
+      <div class="stat"><b class="num" id="best">–</b><span id="bestL">beste moment</span></div>
+      <div class="stat" id="battBox" hidden><b class="num" id="batt">–</b><span id="battL">thuisbatterij</span></div>
+      <div class="stat"><b class="num" id="saved">–</b><span>opgeleverd deze maand</span></div>
+    </div>
+  </section>
+  <section class="card tip" id="tipBox" hidden><h2>Tip van vandaag</h2><div id="tip"></div></section>
+  <section class="card"><h2>Hierna</h2><ul id="plan"><li class="empty">Laden…</li></ul></section>
+  <div class="foot"><span id="upd">&nbsp;</span><a href="./">Volledig dashboard</a></div>
+</main>
+<script>
+// Fouten in dit scherm melden aan Zonnestuur (die filtert en ontdubbelt); netwerkhaperingen tellen niet mee.
+window.zsFout = (function () { let n = 0; return function (msg, where) {
+  msg = String((msg && msg.message) || msg || ""); if (!msg || n++ > 5 || /Failed to fetch|NetworkError|Load failed|AbortError|HTTP 5\d\d|ResizeObserver/i.test(msg)) return;
+  let t = ""; try { t = localStorage.getItem("zs_token") || ""; } catch (e) {}
+  try { fetch("api/fout", { method: "POST", headers: { "Content-Type": "application/json", "X-Token": t }, body: JSON.stringify({ msg: msg.slice(0, 500), where: (String(where || "") + "\n" + location.pathname).slice(0, 3000) }) }).catch(() => {}); } catch (e) {}
+}; })();
+addEventListener("error", (e) => zsFout(e.message, (e.error && e.error.stack) || `${e.filename}:${e.lineno}:${e.colno}`));
+addEventListener("unhandledrejection", (e) => zsFout(e.reason, e.reason && e.reason.stack));
+
+const $ = (id) => document.getElementById(id);
+let token = ""; try { token = localStorage.getItem("zs_token") || new URLSearchParams(location.search).get("token") || ""; } catch (e) {}
+const api = (p) => fetch(p, { headers: token ? { "X-Token": token } : {} }).then((r) => r.json());
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const eur = (v) => { if (v == null) return "–"; const r = Math.round(Number(v) * 100) / 100; return (r < 0 ? "−" : "") + "€ " + Math.abs(r).toFixed(2).replace(".", ","); };
+const ICON = {
+  goed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  neutraal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 12h12"/></svg>',
+  wachten: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
+};
+async function load() {
+  if (document.hidden) return;
+  let s;
+  try { s = await api("api/status"); } catch (e) { $("upd").textContent = "Geen verbinding"; return; }
+  const m = s.moment || {}, lvl = m.level || "neutraal";
+  $("now").className = "card " + lvl;
+  $("badge").innerHTML = ICON[lvl] || ICON.neutraal;
+  $("word").textContent = m.word || "—";
+  $("why").textContent = m.text || "";
+  $("price").textContent = s.price_now == null ? "–" : eur(s.price_now);
+  const w = m.window;
+  $("best").textContent = w ? `${w.from}–${w.to}` : "–";
+  $("bestL").textContent = w ? (w.tomorrow ? "beste moment morgen" : "beste moment vandaag") + (w.kind === "zon" ? " (zon)" : "") : "beste moment";
+  const b = (s.batteries || [])[0];
+  $("battBox").hidden = !b;
+  if (b) { $("batt").textContent = Math.round(b.soc ?? 0) + "%"; $("battL").textContent = "thuisbatterij" + (b.reason ? " · " + b.reason.split(":")[0] : ""); }
+  $("saved").textContent = eur((s.value && s.value.month && s.value.month.eur) ?? (s.month && s.month.eur_saved));
+  const t = s.today_tip;
+  $("tipBox").hidden = !t;
+  if (t) $("tip").innerHTML = `<b>${esc(t.title)}</b><br>${esc(t.text)}`;
+  const items = ((s.plan && s.plan.items) || []).slice(0, 4);
+  $("plan").innerHTML = items.length ? items.map((x) => `<li><span class="t num">${x.now ? "nu" : esc(x.start.slice(11, 16))}–${esc(x.end.slice(11, 16))}</span><span><b>${esc(x.name)}</b> ${esc(x.what)}${x.eur != null ? ` · ± ${eur(x.eur)}` : ""}</span></li>`).join("")
+    : '<li class="empty">Niets gepland de komende 24 uur.</li>';
+  $("upd").textContent = "Bijgewerkt " + new Date().toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+}
+load(); setInterval(load, 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+</script>
+</body>
+</html>

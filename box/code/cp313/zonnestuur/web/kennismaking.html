@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Kennismaking · Zonnestuur</title>
+<style>
+  html, body { overscroll-behavior-y: none; }
+  @font-face { font-family: "Inter"; src: url("fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Inter Tight"; src: url("fonts/inter-tight.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.55 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; min-height: 100dvh; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: max(14px, env(safe-area-inset-top)) 16px 120px; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 6px 2px 14px; }
+  .brand { display: flex; gap: 10px; align-items: center; font-size: 19px; text-decoration: none; color: inherit; }
+  .brand svg { width: 28px; height: 28px; }
+  header a.skip { color: var(--zs-ink2); font-weight: 600; font-size: 15px; text-decoration: none; }
+  [hidden] { display: none !important; }
+  .slides { display: flex; align-items: flex-start; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; }
+  .slides::-webkit-scrollbar { display: none; }
+  .slide { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; background: var(--zs-vlak); border-radius: 26px; border: 1px solid var(--zs-lijn);
+           padding: 30px 30px 32px; max-height: calc(100dvh - 170px); overflow-y: auto; overscroll-behavior: contain; }
+  .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--zs-ink3); }
+  h1 { font: 760 clamp(32px, 5.6vw, 50px)/1.02 "Inter Tight", Inter, sans-serif; letter-spacing: -.045em; margin: 10px 0 14px; text-wrap: balance; }
+  h2 { font: 720 20px/1.2 "Inter Tight", Inter, sans-serif; letter-spacing: -.02em; margin: 0 0 4px; }
+  .lead { font-size: 18px; color: var(--zs-ink2); margin: 0 0 20px; max-width: 58ch; }
+  p { margin: 0 0 10px; }
+  .film { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 18px; overflow: hidden; border: 0; padding: 0; cursor: pointer;
+          background: #13202b; color: #fff; }
+  .film img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: .9; }
+  .film .play { position: absolute; inset: 0; display: grid; place-items: center; }
+  .film .play span { display: flex; align-items: center; gap: 10px; background: rgba(19, 32, 43, .86); padding: 12px 20px 12px 14px; border-radius: 999px; font-weight: 700; font-size: 16px; }
+  .film .play i { width: 34px; height: 34px; border-radius: 50%; background: var(--zs-zon); display: grid; place-items: center; }
+  .film video { width: 100%; height: 100%; display: block; background: #000; }
+  .stappen { display: grid; gap: 12px; margin: 6px 0 18px; }
+  .stap { display: grid; grid-template-columns: 48px 1fr; gap: 14px; align-items: start; }
+  .stap .ic, .tegel .ic { width: 48px; height: 48px; border-radius: 15px; display: grid; place-items: center; background: color-mix(in srgb, var(--zs-zon) 22%, transparent); color: #8a5a00; }
+  .stap .ic svg, .tegel .ic svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .stap p, .tegel p { color: var(--zs-ink2); font-size: 15px; margin: 0; }
+  .vlak { border-radius: 18px; padding: 16px 18px; background: var(--zs-zacht); font-size: 15px; }
+  .vlak + .vlak { margin-top: 10px; }
+  .getal { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 4px 0 18px; }
+  .getal div { border-radius: 18px; padding: 16px; background: var(--zs-zacht); }
+  .getal b { display: block; font: 760 30px/1.05 "Inter Tight", Inter, sans-serif; letter-spacing: -.03em; margin-bottom: 4px; }
+  .getal .goed b { color: #0a7f55; } .getal span { font-size: 14px; color: var(--zs-ink2); }
+  .tegels { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .tegel { border-radius: 18px; padding: 14px; box-shadow: 0 0 0 1px var(--zs-lijn); display: grid; gap: 8px; align-content: start; }
+  .tegel .ic { width: 40px; height: 40px; border-radius: 12px; } .tegel .ic svg { width: 22px; height: 22px; }
+  .tegel h3 { margin: 0; font-size: 16px; }
+  nav.onder { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px max(14px, env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--zs-dag) 88%, transparent);
+              -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-top: 1px solid var(--zs-lijn); }
+  nav.onder .in { max-width: 980px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+  .dots { display: flex; gap: 6px; flex: 1; } .dots button { width: 9px; height: 9px; border-radius: 50%; border: 0; padding: 0; background: var(--zs-lijn); cursor: pointer; }
+  .dots button.on { background: var(--zs-ink); width: 24px; border-radius: 99px; }
+  .btn { font: inherit; font-weight: 650; padding: 13px 22px; border-radius: 999px; border: 0; cursor: pointer; text-decoration: none; display: inline-block; text-align: center; }
+  .btn.terug { background: transparent !important; color: var(--zs-ink) !important; box-shadow: inset 0 0 0 1.5px var(--zs-lijn) !important; }
+  .eind { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  @media (min-width: 880px) {
+    #nodig .zn { grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+    #nodig .zn-r { margin-top: 0; }
+    #nodig .zn-r:empty { display: grid; } #nodig .zn-r:empty::before { content: "Tik links aan wat je hebt. Hier zie je dan wat Zonnestuur voor je kan doen."; color: var(--zs-ink3); font-size: 15px; padding: 16px; border-radius: 16px; border: 1.5px dashed var(--zs-lijn); }
+  }
+  @media (max-width: 600px) {
+    .slide { padding: 22px 18px 24px; border-radius: 22px; min-height: 0; }
+    .lead { font-size: 16px; } .getal b { font-size: 21px; }
+    .tegels { grid-template-columns: 1fr 1fr; gap: 10px; } .tegel { padding: 12px; } .tegel p { font-size: 13px; }
+    .btn { padding: 12px 18px; }
+  }
+</style>
+<link rel="stylesheet" href="stijl.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="./"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="6.5" fill="#ffb224"/><g stroke="#ffb224" stroke-width="2.4" stroke-linecap="round"><path d="M16 2.5v3.5M16 26v3.5M2.5 16H6M26 16h3.5M6.4 6.4l2.5 2.5M23.1 23.1l2.5 2.5M6.4 25.6l2.5-2.5M23.1 8.9l2.5-2.5"/></g></svg>Zonnestuur</a>
+    <a class="skip" id="skip" href="./">Overslaan →</a>
+  </header>
+
+  <div class="slides" id="slides">
+    <section class="slide" aria-label="Welkom">
+      <div class="eyebrow">Kennismaking · 2 minuten</div>
+      <h1>Je huis kiest zelf het beste moment</h1>
+      <p class="lead">Zonnestuur laat je boiler, warmtepomp, auto en wasmachine draaien op je eigen zonnestroom, of in de goedkoopste uren van de dag. Jij merkt er niets van, behalve een lagere rekening.</p>
+      <button class="film" id="film" type="button" aria-label="Bekijk de uitlegvideo (1 minuut)">
+        <img src="img/uitleg.webp" alt="" loading="lazy">
+        <span class="play"><span><i><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 1.5v11l9.5-5.5z" fill="#13202b"/></svg></i>Bekijk hoe het werkt · 1 min</span></span>
+      </button>
+    </section>
+
+    <section class="slide" aria-label="Waarom">
+      <div class="eyebrow">Waarom nu</div>
+      <h1>Vanaf 2027 telt elke kWh die je zelf gebruikt</h1>
+      <p class="lead">Op 1 januari 2027 stopt de salderingsregeling. Stroom die je teruglevert, mag je dan niet meer wegstrepen tegen stroom die je later afneemt.</p>
+      <div class="getal">
+        <div class="goed"><b>± 20 tot 30 ct</b><span>bespaar je op elke kWh van je eigen zon die je zelf gebruikt</span></div>
+        <div><b>een paar cent</b><span>krijg je voor een kWh die je teruglevert, en soms betaal je er zelfs voor</span></div>
+      </div>
+      <div class="vlak">Zonder zonnepanelen? Met een dynamisch contract scheelt het per uur flink wat je betaalt. Zonnestuur zoekt de goedkoopste uren voor je uit.</div>
+    </section>
+
+    <section class="slide" aria-label="Zo werkt het">
+      <div class="eyebrow">Zo werkt het</div>
+      <h1>Kijken, plannen, schakelen</h1>
+      <div class="stappen">
+        <div class="stap"><span class="ic"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span>
+          <div><h2>Kijken</h2><p>Via je slimme meter ziet Zonnestuur elke paar seconden of je stroom over hebt. Daarbij de zonverwachting en de stroomprijs per kwartier.</p></div></div>
+        <div class="stap"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M7.5 14h3M13.5 14h3M7.5 17h3"/></svg></span>
+          <div><h2>Plannen</h2><p>Elk kwartier rekent hij uit wanneer elk apparaat het beste kan draaien: op de zon, anders in de goedkoopste uren.</p></div></div>
+        <div class="stap"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 2.5v9"/><path d="M6.3 6.2a8 8 0 1 0 11.4 0"/></svg></span>
+          <div><h2>Schakelen</h2><p>Hij zet je apparaten aan en uit via een slimme schakelaar, je laadpaal, of de koppeling met je merk.</p></div></div>
+      </div>
+      <div class="vlak"><b>Altijd op tijd klaar.</b> Jij kiest hoe laat het warme water of de auto klaar moet zijn. Is er niet genoeg zon, dan gebruikt Zonnestuur de goedkoopste uren ervoor.</div>
+      <div class="vlak"><b>Alles bij jou thuis.</b> Je meterdata gaan niet naar een cloud. Valt Zonnestuur uit, dan werken je apparaten gewoon op hun eigen instellingen.</div>
+    </section>
+
+    <section class="slide" aria-label="Wat kun je ermee">
+      <div class="eyebrow">Wat kun je ermee</div>
+      <h1>Eén systeem voor je hele huis</h1>
+      <div class="tegels">
+        <div class="tegel"><span class="ic"><svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="4"/><path d="M12 8.5c1.5 2 2.5 3.2 2.5 4.8a2.5 2.5 0 0 1-5 0c0-1.6 1-2.8 2.5-4.8z"/></svg></span><h3>Warm water</h3><p>De boiler verwarmt op je zon. Altijd warm op tijd.</p></div>
+        <div class="tegel"><span class="ic"><svg viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="3"/><circle cx="9" cy="12" r="3.5"/><path d="M15.5 9.5h3M15.5 12h3M15.5 14.5h3"/></svg></span><h3>Warmtepomp</h3><p>Warmte opslaan als stroom goedkoop is.</p></div>
+        <div class="tegel"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 16.5V12l2-5h12l2 5v4.5z"/><circle cx="7.5" cy="16.5" r="1.8"/><circle cx="16.5" cy="16.5" r="1.8"/><path d="M4 12h16"/></svg></span><h3>Auto laden</h3><p>Op de zon of goedkoop, en vol op de tijd die jij kiest.</p></div>
+        <div class="tegel"><span class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="2.5" width="16" height="19" rx="3"/><circle cx="12" cy="13.5" r="4.5"/><path d="M7.5 6h2"/></svg></span><h3>Was en vaat</h3><p>Start vanzelf op het beste moment, met een melding.</p></div>
+        <div class="tegel"><span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="3"/><path d="M9.5 1.5h5M12 8.5l-2.5 4h5L12 16.5"/></svg></span><h3>Thuisbatterij</h3><p>Laden en ontladen op het juiste moment.</p></div>
+        <div class="tegel"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M12 1.5v1.5M5.5 8H4M20 8h-1.5M3 21l3-8h12l3 8zM9 13l-1 8M15 13l1 8M4.5 17h15"/></svg></span><h3>Zonnepanelen</h3><p>Afknijpen als terugleveren geld kost.</p></div>
+        <div class="tegel"><span class="ic"><svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2.5"/><path d="M8 21h8M12 17v4"/></svg></span><h3>Huisscherm</h3><p>Op je Nest Hub: is stroom nu goedkoop? Met radio.</p></div>
+        <div class="tegel"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 20.5h18M6 17V11M11 17V6M16 17v-4M21 17V8"/></svg></span><h3>Inzicht</h3><p>Wat je bespaart, tips en welk contract het beste past.</p></div>
+      </div>
+    </section>
+
+    <section class="slide" aria-label="Wat heb je nodig">
+      <div class="eyebrow">Wat heb je nodig</div>
+      <h1>Kijk wat je al hebt</h1>
+      <p class="lead">Tik aan wat bij jou thuis past. Je ziet meteen wat Zonnestuur kan en of je nog iets nodig hebt.</p>
+      <div id="nodig"></div>
+    </section>
+
+    <section class="slide" aria-label="Beginnen">
+      <div class="eyebrow">Beginnen</div>
+      <h1 id="eindKop">Klaar om te beginnen</h1>
+      <p class="lead" id="eindTekst">Koppelen duurt ongeveer 5 minuten. Zonnestuur zoekt je meter en apparaten zelf in je thuisnetwerk; je hoeft geen adressen of codes over te typen.</p>
+      <div class="vlak">Tip: begin met één apparaat, bijvoorbeeld de boiler. Je kunt later altijd meer toevoegen bij Instellingen.</div>
+      <div class="vlak">Vragen of iets onduidelijk? Tik bovenin Zonnestuur op het tekstwolkje om ons een bericht te sturen.</div>
+      <div class="eind"><a class="btn" id="start" href="setup">Begin met koppelen →</a><a class="btn terug" href="help">Meer uitleg</a></div>
+    </section>
+  </div>
+</div>
+
+<nav class="onder" aria-label="Kennismaking">
+  <div class="in"><div class="dots" id="dots"></div>
+    <button class="btn terug" id="vorige" type="button" hidden>Terug</button><button class="btn" id="volgende" type="button">Volgende</button></div>
+</nav>
+
+<script src="nodig.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const S = $("slides"), slides = [...S.children], START = new URLSearchParams(location.search).has("start");
+if (START) $("skip").href = "setup";
+else { $("start").href = "./"; $("start").textContent = "Naar het dashboard →"; $("eindKop").textContent = "Dat was de kennismaking";
+  $("eindTekst").textContent = "Meer weten over een onderdeel? Bij Meer uitleg staat per kaart wat je ziet en hoe Zonnestuur rekent."; }
+$("dots").innerHTML = slides.map((s, i) => `<button type="button" aria-label="${s.getAttribute("aria-label")}" data-i="${i}"></button>`).join("");
+const nu = () => Math.round(S.scrollLeft / S.clientWidth);
+function naar(i) { i = Math.max(0, Math.min(slides.length - 1, i)); S.scrollTo({ left: i * S.clientWidth }); slides[i].scrollTop = 0; window.scrollTo(0, 0); }
+function bij() {
+  const i = nu();
+  [...$("dots").children].forEach((d, j) => d.classList.toggle("on", j === i));
+  $("vorige").hidden = i === 0;
+  $("volgende").textContent = i === slides.length - 1 ? (START ? "Begin met koppelen" : "Naar het dashboard") : "Volgende";
+}
+S.addEventListener("scroll", () => requestAnimationFrame(bij), { passive: true });
+$("dots").onclick = (e) => { const i = e.target.dataset.i; if (i != null) naar(+i); };
+$("vorige").onclick = () => naar(nu() - 1);
+$("volgende").onclick = () => { const i = nu(); if (i === slides.length - 1) location.href = $("start").getAttribute("href"); else naar(i + 1); };
+document.addEventListener("keydown", (e) => { if (e.target.closest("input,textarea")) return; if (e.key === "ArrowRight") naar(nu() + 1); if (e.key === "ArrowLeft") naar(nu() - 1); });
+// De video staat op zonnestuur.nl (zo blijft Zonnestuur zelf klein); pas laden als je op afspelen drukt.
+$("film").onclick = () => {
+  const v = document.createElement("video");
+  v.controls = true; v.autoplay = true; v.playsInline = true; v.poster = "img/uitleg.webp";
+  v.innerHTML = '<source src="https://zonnestuur.nl/video/uitleg.mp4" type="video/mp4"><source src="https://zonnestuur.nl/video/uitleg.webm" type="video/webm">';
+  v.onerror = () => {};
+  const f = $("film"); f.replaceWith(Object.assign(document.createElement("div"), { className: "film", id: "film" })); $("film").append(v); v.play().catch(() => {});
+};
+zsNodig($("nodig"), { koppelUrl: "koppelen" });
+bij();
+</script>
+</body>
+</html>

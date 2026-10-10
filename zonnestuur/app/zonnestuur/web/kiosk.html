@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Wandscherm · Zonnestuur</title>
+<style>
+/* In een app-webweergave: doorslepen bovenaan mag niet doorgaan naar 'trek omlaag om te verversen' van de app. */
+html, body { overscroll-behavior-y: none; }
+
+  @font-face { font-family: "Inter"; src: url("fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Inter Tight"; src: url("fonts/inter-tight.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  /* Wandscherm "stroomklok": de dag als wijzerplaat, elk uur gekleurd naar prijs (of zon), met nu als wijzer.
+     Overdag porselein, 's avonds diep nachtblauw. Eén opvallend element (de klok), de rest rustig. */
+  :root {
+    color-scheme: light;
+    --bg: #eceff3; --panel: #f8fafc; --line: #dde2e8; --ink: #121821; --ink-2: #3f4955; --ink-3: #56616f;
+    --now: #ff9f1c; --now-ink: #8a4b00;
+    --cheap: #2a78d6; --mid: #c4cbd3; --dear: #e34948; --sun: #f0a020;
+    --ok: #17845a; --ok-bg: #dff3ea; --wait: #c2382f; --wait-bg: #fbe4e1; --meh: #8a4b00; --meh-bg: #fdf0db;
+    --seg: #e3e8ee; --seg-on: #ffffff; --shadow: 0 1px 2px rgba(18, 24, 33, .05), 0 18px 40px -26px rgba(18, 24, 33, .35);
+  }
+  :root[data-mode="dark"] {
+    color-scheme: dark;
+    --bg: #0b1220; --panel: #111a2b; --line: #1f2a3d; --ink: #eef2f7; --ink-2: #b7c1d0; --ink-3: #8d99ab;
+    --now: #ffb224; --now-ink: #ffcf73;
+    --cheap: #3c8cf0; --mid: #36425a; --dear: #ef6461; --sun: #ffb224;
+    --ok: #4ade80; --ok-bg: rgba(74, 222, 128, .12); --wait: #ff8a80; --wait-bg: rgba(239, 100, 97, .14); --meh: #ffcf73; --meh-bg: rgba(255, 178, 36, .12);
+    --seg: #1a2537; --seg-on: #2a3953; --shadow: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 20px 50px -30px rgba(0, 0, 0, .9);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.4 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+         -webkit-font-smoothing: antialiased; -webkit-user-select: none; user-select: none; transition: background .6s; }
+  body.dim main { filter: brightness(.7); }
+  .num { font-family: "Inter Tight", "Inter", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  main { height: 100%; min-height: 560px; display: grid; grid-template-rows: auto 1fr auto; gap: 18px; max-width: 1500px; margin: 0 auto;
+         padding: max(18px, env(safe-area-inset-top)) clamp(16px, 2.4vw, 32px) max(18px, env(safe-area-inset-bottom)); }
+
+  /* bovenbalk */
+  .bar { display: flex; align-items: center; gap: 14px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; }
+  .brand svg { width: 26px; height: 26px; }
+  .time { margin-left: auto; text-align: right; line-height: 1.15; }
+  .time b { display: block; font-size: 26px; font-weight: 650; }
+  .time span { font-size: 14px; color: var(--ink-2); }
+  .live { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; color: var(--ink-2); padding: 8px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
+  .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+  .live.off i { background: var(--wait); }
+  .icon { width: 48px; height: 48px; border-radius: 16px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+  .icon svg { width: 22px; height: 22px; }
+
+  /* hoofdindeling */
+  .stage { display: grid; grid-template-columns: minmax(340px, 1fr) minmax(380px, 1.05fr); gap: 18px; min-height: 0; }
+  .stage > .panel { min-height: 0; overflow: auto; }
+  @media (max-width: 900px) { main { height: auto; } .stage { grid-template-columns: 1fr; } .stage > .panel { overflow: visible; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 30px; box-shadow: var(--shadow); min-width: 0; }
+
+  /* de stroomklok */
+  .clock { display: grid; place-items: center; align-content: center; padding: clamp(14px, 2vw, 26px); gap: 12px; }
+  .dial { width: min(100%, 540px, calc(100vh - 300px)); min-width: 280px; aspect-ratio: 1; position: relative; }
+  @media (max-width: 900px) { .dial { width: min(100%, 520px); } }
+  .dial svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .center { position: absolute; inset: 24%; display: grid; place-content: center; justify-items: center; text-align: center; gap: 6px; }
+  .verdict { display: inline-flex; align-self: center; justify-self: center; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; font-weight: 650; font-size: clamp(15px, 1.6vw, 19px); }
+  .verdict.groen { background: var(--ok-bg); color: var(--ok); }
+  .verdict.rood { background: var(--wait-bg); color: var(--wait); }
+  .verdict.oranje { background: var(--meh-bg); color: var(--meh); }
+  .verdict i { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
+  .price { font-size: clamp(38px, 5.2vw, 76px); font-weight: 650; line-height: 1; white-space: nowrap; }
+  .unit { font-size: 14px; color: var(--ink-2); margin-top: -2px; }
+  .why { font-size: clamp(13px, 1.15vw, 16px); color: var(--ink-2); max-width: 26ch; margin: 0 auto; text-wrap: balance; }
+  .key { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; font-size: 14px; color: var(--ink-2); }
+  .key span { display: inline-flex; align-items: center; gap: 7px; }
+  .key i { width: 12px; height: 12px; border-radius: 4px; }
+
+  /* apparaten */
+  .devs { padding: 10px 0; display: flex; flex-direction: column; }
+  .devs h2 { font: 650 20px/1.2 "Inter Tight", "Inter", sans-serif; letter-spacing: -.01em; margin: 14px 26px 6px; }
+  .dev { padding: 18px 26px; border-top: 1px solid var(--line); display: grid; grid-template-columns: 52px 1fr; gap: 6px 16px; }
+  .dev:first-of-type { border-top: 0; }
+  .dev .ico { width: 52px; height: 52px; border-radius: 17px; display: grid; place-items: center; background: var(--seg); color: var(--ink-2); grid-row: span 2; }
+  .dev.on .ico { background: var(--now); color: #1b1200; }
+  .dev .ico svg { width: 26px; height: 26px; }
+  .dev .top { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+  .dev .name { font-weight: 650; font-size: 19px; }
+  .dev .kw { margin-left: auto; font-size: 22px; font-weight: 650; }
+  .dev .kw small { font-size: 13px; color: var(--ink-2); font-weight: 550; margin-left: 2px; }
+  .dev .state { color: var(--ink-2); font-size: 15px; grid-column: 2; }
+  .controls { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
+  .seg { display: inline-grid; grid-auto-flow: column; background: var(--seg); border-radius: 16px; padding: 4px; gap: 4px; }
+  .seg button { font: inherit; font-size: 15px; font-weight: 600; min-height: 48px; padding: 0 14px; border: 0; border-radius: 12px; background: transparent; color: var(--ink-2); cursor: pointer; }
+  .seg button.on { background: var(--seg-on); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+  .stepper { display: inline-flex; align-items: center; gap: 6px; background: var(--seg); border-radius: 16px; padding: 4px 4px 4px 14px; font-size: 15px; color: var(--ink-2); }
+  .stepper b { color: var(--ink); font-size: 18px; min-width: 56px; text-align: center; }
+  .stepper button { font: inherit; width: 44px; height: 44px; border-radius: 12px; border: 0; background: var(--seg-on); color: var(--ink); font-size: 22px; cursor: pointer; }
+  .evk { grid-column: 1 / -1; display: grid; gap: 10px; margin-top: 8px; }
+  .evk .cars { display: flex; flex-wrap: wrap; gap: 8px; }
+  .evk .cars button { font: inherit; font-size: 16px; font-weight: 650; min-height: 46px; padding: 0 16px; border-radius: 14px; border: 2px solid transparent; background: var(--seg); color: var(--ink); cursor: pointer; display: inline-flex; gap: 8px; align-items: baseline; }
+  .evk .cars button small { color: var(--ink-2); font-weight: 600; }
+  .evk .cars button.on { border-color: var(--now); background: var(--seg-on); }
+  .evk .bar { position: relative; height: 14px; border-radius: 7px; background: var(--seg); }
+  .evk .bar .f { position: absolute; inset: 0 auto 0 0; border-radius: 7px; background: var(--cheap); transition: width .6s; }
+  .evk .bar .t { position: absolute; top: -5px; bottom: -5px; width: 3px; border-radius: 2px; background: var(--ink); transform: translateX(-1.5px); }
+  .evk .line { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; color: var(--ink-2); flex-wrap: wrap; }
+  .evk .line b { color: var(--ink); font-size: 20px; }
+  button:focus-visible { outline: 3px solid var(--cheap); outline-offset: 2px; }
+  .empty { padding: 24px 26px; color: var(--ink-2); }
+
+  /* onderbalk */
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; }
+  .fact { padding: 18px 22px; }
+  .fact .k { font-size: 14px; color: var(--ink-2); }
+  .fact .v { font-size: clamp(26px, 2.6vw, 34px); font-weight: 650; margin-top: 2px; }
+  .fact .d { font-size: 14px; color: var(--ink-3); margin-top: 2px; }
+
+  /* instellingen */
+  .sheet-bg { position: fixed; inset: 0; background: rgba(5, 10, 20, .45); display: grid; place-items: end center; z-index: 10; }
+  .sheet { max-height: 92vh; overflow: auto; width: min(640px, 100%); background: var(--panel); border-radius: 30px 30px 0 0; padding: 26px 26px max(26px, env(safe-area-inset-bottom)); box-shadow: 0 -20px 60px rgba(0, 0, 0, .25); }
+  .sheet h2 { font: 650 24px/1.2 "Inter Tight", "Inter", sans-serif; margin: 0 0 4px; }
+  .sheet p { color: var(--ink-2); margin: 0 0 18px; font-size: 15px; }
+  .row { display: grid; gap: 10px; margin-bottom: 20px; }
+  .row > span { font-weight: 600; font-size: 15px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips button { font: inherit; font-size: 15px; font-weight: 600; min-height: 46px; padding: 0 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--ink-2); cursor: pointer; }
+  .chips button.on { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+  .sheet .done { width: 100%; font: inherit; font-weight: 650; font-size: 17px; min-height: 54px; border-radius: 16px; border: 0; background: var(--now); color: #1b1200; cursor: pointer; }
+  .sheet a { color: var(--ink-2); font-size: 14px; }
+  .seg button { white-space: nowrap; }
+  .why-out { display: none; color: var(--ink-2); text-align: center; margin: 0; max-width: 34ch; font-size: 15px; }
+  @media (max-width: 560px) {
+    .center .why, .time span, .unit { display: none; }
+    .why-out { display: block; }
+    .center { inset: 20%; }
+    .verdict { font-size: 14px; padding: 6px 12px; }
+    .dev { padding: 16px 18px; } .devs h2 { margin-left: 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) { body { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <header class="bar">
+    <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="7" fill="#ffb224"/><path d="M16 3v3M16 26v3M3 16h3M26 16h3M6.8 6.8l2.1 2.1M23.1 23.1l2.1 2.1M6.8 25.2l2.1-2.1M23.1 8.9l2.1-2.1" stroke="#ffb224" stroke-width="2.4" stroke-linecap="round"/></svg>Zonnestuur</div>
+    <span class="live" id="live"><i></i><span id="liveTxt">verbinden</span></span>
+    <div class="time"><b class="num" id="clockTime">--:--</b><span id="clockDate">&nbsp;</span></div>
+    <button class="icon" id="setBtn" aria-label="Instellingen van dit scherm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
+  </header>
+
+  <div class="stage">
+    <section class="panel clock" aria-label="Stroomklok van vandaag">
+      <div class="dial">
+        <svg id="dial" viewBox="-34 -34 468 468" role="img" aria-label="Prijs of zon per uur vandaag, met de huidige tijd"></svg>
+        <div class="center">
+          <span class="verdict oranje" id="verdict"><i></i><span id="word">Even kijken</span></span>
+          <div class="price num" id="price">–</div>
+          <div class="unit">per kWh, alles inbegrepen</div>
+          <div class="why" id="why">&nbsp;</div>
+        </div>
+      </div>
+      <p class="why-out" id="whyOut"></p>
+      <div class="key" id="key"></div>
+    </section>
+
+    <section class="panel devs" aria-labelledby="devH">
+      <h2 id="devH">Wat Zonnestuur regelt</h2>
+      <div id="devices"><div class="empty">Laden…</div></div>
+    </section>
+  </div>
+
+  <div class="facts" id="facts"></div>
+</main>
+
+<div class="sheet-bg" id="sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetH">
+    <h2 id="sheetH">Dit scherm</h2>
+    <p>Deze instellingen gelden alleen voor dit scherm.</p>
+    <div class="row"><span>Uiterlijk</span><div class="chips" id="optMode"><button data-v="auto">Dag en nacht vanzelf</button><button data-v="light">Altijd licht</button><button data-v="dark">Altijd donker</button></div></div>
+    <div class="row"><span>'s Nachts (22:00–07:00)</span><div class="chips" id="optDim"><button data-v="1">Dimmen</button><button data-v="0">Niet dimmen</button></div></div>
+    <div class="row"><span>De klok toont</span><div class="chips" id="optDial"><button data-v="auto">Vanzelf</button><button data-v="price">Stroomprijs</button><button data-v="sun">Zon</button></div></div>
+    <div class="row"><span>Apparaten op dit scherm</span><div class="chips" id="optDevs"></div></div>
+    <button class="done" id="sheetDone">Klaar</button>
+    <p style="margin:14px 0 0"><a href="./">Naar het volledige dashboard</a> · <a href="instellingen">Alle instellingen</a></p>
+  </div>
+</div>
+
+<script>
+// Fouten in dit scherm melden aan Zonnestuur (die filtert en ontdubbelt); netwerkhaperingen tellen niet mee.
+window.zsFout = (function () { let n = 0; return function (msg, where) {
+  msg = String((msg && msg.message) || msg || ""); if (!msg || n++ > 5 || /Failed to fetch|NetworkError|Load failed|AbortError|HTTP 5\d\d|ResizeObserver/i.test(msg)) return;
+  let t = ""; try { t = localStorage.getItem("zs_token") || ""; } catch (e) {}
+  try { fetch("api/fout", { method: "POST", headers: { "Content-Type": "application/json", "X-Token": t }, body: JSON.stringify({ msg: msg.slice(0, 500), where: (String(where || "") + "\n" + location.pathname).slice(0, 3000) }) }).catch(() => {}); } catch (e) {}
+}; })();
+addEventListener("error", (e) => zsFout(e.message, (e.error && e.error.stack) || `${e.filename}:${e.lineno}:${e.colno}`));
+addEventListener("unhandledrejection", (e) => zsFout(e.reason, e.reason && e.reason.stack));
+
+const $ = (id) => document.getElementById(id);
+const nl = (v, d = 0) => (v ?? 0).toLocaleString("nl-NL", { minimumFractionDigits: d, maximumFractionDigits: d });
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const hhmm = (d) => d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+let token = ""; try { token = localStorage.getItem("zs_token") || ""; } catch (e) {}
+const api = (p, o = {}) => fetch(p, Object.assign({}, o, { headers: Object.assign({ "Content-Type": "application/json" }, token ? { "X-Token": token } : {}) })).then((r) => r.json());
+
+// ---- voorkeuren van dit scherm
+const PREF = { mode: "auto", dim: "1", dial: "auto", hide: [] };
+try { Object.assign(PREF, JSON.parse(localStorage.getItem("zs_kiosk") || "{}")); } catch (e) {}
+const savePref = () => { try { localStorage.setItem("zs_kiosk", JSON.stringify(PREF)); } catch (e) {} };
+
+let S = null, P = null, M = null, C = null;
+
+function applyMode() {
+  const h = new Date().getHours(), night = h >= 21 || h < 7;
+  document.documentElement.dataset.mode = PREF.mode === "auto" ? (night ? "dark" : "light") : PREF.mode;
+  document.body.classList.toggle("dim", PREF.dim === "1" && (h >= 22 || h < 7));
+}
+
+// ---- de stroomklok
+const R_OUT = 196, R_IN = 156;
+function polar(r, hour) { const a = (hour / 24) * 2 * Math.PI - Math.PI / 2; return [200 + r * Math.cos(a), 200 + r * Math.sin(a)]; }
+function arc(h0, h1, r0, r1) {
+  const [a, b] = polar(r1, h0), [c, d] = polar(r1, h1), [e, f] = polar(r0, h1), [g, k] = polar(r0, h0), big = h1 - h0 > 12 ? 1 : 0;
+  return `M${a},${b} A${r1},${r1} 0 ${big} 1 ${c},${d} L${e},${f} A${r0},${r0} 0 ${big} 0 ${g},${k} Z`;
+}
+function dialMode() { return PREF.dial !== "auto" ? PREF.dial : (S && S.has_panels ? "sun" : "price"); }
+function hourData() {
+  // de komende 24 uur, elk uur op zijn plek op de klok (na middernacht dus de nacht van morgen)
+  const h0 = new Date(); h0.setMinutes(0, 0, 0);
+  const t0 = h0.getTime() / 1000, out = [];
+  if (dialMode() === "price" && P && P.slots && P.slots.length) {
+    const byH = {};
+    for (const r of P.slots) if (r.ts >= t0 && r.ts < t0 + 86400) { const h = new Date(r.ts * 1000).getHours(); (byH[h] = byH[h] || []).push(r); }
+    const vals = Object.values(byH).map((rs) => rs.reduce((a, r) => a + r.all_in, 0) / rs.length);
+    const sorted = [...vals].sort((a, b) => a - b), q = (p) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
+    const lo = q(0.33), hi = q(0.67);
+    for (let h = 0; h < 24; h++) {
+      const rs = byH[h]; if (!rs) { out.push(null); continue; }
+      const v = rs.reduce((a, r) => a + r.all_in, 0) / rs.length;
+      out.push({ v, color: v <= lo ? "var(--cheap)" : v >= hi ? "var(--dear)" : "var(--mid)", planned: rs.some((r) => r.planned && r.planned.length) });
+    }
+  } else if (C && C.windows) {
+    for (let h = 0; h < 24; h++) out.push({ v: 0, color: "var(--mid)", planned: false });
+    for (const w of C.windows.filter((w) => !w.tomorrow)) {
+      const a = Number(w.from.slice(0, 2)), b = Number(w.to.slice(0, 2));
+      for (let h = a; h < Math.max(a + 1, b); h++) out[h] = { v: 1, color: "var(--sun)", planned: false };
+    }
+    for (const d of (S && S.devices) || []) for (const bh of d.best_hours || []) { const h = Number(bh.slice(0, 2)); if (out[h]) out[h].planned = true; }
+  }
+  return out;
+}
+function drawDial() {
+  const svg = $("dial"), now = new Date(), hn = now.getHours() + now.getMinutes() / 60, data = hourData();
+  let h = "";
+  for (let i = 0; i < 24; i++) {
+    const d = data[i], past = false;
+    h += `<path d="${arc(i + 0.04, i + 0.96, R_IN, R_OUT)}" fill="${d ? d.color : "var(--seg)"}" opacity="${past ? 0.32 : 1}"/>`;
+    if (d && d.planned) { const [x, y] = polar(R_IN - 11, i + 0.5); h += `<circle cx="${x}" cy="${y}" r="4.5" fill="var(--now)" opacity="${past ? 0.4 : 1}"/>`; }
+  }
+  for (const t of [0, 6, 12, 18]) {
+    const [x, y] = polar(R_OUT + 20, t);
+    h += `<text x="${x}" y="${y + 5}" text-anchor="middle" font-size="16" font-weight="600" fill="var(--ink-3)" font-family="Inter Tight, Inter, sans-serif">${String(t).padStart(2, "0")}</text>`;
+  }
+  const [x1, y1] = polar(R_IN - 2, hn), [x2, y2] = polar(R_OUT + 8, hn);
+  h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--now)" stroke-width="6" stroke-linecap="round"/>`;
+  h += `<circle cx="${x2}" cy="${y2}" r="9" fill="var(--now)" stroke="var(--panel)" stroke-width="4"/>`;
+  svg.innerHTML = h;
+  const mode = dialMode();
+  $("key").innerHTML = mode === "price"
+    ? `<span>Komende 24 uur:</span><span><i style="background:var(--cheap)"></i>Goedkoop</span><span><i style="background:var(--mid)"></i>Gemiddeld</span><span><i style="background:var(--dear)"></i>Duur</span><span><i style="background:var(--now);border-radius:50%"></i>Gepland</span>`
+    : `<span><i style="background:var(--sun)"></i>Zon over</span><span><i style="background:var(--now);border-radius:50%"></i>Gepland</span>`;
+}
+
+// ---- het oordeel in het midden
+function drawCenter() {
+  if (M) {
+    $("verdict").className = "verdict " + M.state;
+    $("word").textContent = M.word;
+    $("why").textContent = M.text;
+    $("whyOut").textContent = M.text;
+  }
+  if (S) $("price").textContent = `€ ${nl(S.price_now, 2)}`;
+}
+
+// ---- apparaten met bediening
+const ICON = {
+  boiler: '<path d="M12 3c3 4 6 7 6 11a6 6 0 0 1-12 0c0-4 3-7 6-11z"/>',
+  ev: '<path d="M5 16V11l2-4h10l2 4v5"/><path d="M4 16h16v2H4z"/><circle cx="8" cy="16" r="1.6"/><circle cx="16" cy="16" r="1.6"/>',
+  heatpump: '<rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="12" cy="12" r="3.5"/>',
+  generic: '<rect x="6" y="3" width="12" height="18" rx="3"/><circle cx="12" cy="13" r="3.5"/><path d="M9 6.5h2"/>',
+};
+function evCar(d) {
+  const E = d.ev;
+  if (!E || !E.cars || !E.cars.length) return null;
+  return E.cars.find((c) => c.id === E.active) || E.cars[0];
+}
+function evBlock(d) {
+  const car = evCar(d), E = d.ev;
+  if (!car) return "";
+  const hm = (m) => m >= 60 ? `${Math.floor(m / 60)} u${m % 60 ? " " + (m % 60) : ""}` : `${m} min`;
+  const chips = E.cars.length > 1 ? `<div class="cars" role="group" aria-label="Welke auto laadt?">${E.cars.map((c) =>
+    `<button data-id="${esc(d.id)}" data-evcar="${esc(c.id)}" class="${c.id === car.id ? "on" : ""}">${esc(c.name)}<small>${c.soc != null ? Math.round(c.soc) + "%" : "?"}</small></button>`).join("")}</div>` : "";
+  const soc = car.soc;
+  let right = "";
+  if (soc != null && E.need_min > 0) right = E.mode === "vol" ? `laadt nu vol · ± ${hm(E.need_min)}` : E.plan ? `${E.plan[0]}–${E.done_at} · ± € ${nl(E.cost, 2)}` : E.short ? `om ${E.short.ready} ± ${E.short.pct}%` : `nog ± ${hm(E.need_min)}`;
+  else if (soc != null) right = "doel bereikt";
+  return `<div class="evk">${chips}
+    ${soc != null ? `<div class="bar"><span class="f" style="width:${soc}%"></span><span class="t" style="left:${E.target ?? car.target_pct}%"></span></div>
+    <div class="line"><span><b class="num">${Math.round(soc)}%</b> ${esc(car.name)}${car.range_km != null ? ` · ± ${car.range_km} km` : ""}</span><span>${esc(right)}</span></div>` : ""}</div>`;
+}
+function stateText(d) {
+  if (!d.online) return /aangesloten|stekker/i.test(d.reason) ? "Niet aangesloten" : /klaarzet|start op afstand/i.test(d.reason) ? "Zet hem klaar met 'start op afstand'" : "Niet bereikbaar";
+  if (d.mode === "on") return `Door jou aangezet${d.override_until ? " tot " + d.override_until.slice(11, 16) : ""}`;
+  if (d.mode === "off") return `Vandaag overgeslagen${d.override_until ? " tot " + d.override_until.slice(11, 16) : ""}`;
+  const r = String(d.reason || "");
+  if (d.on && d.power_w > 50) return d.kind === "ev" ? "Laadt nu" + (/goedkoop/.test(r) ? ", goedkoop uur" : /zon|overschot/.test(r) ? ", op zon" : "") : "Draait nu" + (/goedkoop/.test(r) ? ", goedkoop uur" : /zon|overschot/.test(r) ? ", op zon" : "");
+  if (d.on && d.kind === "ev") return "Vol of wacht op de auto";
+  const m = r.match(/goedkoop uur \((\d\d:\d\d)\)/) || r.match(/\((\d\d:\d\d)\)/);
+  if (m) return `Wacht op goedkoper uur, ${m[1]}`;
+  if ((d.best_hours || []).length) return `Gepland om ${d.best_hours[0]}`;
+  if (/vandaag klaar|niets gepland/.test(r)) return "Klaar voor vandaag";
+  return r ? r.charAt(0).toUpperCase() + r.slice(1) : "Automatisch";
+}
+function drawDevices() {
+  const box = $("devices"), devs = ((S && S.devices) || []).filter((d) => !PREF.hide.includes(d.id));
+  const bats = ((S && S.batteries) || []).filter((b) => !PREF.hide.includes("bat:" + b.id));
+  if (!devs.length && !bats.length) { box.innerHTML = `<div class="empty">Kies op het instellingenscherm welke apparaten je hier wilt zien.</div>`; return; }
+  const BWORD = { auto: "Zelf gebruiken", save: "Houdt vast voor later", charge: "Laadt van het net", export: "Verkoopt aan het net", idle: "Stand-by" };
+  const batHtml = bats.map((b) => {
+    const soc = b.soc == null ? null : Math.round(b.soc), pw = b.power_w || 0;
+    const nx = b.next ? ` · om ${b.next.start} ${b.next.action === "charge" ? "laden tot " + Math.round(b.next.soc) + "%" : b.next.action === "export" ? "verkopen" : "vasthouden"}` : "";
+    return `<div class="dev ${Math.abs(pw) > 30 ? "on" : ""}">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="3"/><path d="M9.5 2h5M12 8.5l-2.5 4h5l-2.5 4"/></svg></div>
+      <div class="top"><span class="name">${esc(b.name)}</span><span class="kw num">${soc == null ? "–" : soc + "<small>%</small>"}</span></div>
+      <div class="state">${b.online ? esc((pw > 30 ? `Laadt ${nl(pw / 1000, 1)} kW` : pw < -30 ? `Levert ${nl(-pw / 1000, 1)} kW` : BWORD[b.action] || "") + nx) : "Niet bereikbaar"}</div>
+      ${soc != null ? `<div class="evk"><div class="bar"><span class="f" style="width:${soc}%"></span>${b.target_soc ? `<span class="t" style="left:${b.target_soc}%"></span>` : ""}</div></div>` : ""}
+    </div>`;
+  }).join("");
+  box.innerHTML = devs.map((d) => {
+    const running = d.on && d.power_w > 50, ready = (d.ready_times || [])[0];
+    const midnight = Math.max(0.1, (new Date(new Date().setHours(24, 0, 0, 0)) - Date.now()) / 3.6e6);
+    return `<div class="dev ${running ? "on" : ""}">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICON[d.kind] || ICON.generic}</svg></div>
+      <div class="top"><span class="name">${esc(d.name)}</span><span class="kw num">${running ? nl(d.power_w / 1000, 1) + "<small>kW</small>" : ""}</span></div>
+      <div class="state">${esc(stateText(d))}</div>
+      ${evBlock(d)}
+      <div class="controls">
+        <div class="seg" role="group" aria-label="${esc(d.name)} bedienen">
+          <button data-id="${esc(d.id)}" data-mode="auto" class="${d.mode === "auto" && !(d.ev && d.ev.mode === "vol") ? "on" : ""}">Automatisch</button>
+          ${d.ev && d.ev.cars.length ? `<button data-id="${esc(d.id)}" data-evmode="vol" class="${d.ev.mode === "vol" && d.mode === "auto" ? "on" : ""}">Nu vol</button>`
+            : `<button data-id="${esc(d.id)}" data-mode="on" data-hours="2" class="${d.mode === "on" ? "on" : ""}">Nu aan</button>`}
+          <button data-id="${esc(d.id)}" data-mode="off" data-hours="${midnight}" class="${d.mode === "off" ? "on" : ""}">Overslaan</button>
+        </div>
+        ${d.kind === "ev" || ready ? `<div class="stepper"><span>${d.kind === "ev" ? "Vol om" : "Klaar om"}</span><button data-id="${esc(d.id)}" data-step="-30" aria-label="Eerder">−</button><b class="num">${esc(ready || "–")}</b><button data-id="${esc(d.id)}" data-step="30" aria-label="Later">+</button></div>` : ""}
+        ${evCar(d) ? `<div class="stepper"><span>Tot</span><button data-id="${esc(d.id)}" data-evt="-10" aria-label="Minder">−</button><b class="num">${evCar(d).target_pct}%</b><button data-id="${esc(d.id)}" data-evt="10" aria-label="Meer">+</button></div>` : ""}
+      </div></div>`;
+  }).join("") + batHtml;
+  const evPost = (id, body) => api(`api/device/${encodeURIComponent(id)}/ev`, { method: "POST", body: JSON.stringify(body) });
+  box.querySelectorAll("[data-evcar]").forEach((b) => b.onclick = async () => { await evPost(b.dataset.id, { car: b.dataset.evcar }); loadStatus(); });
+  box.querySelectorAll("[data-evmode]").forEach((b) => b.onclick = async () => {
+    b.closest(".seg").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+    await api(`api/device/${encodeURIComponent(b.dataset.id)}/mode`, { method: "POST", body: JSON.stringify({ mode: "auto", hours: null }) });
+    await evPost(b.dataset.id, { mode: "vol" }); loadStatus();
+  });
+  box.querySelectorAll("[data-evt]").forEach((b) => b.onclick = async () => {
+    const d = S.devices.find((x) => x.id === b.dataset.id), car = evCar(d);
+    await evPost(d.id, { car_settings: { id: car.id, target_pct: car.target_pct + Number(b.dataset.evt) } }); loadStatus();
+  });
+  box.querySelectorAll("[data-mode]").forEach((b) => b.onclick = async () => {
+    b.closest(".seg").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+    const dv = S.devices.find((x) => x.id === b.dataset.id);
+    if (dv && dv.ev && dv.ev.mode === "vol") await evPost(dv.id, { mode: "slim" });
+    await api(`api/device/${encodeURIComponent(b.dataset.id)}/mode`, { method: "POST", body: JSON.stringify({ mode: b.dataset.mode, hours: b.dataset.mode === "auto" ? null : Number(b.dataset.hours) }) });
+    loadStatus();
+  });
+  box.querySelectorAll("[data-step]").forEach((b) => b.onclick = async () => {
+    const d = S.devices.find((x) => x.id === b.dataset.id), cur = (d.ready_times || [])[0] || (d.kind === "ev" ? "07:00" : "18:00");
+    let m = (Number(cur.slice(0, 2)) * 60 + Number(cur.slice(3, 5)) + Number(b.dataset.step) + 1440) % 1440;
+    const t = `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    b.parentElement.querySelector("b").textContent = t;
+    await api(`api/device/${encodeURIComponent(d.id)}/ready`, { method: "POST", body: JSON.stringify({ times: [t, ...(d.ready_times || []).slice(1)] }) });
+    loadStatus();
+  });
+}
+
+// ---- onderbalk
+function cheapestBlock(hours = 3) {
+  if (!P || !P.slots || !P.slots.length) return null;
+  const nowTs = Date.now() / 1000, byH = {};
+  for (const r of P.slots) if (r.end > nowTs) { const k = Math.floor(r.ts / 3600) * 3600; (byH[k] = byH[k] || []).push(r.all_in); }
+  const ks = Object.keys(byH).map(Number).sort((a, b) => a - b);
+  let best = null;
+  for (let i = 0; i + hours <= ks.length; i++) {
+    if (ks[i + hours - 1] - ks[i] !== (hours - 1) * 3600) continue;
+    const avg = ks.slice(i, i + hours).reduce((a, k) => a + byH[k].reduce((x, y) => x + y, 0) / byH[k].length, 0) / hours;
+    if (!best || avg < best.avg) best = { start: ks[i], avg };
+  }
+  return best;
+}
+function drawFacts() {
+  if (!S) return;
+  const V = S.value || { month: { eur: S.month.eur_saved } };
+  const f = [];
+  f.push(["Opgeleverd deze maand", `€ ${nl(V.month.eur, 2)}`, S.has_panels ? `${nl(S.month.kwh_solar, 1)} kWh eigen zon gebruikt` : "door in goedkope uren te draaien"]);
+  const g = S.grid_w;
+  f.push([g != null && g < -30 ? "Je levert terug" : "Je huis gebruikt nu", g == null ? "–" : `${nl(Math.abs(g) / 1000, 1)} kW`, S.has_panels ? `zon nu ± ${nl((S.forecast_now_w || 0) / 1000, 1)} kW` : "van het net"]);
+  const b = cheapestBlock(3);
+  if (b) { const a = new Date(b.start * 1000), e = new Date((b.start + 3 * 3600) * 1000);
+    f.push(["Goedkoopste 3 uur", `${hhmm(a)}–${hhmm(e)}`, `gemiddeld € ${nl(b.avg, 2)} per kWh${a.getDate() !== new Date().getDate() ? ", morgen" : ""}`]); }
+  $("facts").innerHTML = f.map(([k, v, d]) => `<div class="panel fact"><div class="k">${k}</div><div class="v num">${v}</div><div class="d">${d}</div></div>`).join("");
+}
+
+// ---- verversen
+function tick() {
+  const n = new Date();
+  $("clockTime").textContent = hhmm(n);
+  $("clockDate").textContent = n.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
+  applyMode();
+}
+async function loadStatus() {
+  try {
+    S = await api("api/status");
+    const H = S.health || {}, bad = (S.problems || []).some((p) => p.level === "warn");
+    $("live").classList.toggle("off", bad);
+    $("liveTxt").textContent = bad ? "Let op" : "Live";
+    drawCenter(); drawDevices(); drawFacts(); drawDial();
+  } catch (e) { $("live").classList.add("off"); $("liveTxt").textContent = "Geen verbinding"; }
+}
+async function loadMoment() { try { M = await api("api/moment"); drawCenter(); } catch (e) {} }
+async function loadSlow() {
+  try { P = await api("api/prices"); } catch (e) { P = null; }
+  try { C = await api("api/coach"); } catch (e) { C = null; }
+  drawDial(); drawFacts();
+}
+
+// ---- instellingen van dit scherm
+function sheet(open) {
+  $("sheet").hidden = !open;
+  if (!open) return;
+  const mark = (id, v) => $(id).querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
+  mark("optMode", PREF.mode); mark("optDim", PREF.dim); mark("optDial", PREF.dial);
+  $("optDevs").innerHTML = ((S && S.devices) || []).map((d) => `<button data-id="${esc(d.id)}" class="${PREF.hide.includes(d.id) ? "" : "on"}">${esc(d.name)}</button>`).join("")
+    + ((S && S.batteries) || []).map((b) => `<button data-id="bat:${esc(b.id)}" class="${PREF.hide.includes("bat:" + b.id) ? "" : "on"}">${esc(b.name)}</button>`).join("");
+  $("optDevs").querySelectorAll("button").forEach((b) => b.onclick = () => {
+    b.classList.toggle("on");
+    PREF.hide = [...$("optDevs").querySelectorAll("button:not(.on)")].map((x) => x.dataset.id); savePref(); drawDevices();
+  });
+}
+for (const [id, key] of [["optMode", "mode"], ["optDim", "dim"], ["optDial", "dial"]]) {
+  $(id).querySelectorAll("button").forEach((b) => b.onclick = () => {
+    PREF[key] = b.dataset.v; savePref();
+    $(id).querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+    applyMode(); drawDial();
+  });
+}
+$("setBtn").onclick = () => sheet(true);
+$("sheetDone").onclick = () => sheet(false);
+$("sheet").addEventListener("click", (e) => { if (e.target === $("sheet")) sheet(false); });
+
+tick(); loadStatus(); loadMoment(); loadSlow();
+setInterval(tick, 15000); setInterval(loadStatus, 8000); setInterval(loadMoment, 30000); setInterval(loadSlow, 300000);
+setInterval(drawDial, 60000);
+(async () => { try { await navigator.wakeLock.request("screen"); } catch (e) {} })();
+document.addEventListener("visibilitychange", async () => { if (document.visibilityState === "visible") { try { await navigator.wakeLock.request("screen"); } catch (e) {} } });
+</script>
+</body>
+</html>

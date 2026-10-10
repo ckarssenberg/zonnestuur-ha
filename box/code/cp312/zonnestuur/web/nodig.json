@@ -1,0 +1,145 @@
+{
+ "_uitleg": "Inhoud van 'Wat heb je nodig?' (kennismaking in de app en zonnestuur.nl/hoe-het-werkt). Prijzen zijn richtprijzen.",
+ "vragen": [
+  {
+   "id": "draai",
+   "alleen_website": true,
+   "vraag": "Heb je een Raspberry Pi?",
+   "keuzes": [
+    {
+     "id": "pi",
+     "tekst": "Ja, een Pi 4 of 5",
+     "kan": "Dan heb je alleen de Zonnestuur SD-kaart nodig. Kaart erin, stekker erin, en Zonnestuur zoekt zelf je apparaten. Andere software is niet nodig."
+    },
+    {
+     "id": "geen",
+     "tekst": "Nee",
+     "nodig": "Een Raspberry Pi 4 of 5 met 4 GB of meer, een voeding en een behuizing, plus de Zonnestuur SD-kaart. Liever kant-en-klaar? Meld je aan, dan hoor je wanneer het kastje er is.",
+     "prijs": "± € 80 tot € 110 voor Pi, voeding en behuizing"
+    }
+   ]
+  },
+  {
+   "id": "panelen",
+   "vraag": "Heb je zonnepanelen?",
+   "keuzes": [
+    {
+     "id": "ja",
+     "tekst": "Ja",
+     "kan": "Zonnestuur laat je apparaten draaien op je eigen zonnestroom, in plaats van die voor bijna niets terug te leveren."
+    },
+    {
+     "id": "nee",
+     "tekst": "Nee",
+     "kan": "Zonnestuur laat je apparaten draaien in de goedkoopste uren. Daarvoor heb je een dynamisch contract nodig."
+    }
+   ]
+  },
+  {
+   "id": "contract",
+   "vraag": "Wat voor energiecontract heb je?",
+   "keuzes": [
+    {
+     "id": "dynamisch",
+     "tekst": "Dynamisch (prijs per uur)",
+     "kan": "Zonnestuur combineert zon en uurprijzen: bij te weinig zon kiest hij de goedkoopste uren."
+    },
+    {
+     "id": "vast",
+     "tekst": "Vast of variabel",
+     "kan": "Zonnestuur stuurt op je eigen zon. Zonder zonnepanelen levert sturen met een vast contract weinig op.",
+     "tip": "Zonnestuur vergelijkt na een paar weken wat je bij andere contracten (ook dynamisch) had betaald.",
+     "kan_als": {
+      "panelen": "ja"
+     }
+    },
+    {
+     "id": "weet",
+     "tekst": "Weet ik niet",
+     "tip": "Kijk op je laatste jaarnota of in de app van je leverancier. Je kunt het later in Zonnestuur aanpassen."
+    }
+   ]
+  },
+  {
+   "id": "meter",
+   "vraag": "Hoe lees je je slimme meter uit?",
+   "toon_als": {
+    "panelen": "ja"
+   },
+   "keuzes": [
+    {
+     "id": "homewizard",
+     "tekst": "HomeWizard P1-meter",
+     "kan": "Werkt meteen. Zet in de HomeWizard-app bij de meter Lokale API aan."
+    },
+    {
+     "id": "kabel",
+     "tekst": "P1-kabel",
+     "kan": "Werkt rechtstreeks: een P1-kabel (USB) van je slimme meter naar de Raspberry Pi."
+    },
+    {
+     "id": "anders",
+     "tekst": "YouLess of Shelly EM",
+     "kan": "Werkt rechtstreeks."
+    },
+    {
+     "id": "niets",
+     "tekst": "Nog niets",
+     "nodig": "Een P1-meter in de P1-poort van je slimme meter, bijvoorbeeld de HomeWizard P1-meter, of een P1-kabel (USB) naar de Raspberry Pi.",
+     "prijs": "± € 30 (HomeWizard) of ± € 15 (P1-kabel)"
+    }
+   ]
+  },
+  {
+   "id": "apparaten",
+   "meer": true,
+   "vraag": "Wat wil je slim laten draaien?",
+   "keuzes": [
+    {
+     "id": "boiler",
+     "tekst": "Elektrische boiler",
+     "kan": "De grootste winst: warm water maken op je zon of in de goedkoopste uren. Altijd op tijd warm.",
+     "nodig": "Een slimme schakelaar voor de boiler, bijvoorbeeld een Shelly 1PM of Pro 1PM. Laat die door een installateur plaatsen. Heeft je boiler een eigen app (bijv. Ariston), dan kan het ook daarmee.",
+     "prijs": "± € 25 tot € 45"
+    },
+    {
+     "id": "warmtepomp",
+     "tekst": "Warmtepomp of warmtepompboiler",
+     "kan": "Bij zon of goedkope stroom zet Zonnestuur de temperatuur iets hoger, zodat de warmte wordt opgeslagen.",
+     "nodig": "Een koppeling met je merk (zoek het in de koppellijst), of een SG-ready-contact dat de installateur aansluit.",
+     "link": "koppelen"
+    },
+    {
+     "id": "auto",
+     "tekst": "Elektrische auto",
+     "kan": "Laden op je zon of in de goedkoopste uren, en toch vol op de tijd die jij kiest.",
+     "nodig": "Een laadpaal die je op afstand kunt sturen (bijna alle nieuwe laadpalen kunnen dat, via de app van de fabrikant of OCPP). Elk automerk werkt via de laadpaal."
+    },
+    {
+     "id": "witgoed",
+     "tekst": "Wasmachine, droger of vaatwasser",
+     "kan": "Je zet de machine klaar met start op afstand; Zonnestuur start hem op het beste moment en stuurt een melding.",
+     "nodig": "Een machine met start op afstand (bijv. Home Connect van Bosch/Siemens, Miele, AEG, Samsung).",
+     "tip": "Heb je een gewone machine? Dan vertelt Zonnestuur elke ochtend wanneer je het beste kunt wassen."
+    },
+    {
+     "id": "batterij",
+     "tekst": "Thuisbatterij",
+     "kan": "Elk kwartier een plan: zelf gebruiken, vasthouden voor de dure uren, of goedkoop laden van het net.",
+     "nodig": "HomeWizard, Marstek, Zendure en Victron werken rechtstreeks. Veel andere merken via de koppelmotor in Zonnestuur."
+    },
+    {
+     "id": "omvormer",
+     "tekst": "Omvormer van de zonnepanelen",
+     "kan": "Zonnestuur ziet precies wat je panelen opwekken en knijpt ze af als terugleveren geld kost.",
+     "nodig": "Fronius, SMA, SolarEdge, Huawei, GoodWe, Sungrow, Kostal, Hoymiles, APsystems, Victron en SunSpec werken rechtstreeks. Bij het merk staat wat je in de omvormer moet aanzetten."
+    },
+    {
+     "id": "scherm",
+     "tekst": "Google Nest Hub of tablet",
+     "kan": "Het Huisscherm: groot in beeld of stroom nu goedkoop is, de prijs per uur, het weer, met radio."
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,6 @@
+[Unit]
+Description=Zonnestuur motor opnieuw opbouwen na een wijziging
+
+[Service]
+Type=oneshot
+ExecStart=/opt/zonnestuur/motor/motor.sh

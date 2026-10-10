@@ -1,0 +1,69 @@
+# De motor van de Zonnestuur Box: Home Assistant (voor de koppelingen), de Matter-server en, als ze aan staan,
+# een Thread-grensrouter (profiel 'thread', met een Thread-dongle) en evcc (profiel 'evcc', voor EEBUS-laadpalen
+# en auto's). Alles op het hostnetwerk; gegevens onder /var/lib/zonnestuur. Gestart door zonnestuur-motor.service
+# (projectnaam zonnestuur-motor via -p; werkt met docker compose v2 en docker-compose v1.29).
+
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: zs-homeassistant
+    network_mode: host
+    # Niet 'privileged': alleen seriële dongles (ttyUSB 188, ttyACM 166) en bluetooth via D-Bus
+    device_cgroup_rules:
+      - "c 188:* rmw"
+      - "c 166:* rmw"
+    cap_add: [NET_ADMIN, NET_RAW]    # bluetooth en netwerk-ontdekking
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Amsterdam
+    volumes:
+      - /var/lib/zonnestuur/ha:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+      - /dev:/dev                    # dongles die later worden ingeprikt; toegang beperkt door de regels hierboven
+      - /run/udev:/run/udev:ro
+
+  matter-server:
+    image: ghcr.io/home-assistant-libs/python-matter-server:stable
+    container_name: zs-matter
+    network_mode: host
+    cap_add: [NET_ADMIN, NET_RAW]    # bluetooth voor nieuwe apparaten
+    restart: unless-stopped
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /var/lib/zonnestuur/matter:/data
+      - /run/dbus:/run/dbus:ro
+    command: --storage-path /data --paa-root-cert-dir /data/credentials --bluetooth-adapter 0
+
+  otbr:
+    profiles: ["thread"]
+    image: ghcr.io/d34dc3n73r/ha-otbr:stable
+    container_name: zs-otbr
+    network_mode: host
+    restart: unless-stopped
+    cap_add: [NET_ADMIN, IPC_LOCK]
+    environment:
+      DEVICE: ${OTBR_DEVICE:-/dev/ttyUSB0}
+      BACKBONE_IF: ${OTBR_BACKBONE:-eth0}
+      OTBR_REST_PORT: 8081
+      FLOW_CONTROL: 1
+      BAUDRATE: 460800
+      FIREWALL: 1
+      NAT64: 1
+    devices:
+      - ${OTBR_DEVICE:-/dev/ttyUSB0}
+      - /dev/net/tun
+    volumes:
+      - /var/lib/zonnestuur/otbr:/data/thread
+      - /etc/localtime:/etc/localtime:ro
+
+  evcc:
+    profiles: ["evcc"]
+    image: evcc/evcc:latest
+    container_name: zs-evcc
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - /var/lib/zonnestuur/evcc/evcc.yaml:/etc/evcc.yaml
+      - /var/lib/zonnestuur/evcc/data:/root/.evcc
