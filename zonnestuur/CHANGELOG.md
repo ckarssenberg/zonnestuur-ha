@@ -1,5 +1,8 @@
 # Wijzigingen
 
+## 0.50.1
+- Telefoon: je kunt nu rustig over de grafieken (prijzen, planning) heen scrollen. De uitleg bij een uur verschijnt pas als je er bewust op tikt; tik ergens anders om hem weer weg te halen.
+
 ## 0.50.0
 - Jaaroverzicht: per maand en per apparaat wat Zonnestuur opleverde, en hoeveel van de prijs van Pro je al terugverdiende.
 - Melding "morgen wordt waarschijnlijk een goedkope dag" als de prijsverwachting (wind, zon) duidelijk lager is dan de afgelopen week.

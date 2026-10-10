@@ -1858,7 +1858,7 @@ function drawLanes() {
       const hit = el("rect", { x: L + h.i * slot, y: y + 8, width: slot, height: 26, fill: "transparent" }, svg);
       hit.addEventListener("pointerenter", () => showTip(tip, box, (L + h.i * slot + slot / 2) * (box.clientWidth / W),
         `<b>${esc(ln.name)}</b><div class="row"><i class="sw" style="background:${h.c}"></i>${t.toLocaleDateString("nl-NL", { weekday: "short" })} ${hhmm(t)}<em>${esc(h.w)}${h.soc != null ? " · " + nl(h.soc) + "%" : ""}</em></div>`));
-      hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+      hit.addEventListener("pointerleave", () => { if (TT.touch) return; tip.style.opacity = 0; });
       void r;
     }
     if (ln.ov && ln.ov.b > ln.ov.a) {
@@ -1866,7 +1866,7 @@ function drawLanes() {
       el("rect", { x: xa, y: y + 16, width: Math.max(2, xb - xa), height: 12, rx: 4, fill: "url(#hatch)", stroke: "var(--ink-2)", "stroke-width": 1 }, svg);
       const hit = el("rect", { x: xa, y: y + 8, width: Math.max(4, xb - xa), height: 26, fill: "transparent" }, svg);
       hit.addEventListener("pointerenter", () => showTip(tip, box, ((xa + xb) / 2) * (box.clientWidth / W), `<b>${esc(ln.name)}</b><div class="row">Door jou ${ln.ov.on ? "aangezet" : "uitgezet"}<em>tot ${hhmm(new Date((start + ln.ov.b * 3600) * 1000))}</em></div>`));
-      hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+      hit.addEventListener("pointerleave", () => { if (TT.touch) return; tip.style.opacity = 0; });
     }
     for (const rt of ln.ready) if (rt < n) el("rect", { x: L + rt * slot - 1, y: y + 13, width: 2, height: 18, rx: 1, fill: "var(--ink)" }, svg);
   });
@@ -1897,7 +1897,32 @@ function roundedTop(x, y, w, h, r) {
   if (h <= 0) return "";
   return `M${x},${y + h} V${y + r} Q${x},${y} ${x + r},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${y + h} Z`;
 }
+// Telefoon: uitleg bij een grafiek pas tonen na een bewuste tik, niet tijdens scrollen.
+const TT = { touch: false, x: 0, y: 0, t: 0, moved: false, pending: null };
+function hideTips() { document.querySelectorAll(".tip").forEach((t) => { t.style.opacity = 0; }); }
+// Bij aanraken komt "pointerover" vóór "pointerenter" en "pointerdown": daar het soort aanwijzer vastleggen.
+document.addEventListener("pointerover", (e) => {
+  TT.touch = e.pointerType !== "mouse";
+  if (TT.touch) { TT.pending = null; TT.x = e.clientX; TT.y = e.clientY; TT.t = Date.now(); TT.moved = false; hideTips(); }
+}, true);
+document.addEventListener("pointerdown", (e) => {
+  TT.touch = e.pointerType !== "mouse";
+  if (TT.touch) { TT.x = e.clientX; TT.y = e.clientY; TT.t = Date.now(); TT.moved = false; }
+}, true);
+document.addEventListener("pointermove", (e) => {
+  if (TT.touch && (Math.abs(e.clientX - TT.x) > 10 || Math.abs(e.clientY - TT.y) > 10)) { TT.moved = true; TT.pending = null; }
+}, true);
+document.addEventListener("pointercancel", () => { TT.moved = true; TT.pending = null; }, true);
+document.addEventListener("click", () => {
+  const p = TT.pending; TT.pending = null;
+  if (p && TT.touch && !TT.moved && Date.now() - TT.t < 800) showTipNow(...p);
+});
+window.addEventListener("scroll", () => { if (TT.touch) { TT.pending = null; hideTips(); } }, { passive: true });
 function showTip(tip, box, x, html) {
+  if (TT.touch) { TT.pending = [tip, box, x, html]; return; }
+  showTipNow(tip, box, x, html);
+}
+function showTipNow(tip, box, x, html) {
   tip.innerHTML = html;
   tip.style.opacity = 1;
   const tw = tip.offsetWidth;
@@ -1966,7 +1991,7 @@ function drawToday() {
 
   const cross = el("line", { y1: T, y2: H - B, stroke: "var(--ink-3)", "stroke-width": 1, opacity: 0 }, svg);
   const hit = el("rect", { x: L, y: T, width: W - L - R, height: H - T - B, fill: "transparent" }, svg);
-  hit.addEventListener("pointermove", (e) => {
+  const onMove = (e) => {
     const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * (W / r.width);
     const ts = start + ((px - L) / (W - L - R)) * day;
     const s = samples.reduce((best, c) => (Math.abs(c.ts - ts) < Math.abs((best?.ts ?? 1e12) - ts) ? c : best), null);
@@ -1978,8 +2003,10 @@ function drawToday() {
       <div class="row"><i class="sw" style="background:var(--net)"></i>Van net<em>${s && Math.abs(s.ts - ts) < 600 ? nl(Math.max(0, (s.dev_w || 0) - (s.dev_solar_w || 0)) / 1000, 2) + " kW" : "–"}</em></div>
       <div class="row"><i class="sw line"></i>Voorspeld<em>${f ? nl(f.pv_w / 1000, 2) + " kW" : "–"}</em></div>
       <div class="row"><i class="sw line" style="border-color:var(--sun-ink)"></i>Gepland<em>${nl((plan[t.getHours()] || 0) / 1000, 2)} kW</em></div>`);
-  });
-  hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; cross.setAttribute("opacity", 0); });
+  };
+  hit.addEventListener("pointermove", (e) => { if (!TT.touch) onMove(e); });
+  hit.addEventListener("click", (e) => { if (TT.touch) onMove(e); });
+  hit.addEventListener("pointerleave", () => { if (TT.touch) return; tip.style.opacity = 0; cross.setAttribute("opacity", 0); });
 }
 
 function drawMonth() {
@@ -2022,7 +2049,7 @@ function drawMonth() {
         <div class="row"><i class="sw" style="background:var(--net)"></i>Van net<em>${nl(g, 1)} kWh</em></div>
         <div class="row">Bespaard<em>${eur(r.d.eur_saved)}</em></div>`);
     });
-    hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+    hit.addEventListener("pointerleave", () => { if (TT.touch) return; tip.style.opacity = 0; });
   });
   $("monthTable").innerHTML = "<tr><th>Dag</th><th>Uit zon (kWh)</th><th>Van net (kWh)</th><th>Bespaard</th></tr>" +
     rows.filter((r) => r.d.kwh > 0).reverse().map((r) =>
@@ -2184,7 +2211,7 @@ function drawPrices() {
         <div class="row">Teruglevering levert op<em>${eur3(r.feed_in)}</em></div>
         ${r.planned.length ? `<div class="row"><i class="sw" style="background:var(--glow)"></i>Gepland<em>${esc(r.planned.join(", "))}</em></div>` : ""}`);
     });
-    hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+    hit.addEventListener("pointerleave", () => { if (TT.touch) return; tip.style.opacity = 0; });
   });
   $("priceTable").innerHTML = "<tr><th>Uur</th><th>All-in</th><th>Markt</th><th>Teruglevering</th><th>Gepland</th></tr>" + rows.map((r) =>
     `<tr><td>${new Date(r.ts * 1000).toLocaleDateString("nl-NL", { weekday: "short" })} ${hh(r.ts)}</td><td>${eur3(r.all_in)}</td><td>${eur3(r.market)}</td><td>${eur3(r.feed_in)}</td><td>${esc(r.planned.join(", "))}</td></tr>`).join("");
@@ -2235,7 +2262,7 @@ function drawUsage() {
         <div class="row"><i class="sw" style="background:var(--sun)"></i>Teruggeleverd<em>${nl(b.export_kwh, 2)} kWh · ${eur(b.revenue)}</em></div>
         ${b.dev_kwh > 0.01 ? `<div class="row">Waarvan apparaten Zonnestuur<em>${nl(b.dev_kwh, 2)} kWh</em></div>` : ""}`);
     });
-    hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+    hit.addEventListener("pointerleave", () => { if (TT.touch) return; tip.style.opacity = 0; });
   });
   $("useTable").innerHTML = "<tr><th>Periode</th><th>Afgenomen</th><th>Kosten</th><th>Teruggeleverd</th><th>Opbrengst</th></tr>" + bk.map((b) =>
     `<tr><td>${esc(b.label)}</td><td>${nl(b.import_kwh, 2)} kWh</td><td>${eur(b.cost)}</td><td>${nl(b.export_kwh, 2)} kWh</td><td>${eur(b.revenue)}</td></tr>`).join("");
@@ -2300,7 +2327,7 @@ function drawInsight() {
     hit.addEventListener("pointerenter", () => showTip(tip, box, (L + h * slot + slot / 2) * (box.clientWidth / W), `<b>${String(h).padStart(2, "0")}:00–${String(h + 1).padStart(2, "0")}:00</b>
       <div class="row"><i class="sw" style="background:var(--net)"></i>Afgenomen<em>${nl(i, 2)} kWh</em></div>
       <div class="row"><i class="sw" style="background:var(--sun)"></i>Teruggeleverd<em>${nl(e, 2)} kWh</em></div>`));
-    hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+    hit.addEventListener("pointerleave", () => { if (TT.touch) return; tip.style.opacity = 0; });
   }
 }
 async function backfill() {
@@ -2370,7 +2397,7 @@ function drawLearned() {
   const dots = [el("circle", { r: 4, fill: "var(--net)", stroke: "var(--card-solid)", "stroke-width": 2, opacity: 0 }, svg),
                 el("circle", { r: 4, fill: "var(--batt)", stroke: "var(--card-solid)", "stroke-width": 2, opacity: 0 }, svg)];
   const hit = el("rect", { x: L, y: T, width: W - L - R, height: H - T - B, fill: "transparent" }, svg);
-  hit.addEventListener("pointermove", (e) => {
+  const onMove = (e) => {
     const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * (W / r.width);
     const h = Math.max(0, Math.min(23, Math.round(((px - L) / (W - L - R)) * 23)));
     cross.setAttribute("x1", X(h)); cross.setAttribute("x2", X(h)); cross.setAttribute("opacity", 1);
@@ -2378,8 +2405,10 @@ function drawLearned() {
     showTip(tip, box, X(h) * (box.clientWidth / W), `<b>${String(h).padStart(2, "0")}:00–${String(h + 1).padStart(2, "0")}:00</b>
       <div class="row"><i class="sw" style="background:var(--net)"></i>Werkdag<em>${wd[h] != null ? nl(wd[h]) + " W" : "–"}</em></div>
       <div class="row"><i class="sw" style="background:var(--batt)"></i>Weekend<em>${we[h] != null ? nl(we[h]) + " W" : "–"}</em></div>`);
-  });
-  hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; cross.setAttribute("opacity", 0); dots.forEach((d) => d.setAttribute("opacity", 0)); });
+  };
+  hit.addEventListener("pointermove", (e) => { if (!TT.touch) onMove(e); });
+  hit.addEventListener("click", (e) => { if (TT.touch) onMove(e); });
+  hit.addEventListener("pointerleave", () => { if (TT.touch) return; tip.style.opacity = 0; cross.setAttribute("opacity", 0); dots.forEach((d) => d.setAttribute("opacity", 0)); });
 }
 let LEARN_KEY = "";
 
@@ -2449,7 +2478,7 @@ function drawCoach() {
       const hit = el("rect", { x: L + i * slot, y: T, width: slot, height: H - T - B, fill: "transparent" }, svg);
       hit.addEventListener("pointerenter", () => showTip(tip, box, (L + i * slot + slot / 2) * (box.clientWidth / W), `<b>${dt.toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" })}</b>
         <div class="row">Zelf gebruikt<em>${v == null ? "–" : nl(v) + "%"}</em></div><div class="row">Opgewekt<em>${nl(d.pv_kwh, 1)} kWh</em></div><div class="row">Teruggeleverd<em>${nl(d.export_kwh, 1)} kWh</em></div>`));
-      hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+      hit.addEventListener("pointerleave", () => { if (TT.touch) return; tip.style.opacity = 0; });
     });
   }
 }
